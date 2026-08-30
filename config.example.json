@@ -1,0 +1,6 @@
+{
+  "config_version": 17,
+  "port": 8765,
+  "stats_enabled": true,
+  "result_detector_enabled": true
+}

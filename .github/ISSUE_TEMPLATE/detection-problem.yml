@@ -1,0 +1,63 @@
+name: Detection problem / 誤検知・取りこぼし
+about: Report a false count or missed WIN/LOSE/DRAW detection
+labels: ["detection"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。`Create-Diagnostic-Report.bat` で作成した診断ZIPがあると原因特定が大幅に速くなります。
+        診断ZIPには画面全体ではなく、結果判定ROIと判定ログだけが含まれます。
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 問題の種類
+      options:
+        - 誤ってWINが加算された
+        - 誤ってLOSEが加算された
+        - WINを検出しなかった
+        - LOSEを検出しなかった
+        - DRAW判定がおかしい
+        - 二重加算された
+        - その他
+    validations:
+      required: true
+  - type: input
+    id: time
+    attributes:
+      label: 発生時刻
+      description: おおよそで構いません。診断ログとの突合に使います。
+      placeholder: "例: 2026-08-28 21:43頃"
+    validations:
+      required: true
+  - type: textarea
+    id: expected_actual
+    attributes:
+      label: 実際の試合結果とツール表示
+      placeholder: "例: 実際はLOSE。ツールはWIN +1。"
+    validations:
+      required: true
+  - type: dropdown
+    id: display_mode
+    attributes:
+      label: AC6表示モード
+      options:
+        - フルスクリーン
+        - ボーダーレス
+        - ウィンドウ
+        - 不明
+  - type: input
+    id: resolution
+    attributes:
+      label: 解像度
+      placeholder: "例: 1920x1080"
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: 診断ZIP
+      description: `AC6-Tracker-Diagnostics-*.zip` をここへドラッグ＆ドロップしてください。
+      placeholder: "ZIPを添付"
+  - type: textarea
+    id: notes
+    attributes:
+      label: その他
+      description: 直前にメニューを開いた、Alt+Tabした、特殊な演出だった等があれば記載してください。

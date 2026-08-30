@@ -1,0 +1,11 @@
+.control_token
+__pycache__/
+*.pyc
+stats.json.tmp
+stats.json.bak.tmp
+stats.json
+stats.json.bak
+config.json
+.runtime.json
+.runtime.json.tmp
+debug_result_*.png

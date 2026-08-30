@@ -1,0 +1,12 @@
+{
+  "template_training": {
+    "final_win": ["IMG_6340", "IMG_6341"],
+    "final_loss": ["IMG_6345"],
+    "phase_win": ["IMG_6343"],
+    "phase_loss": ["IMG_6344"]
+  },
+  "holdout": {
+    "final_win": ["IMG_6342"],
+    "final_loss": ["IMG_6347"]
+  }
+}
