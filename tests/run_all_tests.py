@@ -13,6 +13,7 @@ files=[
     "test_config.py",
     "test_overlay_static.py",
     "test_server_static.py",
+    "test_msix_packaging_static.py",
 ]
 for name in files:
     print("="*70)

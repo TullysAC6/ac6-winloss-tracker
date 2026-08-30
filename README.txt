@@ -14,6 +14,24 @@ YouTubeコメント機能は含みません。
 データ保存先:
   %LOCALAPPDATA%\AC6WinLossTracker\
 
+【Microsoft Store版（準備中）】
+正式公開後は、署名・更新がMicrosoft Store経由で提供されるStore版を推奨予定です。
+GitHub Actionsが生成するMSIX ArtifactはPartner Center提出用の未署名パッケージであり、
+現時点では一般ユーザーによる直接インストール（サイドロード）向けではありません。
+正式なコード署名はMicrosoft Store側で行われます。
+
+Smart App Controlが有効な環境では、GitHub Releasesの未署名EXEや未署名MSIXが
+ブロックされる可能性があります。現在の一般ユーザー向け配布物はRelease ZIPです。
+
+設定・戦績・診断データはMSIXやアプリのインストール先には保存せず、従来どおり
+  %LOCALAPPDATA%\AC6WinLossTracker\
+に保存します。アプリ本体の更新や再パッケージ化とは分離されているため、
+アップデートで既存の設定や戦績を消さない設計です。
+この従来パスをMSIX版でも共有・維持するため、ManifestではAppData書き込み仮想化を無効化し、
+制限付き能力 unvirtualizedResources を宣言しています。Partner Center提出時には、この用途を
+「既存ZIP版の設定・戦績を引き継ぎ、更新やアンインストールからユーザーデータを分離するため」
+として申告してください。
+
 OBSブラウザソース:
   http://127.0.0.1:8765/
 
@@ -61,7 +79,13 @@ Windows EXEをローカルビルド:
   build_release.bat
 
 GitHubではタグ v* をpushすると .github/workflows/build-release.yml がWindows runnerでEXEを生成し、
-AC6-WinLoss-Tracker-Windows.zip をReleaseへ添付します。
+AC6-WinLoss-Tracker-Windows.zip と未署名のStore提出用MSIXをReleaseへ添付します。
+workflow_dispatchからの手動実行でも、ZIPとMSIXをActions Artifactとして取得できます。
+
+MSIXの仮アイコン:
+  store/Assets/
+にある画像はビルド検証用です。Microsoft Storeへ正式提出する前に、ブランドの正式アイコンへ
+必ず差し替えてください。
 
 主要データ:
   %LOCALAPPDATA%\AC6WinLossTracker\config.json
