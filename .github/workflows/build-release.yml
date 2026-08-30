@@ -65,8 +65,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $staging = Join-Path $PWD 'msix'
           New-Item -ItemType Directory -Force (Join-Path $staging 'Assets') | Out-Null
-          Copy-Item dist/AC6-WinLoss-Tracker.exe $staging/
-          Copy-Item store/Assets/*.png (Join-Path $staging 'Assets')/
+          Copy-Item -Path dist/AC6-WinLoss-Tracker.exe -Destination $staging
+          Copy-Item -Path store/Assets/*.png -Destination (Join-Path $staging 'Assets')
 
           $manifest = (Get-Content store/AppxManifest.template.xml -Raw).Replace('__MSIX_VERSION__', $env:MSIX_VERSION)
           $manifestPath = Join-Path $staging 'AppxManifest.xml'
