@@ -27,6 +27,61 @@ jobs:
           --add-data "overlay.html;."
           --add-data "detector_templates.json;."
           app.py
+      - name: Sign EXE with ephemeral test certificate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $subject = 'CN=AC6 WinLoss Tracker Test'
+          $exePath = Join-Path $PWD 'dist\AC6-WinLoss-Tracker.exe'
+          if (-not (Test-Path $exePath)) { throw "EXE not found: $exePath" }
+
+          $certificate = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject $subject `
+            -CertStoreLocation 'Cert:\CurrentUser\My' `
+            -KeyAlgorithm RSA `
+            -KeyLength 2048 `
+            -HashAlgorithm SHA256 `
+            -KeyExportPolicy NonExportable `
+            -KeyUsage DigitalSignature `
+            -NotAfter (Get-Date).AddDays(1)
+
+          try {
+            $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($certificate)
+            try {
+              if ($rsa.KeySize -ne 2048) { throw "Unexpected certificate key size: $($rsa.KeySize)" }
+            } finally {
+              if ($rsa) { $rsa.Dispose() }
+            }
+
+            $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
+            $signTool = Get-ChildItem $sdkRoot -Filter SignTool.exe -File -Recurse |
+              Where-Object { $_.FullName -match '\\x64\\SignTool\.exe$' } |
+              Sort-Object FullName -Descending |
+              Select-Object -First 1
+            if (-not $signTool) {
+              $fallback = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\App Certification Kit\SignTool.exe'
+              if (Test-Path $fallback) { $signTool = Get-Item $fallback }
+            }
+            if (-not $signTool) { throw 'SignTool.exe was not found in the installed Windows SDK.' }
+            Write-Host "Using SignTool: $($signTool.FullName)"
+
+            & $signTool.FullName sign /v /fd SHA256 /sha1 $certificate.Thumbprint /s My $exePath
+            if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE" }
+
+            $signature = Get-AuthenticodeSignature -FilePath $exePath
+            if ($signature.SignatureType -ne 'Authenticode') { throw "Unexpected signature type: $($signature.SignatureType)" }
+            if (-not $signature.SignerCertificate) { throw 'Get-AuthenticodeSignature returned no signer certificate.' }
+            if ($signature.SignerCertificate.Thumbprint -ne $certificate.Thumbprint) { throw 'Signer certificate thumbprint mismatch.' }
+            if ($signature.SignerCertificate.Subject -ne $subject) { throw "Unexpected signer subject: $($signature.SignerCertificate.Subject)" }
+            if ($signature.SignerCertificate.SignatureAlgorithm.Value -ne '1.2.840.113549.1.1.11') {
+              throw "Unexpected certificate signature algorithm: $($signature.SignerCertificate.SignatureAlgorithm.FriendlyName)"
+            }
+            $signature | Format-List Status, StatusMessage, SignatureType, Path, SignerCertificate
+            Write-Host 'Authenticode signature, subject, RSA key size, and SHA256 certificate signature verified.'
+          } finally {
+            Remove-Item -Path "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
+          }
       - name: Prepare release folder
         shell: pwsh
         run: |
