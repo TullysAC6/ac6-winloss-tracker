@@ -210,6 +210,46 @@ function Get-PythonCandidatePaths {
     return $candidates
 }
 
+function Invoke-PythonVerification {
+    param([Parameter(Mandatory = $true)][string]$PythonPath)
+
+    $verificationId = [Guid]::NewGuid().ToString('N')
+    $stdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) "AC6PythonVerification-$verificationId.stdout"
+    $stderrPath = Join-Path ([System.IO.Path]::GetTempPath()) "AC6PythonVerification-$verificationId.stderr"
+    $stdout = ''
+    $stderr = ''
+    $verificationExitCode = -1
+
+    try {
+        # Keep the Python snippet free of nested quotes and JSON escaping.
+        $verificationCode = 'import sys; print(sys.version_info.major); print(sys.version_info.minor); print(sys.version_info.micro); print(sys.executable)'
+        & $PythonPath -c $verificationCode 1> $stdoutPath 2> $stderrPath
+        $verificationExitCode = $LASTEXITCODE
+
+        if (Test-Path -LiteralPath $stdoutPath -PathType Leaf) {
+            $stdout = [string](Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction Stop)
+        }
+        if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
+            $stderr = [string](Get-Content -LiteralPath $stderrPath -Raw -ErrorAction Stop)
+        }
+    } catch {
+        $stderr = @($stderr, $_.Exception.ToString()) -join [Environment]::NewLine
+    } finally {
+        Write-InstallLog "Python verification candidate path: $PythonPath"
+        Write-InstallLog "Python verification exit code: $verificationExitCode"
+        Write-InstallLog "Python verification stdout:`n$stdout"
+        Write-InstallLog "Python verification stderr:`n$stderr"
+        Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+
+    return [PSCustomObject]@{
+        ExitCode = $verificationExitCode
+        Stdout = $stdout
+        Stderr = $stderr
+    }
+}
+
 function Find-SupportedPython {
     $seen = @{}
     try {
@@ -251,21 +291,40 @@ function Find-SupportedPython {
         }
 
         try {
-            $versionOutput = @(& $signedPython.Path -c 'import json,sys; print(json.dumps({"major":sys.version_info.major,"minor":sys.version_info.minor,"micro":sys.version_info.micro,"executable":sys.executable}))' 2>$null)
-            if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) {
-                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("version check failed with exit code $LASTEXITCODE")
-                continue
-            }
-            $versionInfo = $versionOutput[-1] | ConvertFrom-Json
-            if ([int]$versionInfo.major -lt 3 -or ([int]$versionInfo.major -eq 3 -and [int]$versionInfo.minor -lt 10)) {
-                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("Python version is below 3.10: {0}.{1}.{2}" -f $versionInfo.major, $versionInfo.minor, $versionInfo.micro)
+            $verification = Invoke-PythonVerification -PythonPath $signedPython.Path
+            if ($verification.ExitCode -ne 0) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("version check failed with exit code {0}; see Python verification log" -f $verification.ExitCode)
                 continue
             }
 
-            $actualPython = (Resolve-Path -LiteralPath ([string]$versionInfo.executable)).Path
+            $versionLines = @($verification.Stdout -split '\r?\n' | Where-Object { $_ -ne '' })
+            if ($versionLines.Count -ne 4) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("version check returned {0} lines instead of 4; see Python verification log" -f $versionLines.Count)
+                continue
+            }
+
+            $major = 0
+            $minor = 0
+            $micro = 0
+            if (-not [int]::TryParse($versionLines[0].Trim(), [ref]$major) -or
+                -not [int]::TryParse($versionLines[1].Trim(), [ref]$minor) -or
+                -not [int]::TryParse($versionLines[2].Trim(), [ref]$micro)) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason 'version check returned invalid numeric fields; see Python verification log'
+                continue
+            }
+            if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 10)) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("Python version is below 3.10: {0}.{1}.{2}" -f $major, $minor, $micro)
+                continue
+            }
+
+            $actualPython = (Resolve-Path -LiteralPath $versionLines[3].Trim()).Path
             if ($actualPython -ne $signedPython.Path) {
                 $signedPython = Get-SignedExecutableInfo -Path $actualPython
                 if (-not $signedPython) {
+                    continue
+                }
+                if ($signedPython.Signature.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+                    Write-CandidateSkipped -Kind 'Python' -Path $actualPython -Reason ("unexpected signer: {0}" -f $signedPython.Signature.SignerCertificate.Subject)
                     continue
                 }
             }
@@ -275,7 +334,7 @@ function Find-SupportedPython {
             if (-not $signedPythonw) {
                 continue
             }
-            if ($signedPythonw.Signature.SignerCertificate.Subject -ne $signedPython.Signature.SignerCertificate.Subject) {
+            if ($signedPythonw.Signature.SignerCertificate.Thumbprint -ne $signedPython.Signature.SignerCertificate.Thumbprint) {
                 Write-CandidateSkipped -Kind 'Python' -Path $pythonwPath -Reason 'pythonw.exe signer does not match python.exe'
                 continue
             }
@@ -283,7 +342,7 @@ function Find-SupportedPython {
             return [PSCustomObject]@{
                 PythonPath = $signedPython.Path
                 PythonwPath = $signedPythonw.Path
-                Version = '{0}.{1}.{2}' -f $versionInfo.major, $versionInfo.minor, $versionInfo.micro
+                Version = '{0}.{1}.{2}' -f $major, $minor, $micro
                 SignatureStatus = [string]$signedPython.Signature.Status
                 SignerSubject = [string]$signedPython.Signature.SignerCertificate.Subject
             }
@@ -475,11 +534,11 @@ try {
     }
 
     Write-Host "Python $($python.Version): $($python.PythonPath)"
-    Write-InstallLog "Python version: $($python.Version)"
-    Write-InstallLog "python.exe path: $($python.PythonPath)"
-    Write-InstallLog "pythonw.exe path: $($python.PythonwPath)"
-    Write-InstallLog "Python Authenticode Status: $($python.SignatureStatus)"
-    Write-InstallLog "Python signer Subject: $($python.SignerSubject)"
+    Write-InstallLog "selected Python version: $($python.Version)"
+    Write-InstallLog "selected Python path: $($python.PythonPath)"
+    Write-InstallLog "selected Pythonw path: $($python.PythonwPath)"
+    Write-InstallLog "selected Python Authenticode Status: $($python.SignatureStatus)"
+    Write-InstallLog "selected Python signer: $($python.SignerSubject)"
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('AC6WinLossTrackerSource-' + [Guid]::NewGuid().ToString('N'))
     $zipPath = Join-Path $tempRoot 'source.zip'
