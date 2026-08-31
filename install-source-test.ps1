@@ -54,6 +54,95 @@ function Test-IsAppExecutionAlias {
     return $Path -match '(?i)\\Microsoft\\WindowsApps\\'
 }
 
+function ConvertTo-NativeArgument {
+    param([AllowEmptyString()][string]$Argument)
+
+    if ($null -eq $Argument -or $Argument.Length -eq 0) {
+        return '""'
+    }
+    if ($Argument -notmatch '[\s"]') {
+        return $Argument
+    }
+
+    # Apply the CommandLineToArgvW quoting rules used by Windows native programs.
+    $quoted = New-Object System.Text.StringBuilder
+    [void]$quoted.Append('"')
+    $backslashCount = 0
+    foreach ($character in $Argument.ToCharArray()) {
+        if ($character -eq '\') {
+            $backslashCount++
+            continue
+        }
+        if ($character -eq '"') {
+            [void]$quoted.Append(('\' * (($backslashCount * 2) + 1)))
+            [void]$quoted.Append('"')
+        } else {
+            if ($backslashCount -gt 0) {
+                [void]$quoted.Append(('\' * $backslashCount))
+            }
+            [void]$quoted.Append($character)
+        }
+        $backslashCount = 0
+    }
+    if ($backslashCount -gt 0) {
+        [void]$quoted.Append(('\' * ($backslashCount * 2)))
+    }
+    [void]$quoted.Append('"')
+    return $quoted.ToString()
+}
+
+function Invoke-NativeCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @()
+    )
+
+    $nativeArguments = @($ArgumentList | ForEach-Object { ConvertTo-NativeArgument -Argument ([string]$_) })
+    $argumentString = $nativeArguments -join ' '
+    $displayCommand = @((ConvertTo-NativeArgument -Argument $FilePath)) + $nativeArguments -join ' '
+    $process = $null
+    $stdout = ''
+    $stderr = ''
+    $nativeExitCode = -1
+
+    try {
+        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $FilePath
+        $startInfo.Arguments = $argumentString
+        $startInfo.UseShellExecute = $false
+        $startInfo.CreateNoWindow = $true
+        $startInfo.RedirectStandardOutput = $true
+        $startInfo.RedirectStandardError = $true
+
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $startInfo
+        if (-not $process.Start()) {
+            throw 'native process did not start'
+        }
+
+        # Read both streams asynchronously so neither pipe can block the process.
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        $nativeExitCode = $process.ExitCode
+    } catch {
+        $stderr = @($stderr, $_.Exception.ToString()) -join [Environment]::NewLine
+    } finally {
+        if ($process) {
+            $process.Dispose()
+        }
+    }
+
+    return [PSCustomObject]@{
+        Command = $displayCommand
+        ExitCode = $nativeExitCode
+        StdOut = [string]$stdout
+        StdErr = [string]$stderr
+    }
+}
+
 function Get-SignedExecutableInfo {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -165,9 +254,9 @@ function Get-PythonCandidatePaths {
         }
         if ($pyInfo) {
             try {
-                $registered = @(& $pyInfo.Path -0p 2>$null)
-                if ($LASTEXITCODE -eq 0) {
-                    foreach ($line in $registered) {
+                $launcherResult = Invoke-NativeCommand -FilePath $pyInfo.Path -ArgumentList @('-0p')
+                if ($launcherResult.ExitCode -eq 0) {
+                    foreach ($line in @($launcherResult.StdOut -split '\r?\n')) {
                         if ([string]$line -match '([A-Za-z]:\\.+\\python(?:\d+(?:\.\d+)?)?\.exe)\s*$') {
                             try {
                                 Add-PythonCandidate -List $candidates -Path $Matches[1]
@@ -177,7 +266,7 @@ function Get-PythonCandidatePaths {
                         }
                     }
                 } else {
-                    Write-CandidateSkipped -Kind 'Python launcher' -Path $pyInfo.Path -Reason ("py.exe -0p failed with exit code $LASTEXITCODE")
+                    Write-CandidateSkipped -Kind 'Python launcher' -Path $pyInfo.Path -Reason ("py.exe -0p failed with exit code {0}: {1}" -f $launcherResult.ExitCode, $launcherResult.StdErr.Trim())
                 }
             } catch {
                 Write-CandidateSkipped -Kind 'Python launcher' -Path $pyInfo.Path -Reason ("py.exe -0p failed: {0}" -f $_.Exception.Message)
@@ -213,41 +302,14 @@ function Get-PythonCandidatePaths {
 function Invoke-PythonVerification {
     param([Parameter(Mandatory = $true)][string]$PythonPath)
 
-    $verificationId = [Guid]::NewGuid().ToString('N')
-    $stdoutPath = Join-Path ([System.IO.Path]::GetTempPath()) "AC6PythonVerification-$verificationId.stdout"
-    $stderrPath = Join-Path ([System.IO.Path]::GetTempPath()) "AC6PythonVerification-$verificationId.stderr"
-    $stdout = ''
-    $stderr = ''
-    $verificationExitCode = -1
-
-    try {
-        # Keep the Python snippet free of nested quotes and JSON escaping.
-        $verificationCode = 'import sys; print(sys.version_info.major); print(sys.version_info.minor); print(sys.version_info.micro); print(sys.executable)'
-        & $PythonPath -c $verificationCode 1> $stdoutPath 2> $stderrPath
-        $verificationExitCode = $LASTEXITCODE
-
-        if (Test-Path -LiteralPath $stdoutPath -PathType Leaf) {
-            $stdout = [string](Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction Stop)
-        }
-        if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
-            $stderr = [string](Get-Content -LiteralPath $stderrPath -Raw -ErrorAction Stop)
-        }
-    } catch {
-        $stderr = @($stderr, $_.Exception.ToString()) -join [Environment]::NewLine
-    } finally {
-        Write-InstallLog "Python verification candidate path: $PythonPath"
-        Write-InstallLog "Python verification exit code: $verificationExitCode"
-        Write-InstallLog "Python verification stdout:`n$stdout"
-        Write-InstallLog "Python verification stderr:`n$stderr"
-        Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
-    }
-
-    return [PSCustomObject]@{
-        ExitCode = $verificationExitCode
-        Stdout = $stdout
-        Stderr = $stderr
-    }
+    # Keep the Python snippet free of nested quotes and JSON escaping.
+    $verificationCode = 'import sys; print(sys.version_info.major); print(sys.version_info.minor); print(sys.version_info.micro); print(sys.executable)'
+    $result = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $verificationCode)
+    Write-InstallLog "Python verification candidate path: $PythonPath"
+    Write-InstallLog "Python verification exit code: $($result.ExitCode)"
+    Write-InstallLog "Python verification stdout:`n$($result.StdOut)"
+    Write-InstallLog "Python verification stderr:`n$($result.StdErr)"
+    return $result
 }
 
 function Find-SupportedPython {
@@ -402,13 +464,19 @@ function Install-PythonWithWinget {
     }
 
     Write-Step 'Python 3.12を現在のユーザー用に自動インストールしています。'
-    $wingetOutput = @(& $signedWinget.Path install --exact --id Python.Python.3.12 --scope user --silent --accept-package-agreements --accept-source-agreements 2>&1)
-    $wingetExitCode = $LASTEXITCODE
-    if ($wingetOutput.Count -gt 0) {
-        Write-Host ($wingetOutput -join [Environment]::NewLine)
+    $wingetResult = Invoke-NativeCommand -FilePath $signedWinget.Path -ArgumentList @(
+        'install', '--exact', '--id', 'Python.Python.3.12', '--scope', 'user', '--silent',
+        '--accept-package-agreements', '--accept-source-agreements'
+    )
+    Write-InstallLog "winget command: $($wingetResult.Command)"
+    Write-InstallLog "winget exit code: $($wingetResult.ExitCode)"
+    Write-InstallLog "winget stdout:`n$($wingetResult.StdOut)"
+    Write-InstallLog "winget stderr:`n$($wingetResult.StdErr)"
+    if (-not [string]::IsNullOrWhiteSpace($wingetResult.StdOut)) {
+        Write-Host $wingetResult.StdOut
     }
-    if ($wingetExitCode -ne 0) {
-        throw "Pythonの自動インストールに失敗しました（winget終了コード: $wingetExitCode）。インターネット接続を確認してください。"
+    if ($wingetResult.ExitCode -ne 0) {
+        throw "Pythonの自動インストールに失敗しました（winget終了コード: $($wingetResult.ExitCode)）。インターネット接続を確認してください。"
     }
 }
 
@@ -419,30 +487,53 @@ function Invoke-PipInstall {
     )
 
     Write-Step 'Python依存ライブラリを確認しています。'
-    $pipCheck = @(& $PythonPath -m pip --version 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    $pipCheck = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-m', 'pip', '--version')
+    Write-InstallLog "pip version command: $($pipCheck.Command)"
+    Write-InstallLog "pip version exit code: $($pipCheck.ExitCode)"
+    Write-InstallLog "pip version stdout:`n$($pipCheck.StdOut)"
+    Write-InstallLog "pip version stderr:`n$($pipCheck.StdErr)"
+    if ($pipCheck.ExitCode -ne 0) {
         Write-Host 'pipが見つからないため、Python標準のensurepipを実行します。'
-        $ensureOutput = @(& $PythonPath -m ensurepip --upgrade 2>&1)
-        $ensureExitCode = $LASTEXITCODE
-        if ($ensureOutput.Count -gt 0) {
-            Write-Host ($ensureOutput -join [Environment]::NewLine)
+        $ensureResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-m', 'ensurepip', '--upgrade')
+        Write-InstallLog "ensurepip command: $($ensureResult.Command)"
+        Write-InstallLog "ensurepip exit code: $($ensureResult.ExitCode)"
+        Write-InstallLog "ensurepip stdout:`n$($ensureResult.StdOut)"
+        Write-InstallLog "ensurepip stderr:`n$($ensureResult.StdErr)"
+        if (-not [string]::IsNullOrWhiteSpace($ensureResult.StdOut)) {
+            Write-Host $ensureResult.StdOut
         }
-        if ($ensureExitCode -ne 0) {
-            Write-InstallLog "pip install result: failed (ensurepip exit code $ensureExitCode)"
+        if ($ensureResult.ExitCode -ne 0) {
+            Write-InstallLog "pip install result: failed (ensurepip exit code $($ensureResult.ExitCode))"
             throw 'pipの準備に失敗しました。Pythonを再インストールしてから、もう一度お試しください。'
         }
     }
 
-    $pipOutput = @(& $PythonPath -m pip install --user -r $RequirementsPath 2>&1)
-    $pipExitCode = $LASTEXITCODE
-    if ($pipOutput.Count -gt 0) {
-        Write-Host ($pipOutput -join [Environment]::NewLine)
+    $pipResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @(
+        '-m', 'pip', 'install', '--user', '--no-warn-script-location', '-r', $RequirementsPath
+    )
+    Write-InstallLog "pip command: $($pipResult.Command)"
+    Write-InstallLog "pip exit code: $($pipResult.ExitCode)"
+    Write-InstallLog "pip stdout:`n$($pipResult.StdOut)"
+    Write-InstallLog "pip stderr:`n$($pipResult.StdErr)"
+    if (-not [string]::IsNullOrWhiteSpace($pipResult.StdOut)) {
+        Write-Host $pipResult.StdOut
     }
-    if ($pipExitCode -ne 0) {
-        Write-InstallLog "pip install result: failed (exit code $pipExitCode)"
+    if ($pipResult.ExitCode -ne 0) {
+        Write-InstallLog "pip install result: failed (exit code $($pipResult.ExitCode))"
         throw '必要なPythonライブラリのインストールに失敗しました。インターネット接続を確認してください。'
     }
     Write-InstallLog 'pip install result: success'
+
+    $dependencyCode = 'import mss; print(mss.__version__)'
+    $dependencyResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $dependencyCode)
+    Write-InstallLog "dependency verification command: $($dependencyResult.Command)"
+    Write-InstallLog "dependency verification exit code: $($dependencyResult.ExitCode)"
+    Write-InstallLog "dependency verification stdout:`n$($dependencyResult.StdOut)"
+    Write-InstallLog "dependency verification stderr:`n$($dependencyResult.StdErr)"
+    if ($dependencyResult.ExitCode -ne 0) {
+        throw 'インストールしたPythonライブラリを読み込めませんでした。source-install.logを添えて報告してください。'
+    }
+    Write-InstallLog "dependency verification result: success (mss $($dependencyResult.StdOut.Trim()))"
 }
 
 function Install-SourceTree {
