@@ -109,3 +109,13 @@ assert "New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcher
 assert "Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments" in installer
 assert "Wait-AppRuntimeReady -TimeoutSeconds 15" in installer
 print("launcher shortcut and installer readiness checks: OK")
+
+assert "Get-CimInstance Win32_Process" in installer
+assert "Get-NetTCPConnection -LocalPort $RuntimePort -State Listen" in installer
+assert "Test-TrackerCommandLine" in installer
+assert "(?i)^pythonw?\\.exe$" in installer
+assert "[Regex]::Escape($installPath)" in installer
+assert "(app\\.py|launcher\\.pyw)" in installer
+assert "Stop-Process -Id $processId" in installer
+assert installer.index("Stop-RunningTracker") < installer.index("Install-SourceTree -SourcePath")
+print("installer Tracker-only fallback safety checks: OK")

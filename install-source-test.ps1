@@ -536,6 +536,171 @@ function Invoke-PipInstall {
     Write-InstallLog "dependency verification result: success (mss $($dependencyResult.StdOut.Trim()))"
 }
 
+function Get-TrackerRuntime {
+    $runtimePath = Join-Path $dataPath '.runtime.json'
+    try {
+        if (-not (Test-Path -LiteralPath $runtimePath -PathType Leaf)) {
+            return $null
+        }
+        $runtime = Get-Content -LiteralPath $runtimePath -Raw -ErrorAction Stop | ConvertFrom-Json
+        $runtimePid = [int]$runtime.pid
+        $runtimePort = [int]$runtime.port
+        $runtimeToken = [string]$runtime.token
+        if ($runtimePid -le 0 -or $runtimePort -lt 1 -or $runtimePort -gt 65535) {
+            throw 'runtime PID or port is invalid'
+        }
+        return [PSCustomObject]@{
+            Path = $runtimePath
+            Pid = $runtimePid
+            Port = $runtimePort
+            Token = $runtimeToken
+        }
+    } catch {
+        Write-InstallLog "runtime inspection failed: $($_.Exception.Message)"
+        return $null
+    }
+}
+
+function Test-TrackerCommandLine {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [AllowEmptyString()][string]$CommandLine
+    )
+
+    if ($Name -notmatch '(?i)^pythonw?\.exe$') {
+        return $false
+    }
+    if ([string]::IsNullOrWhiteSpace($CommandLine)) {
+        return $false
+    }
+    $trackerEntryPattern = '(?i){0}[\\/](app\.py|launcher\.pyw)(?="|\s|$)' -f [Regex]::Escape($installPath)
+    return $CommandLine -match $trackerEntryPattern
+}
+
+function Get-TrackerProcesses {
+    param([int]$RuntimePort = 0)
+
+    $found = @{}
+    try {
+        $pythonProcesses = @(Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction Stop)
+        foreach ($processInfo in $pythonProcesses) {
+            if (Test-TrackerCommandLine -Name ([string]$processInfo.Name) -CommandLine ([string]$processInfo.CommandLine)) {
+                $found[[int]$processInfo.ProcessId] = $processInfo
+            }
+        }
+    } catch {
+        Write-InstallLog "Tracker process enumeration failed: $($_.Exception.Message)"
+    }
+
+    # A port alone is never trusted. Its owner must pass the same executable
+    # name and Tracker command-line checks before it can become a stop target.
+    if ($RuntimePort -ge 1 -and $RuntimePort -le 65535) {
+        try {
+            $listeners = @(Get-NetTCPConnection -LocalPort $RuntimePort -State Listen -ErrorAction Stop)
+            foreach ($listener in $listeners) {
+                $ownerPid = [int]$listener.OwningProcess
+                if ($ownerPid -le 0) {
+                    continue
+                }
+                $owner = Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $ownerPid) -ErrorAction Stop
+                if ($owner -and (Test-TrackerCommandLine -Name ([string]$owner.Name) -CommandLine ([string]$owner.CommandLine))) {
+                    $found[$ownerPid] = $owner
+                    Write-InstallLog "verified Tracker listener PID: $ownerPid (port $RuntimePort)"
+                }
+            }
+        } catch {
+            Write-InstallLog "Tracker listener inspection unavailable: $($_.Exception.Message)"
+        }
+    }
+
+    return @($found.Values)
+}
+
+function Test-TrackerHttp {
+    param([int]$Port)
+
+    if ($Port -lt 1 -or $Port -gt 65535) {
+        return $false
+    }
+    try {
+        $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/stats" -f $Port) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        return [int]$response.StatusCode -eq 200
+    } catch {
+        return $false
+    }
+}
+
+function Wait-TrackerStopped {
+    param(
+        [int]$RuntimePort = 0,
+        [int]$TimeoutSeconds = 10
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $trackerProcesses = @(Get-TrackerProcesses -RuntimePort $RuntimePort)
+        if ($trackerProcesses.Count -eq 0 -and -not (Test-TrackerHttp -Port $RuntimePort)) {
+            return $true
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    return $false
+}
+
+function Stop-RunningTracker {
+    $runtimePath = Join-Path $dataPath '.runtime.json'
+    $runtime = Get-TrackerRuntime
+    $runtimePort = if ($runtime) { [int]$runtime.Port } else { 0 }
+    $trackerProcesses = @(Get-TrackerProcesses -RuntimePort $runtimePort)
+    $httpAlive = Test-TrackerHttp -Port $runtimePort
+
+    if ($trackerProcesses.Count -eq 0 -and -not $httpAlive) {
+        if (Test-Path -LiteralPath $runtimePath -PathType Leaf) {
+            Remove-Item -LiteralPath $runtimePath -Force -ErrorAction SilentlyContinue
+            Write-InstallLog "removed stale runtime file: $runtimePath"
+        }
+        return
+    }
+
+    Write-Step '更新のため実行中のアプリを終了しています。'
+    $gracefulRequested = $false
+    if ($runtime -and $httpAlive -and -not [string]::IsNullOrWhiteSpace($runtime.Token)) {
+        try {
+            $headers = @{ 'X-Control-Token' = [string]$runtime.Token }
+            $shutdownResponse = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/api/system/shutdown" -f $runtime.Port) -Method Post -Headers $headers -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
+            if ([int]$shutdownResponse.StatusCode -eq 200) {
+                $gracefulRequested = $true
+                Write-InstallLog "graceful shutdown requested for runtime PID $($runtime.Pid) on port $($runtime.Port)"
+            }
+        } catch {
+            Write-InstallLog "graceful shutdown unavailable: $($_.Exception.Message)"
+        }
+    }
+
+    if ($gracefulRequested -and (Wait-TrackerStopped -RuntimePort $runtimePort -TimeoutSeconds 10)) {
+        Remove-Item -LiteralPath $runtimePath -Force -ErrorAction SilentlyContinue
+        Write-InstallLog 'Tracker graceful shutdown completed'
+        return
+    }
+
+    $trackerProcesses = @(Get-TrackerProcesses -RuntimePort $runtimePort)
+    foreach ($processInfo in $trackerProcesses) {
+        $processId = [int]$processInfo.ProcessId
+        Write-InstallLog "fallback stopping Tracker PID ${processId}: $($processInfo.CommandLine)"
+        try {
+            Stop-Process -Id $processId -Force -ErrorAction Stop
+        } catch {
+            Write-InstallLog "fallback stop failed for Tracker PID ${processId}: $($_.Exception.Message)"
+        }
+    }
+
+    if (-not (Wait-TrackerStopped -RuntimePort $runtimePort -TimeoutSeconds 10)) {
+        throw 'AC6 WinLoss Trackerを終了できませんでした。数秒待ってからもう一度実行してください。'
+    }
+    Remove-Item -LiteralPath $runtimePath -Force -ErrorAction SilentlyContinue
+    Write-InstallLog 'Tracker fallback shutdown completed'
+}
+
 function Install-SourceTree {
     param([Parameter(Mandatory = $true)][string]$SourcePath)
 
@@ -698,6 +863,11 @@ try {
 
     Set-InstallStage -Name 'pip-install'
     Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.txt')
+
+    if (Test-Path -LiteralPath $installPath -PathType Container) {
+        Set-InstallStage -Name 'stop-running-app'
+        Stop-RunningTracker
+    }
 
     Set-InstallStage -Name 'source-install'
     Write-Step 'アプリのソースをユーザー領域へインストールしています。'

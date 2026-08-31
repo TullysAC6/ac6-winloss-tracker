@@ -406,6 +406,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
+            if path == "/api/system/shutdown":
+                self.json_response({"ok": True, "status": "shutting_down"})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+                return
             if path == "/api/stats/undo":
                 s, removed = undo_result()
                 self.json_response({

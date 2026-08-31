@@ -13,6 +13,9 @@ assert '"前兆中"' not in s
 
 assert 'RUNTIME_PATH = DATA_ROOT / ".runtime.json"' in s
 assert 'write_runtime_file(server.server_address[1])' in s
+assert 'if path == "/api/system/shutdown":' in s
+assert 'threading.Thread(target=self.server.shutdown, daemon=True).start()' in s
+assert 'self.headers.get("X-Control-Token", "") != CONTROL_TOKEN' in s
 assert 'publish_stats_active(s)' in s
 print("runtime control + stats health restore: OK")
 
