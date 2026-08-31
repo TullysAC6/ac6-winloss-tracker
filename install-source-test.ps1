@@ -14,6 +14,7 @@ $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
 $installParent = Split-Path -Parent $installPath
 $tempRoot = $null
 $exitCode = 0
+$script:currentStage = 'startup'
 
 function Write-InstallLog {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -27,6 +28,27 @@ function Write-Step {
     Write-InstallLog $Message
 }
 
+function Set-InstallStage {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    $script:currentStage = $Name
+    Write-InstallLog "stage: $Name"
+}
+
+function Write-CandidateSkipped {
+    param(
+        [Parameter(Mandatory = $true)][string]$Kind,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Reason
+    )
+
+    try {
+        Write-InstallLog "$Kind candidate skipped: $Path"
+        Write-InstallLog "reason: $Reason"
+    } catch {
+        # A diagnostic write must never stop candidate discovery.
+    }
+}
+
 function Test-IsAppExecutionAlias {
     param([Parameter(Mandatory = $true)][string]$Path)
     return $Path -match '(?i)\\Microsoft\\WindowsApps\\'
@@ -38,17 +60,45 @@ function Get-SignedExecutableInfo {
         [switch]$AllowWindowsApps
     )
 
-    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+    $kind = if ($AllowWindowsApps) { 'Executable' } else { 'Python' }
+
+    # Reject Python App Execution Alias paths before touching the file.
+    if (-not $AllowWindowsApps -and (Test-IsAppExecutionAlias -Path $Path)) {
+        Write-CandidateSkipped -Kind $kind -Path $Path -Reason 'WindowsApps App Execution Alias'
         return $null
     }
 
-    $resolvedPath = (Resolve-Path -LiteralPath $Path).Path
+    try {
+        if (-not (Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction Stop)) {
+            Write-CandidateSkipped -Kind $kind -Path $Path -Reason 'file not found'
+            return $null
+        }
+    } catch {
+        Write-CandidateSkipped -Kind $kind -Path $Path -Reason ("Test-Path failed: {0}" -f $_.Exception.Message)
+        return $null
+    }
+
+    try {
+        $resolvedPath = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path
+    } catch {
+        Write-CandidateSkipped -Kind $kind -Path $Path -Reason ("Resolve-Path failed: {0}" -f $_.Exception.Message)
+        return $null
+    }
+
     if (-not $AllowWindowsApps -and (Test-IsAppExecutionAlias -Path $resolvedPath)) {
+        Write-CandidateSkipped -Kind $kind -Path $resolvedPath -Reason 'WindowsApps App Execution Alias'
         return $null
     }
 
-    $signature = Get-AuthenticodeSignature -LiteralPath $resolvedPath
+    try {
+        $signature = Get-AuthenticodeSignature -LiteralPath $resolvedPath -ErrorAction Stop
+    } catch {
+        Write-CandidateSkipped -Kind $kind -Path $resolvedPath -Reason ("Get-AuthenticodeSignature failed: {0}" -f $_.Exception.Message)
+        return $null
+    }
+
     if ($signature.Status -ne 'Valid' -or $signature.SignatureType -ne 'Authenticode' -or -not $signature.SignerCertificate) {
+        Write-CandidateSkipped -Kind $kind -Path $resolvedPath -Reason ("signature is not valid Authenticode (Status={0}, Type={1})" -f $signature.Status, $signature.SignatureType)
         return $null
     }
 
@@ -67,6 +117,10 @@ function Add-PythonCandidate {
     if ([string]::IsNullOrWhiteSpace($Path)) {
         return
     }
+    if (Test-IsAppExecutionAlias -Path $Path) {
+        Write-CandidateSkipped -Kind 'Python' -Path $Path -Reason 'WindowsApps App Execution Alias'
+        return
+    }
     $List.Add($Path) | Out-Null
 }
 
@@ -74,37 +128,82 @@ function Get-PythonCandidatePaths {
     $candidates = New-Object 'System.Collections.Generic.List[string]'
     $pythonBase = Join-Path $env:LOCALAPPDATA 'Programs\Python'
 
-    Add-PythonCandidate -List $candidates -Path (Join-Path $pythonBase 'Python312\python.exe')
-    if (Test-Path -LiteralPath $pythonBase -PathType Container) {
-        Get-ChildItem -LiteralPath $pythonBase -Directory -Filter 'Python3*' -ErrorAction SilentlyContinue |
-            Sort-Object Name -Descending |
-            ForEach-Object {
-                Add-PythonCandidate -List $candidates -Path (Join-Path $_.FullName 'python.exe')
+    try {
+        Add-PythonCandidate -List $candidates -Path (Join-Path $pythonBase 'Python312\python.exe')
+        if (Test-Path -LiteralPath $pythonBase -PathType Container -ErrorAction Stop) {
+            $pythonDirectories = @(Get-ChildItem -LiteralPath $pythonBase -Directory -Filter 'Python3*' -ErrorAction Stop |
+                Sort-Object Name -Descending)
+            foreach ($directory in $pythonDirectories) {
+                try {
+                    Add-PythonCandidate -List $candidates -Path (Join-Path $directory.FullName 'python.exe')
+                } catch {
+                    Write-CandidateSkipped -Kind 'Python' -Path ([string]$directory.FullName) -Reason ("LOCALAPPDATA candidate failed: {0}" -f $_.Exception.Message)
+                }
             }
+        }
+    } catch {
+        Write-CandidateSkipped -Kind 'Python' -Path $pythonBase -Reason ("LOCALAPPDATA search failed: {0}" -f $_.Exception.Message)
     }
 
-    $pyCommand = Get-Command py.exe -ErrorAction SilentlyContinue
+    $pyCommand = $null
+    try {
+        $pyCommand = Get-Command py.exe -ErrorAction Stop
+    } catch {
+        Write-CandidateSkipped -Kind 'Python launcher' -Path 'py.exe' -Reason ("Get-Command failed: {0}" -f $_.Exception.Message)
+    }
     if ($pyCommand) {
-        $pyInfo = Get-SignedExecutableInfo -Path $pyCommand.Source
+        $pyInfo = $null
+        try {
+            $pySource = [string]$pyCommand.Source
+            if (Test-IsAppExecutionAlias -Path $pySource) {
+                Write-CandidateSkipped -Kind 'Python launcher' -Path $pySource -Reason 'WindowsApps App Execution Alias'
+            } else {
+                $pyInfo = Get-SignedExecutableInfo -Path $pySource
+            }
+        } catch {
+            Write-CandidateSkipped -Kind 'Python launcher' -Path 'py.exe' -Reason ("launcher inspection failed: {0}" -f $_.Exception.Message)
+        }
         if ($pyInfo) {
-            $registered = @(& $pyInfo.Path -0p 2>$null)
-            if ($LASTEXITCODE -eq 0) {
-                foreach ($line in $registered) {
-                    if ([string]$line -match '([A-Za-z]:\\.+\\python(?:\d+(?:\.\d+)?)?\.exe)\s*$') {
-                        Add-PythonCandidate -List $candidates -Path $Matches[1]
+            try {
+                $registered = @(& $pyInfo.Path -0p 2>$null)
+                if ($LASTEXITCODE -eq 0) {
+                    foreach ($line in $registered) {
+                        if ([string]$line -match '([A-Za-z]:\\.+\\python(?:\d+(?:\.\d+)?)?\.exe)\s*$') {
+                            try {
+                                Add-PythonCandidate -List $candidates -Path $Matches[1]
+                            } catch {
+                                Write-CandidateSkipped -Kind 'Python' -Path ([string]$Matches[1]) -Reason ("py launcher candidate failed: {0}" -f $_.Exception.Message)
+                            }
+                        }
                     }
+                } else {
+                    Write-CandidateSkipped -Kind 'Python launcher' -Path $pyInfo.Path -Reason ("py.exe -0p failed with exit code $LASTEXITCODE")
                 }
+            } catch {
+                Write-CandidateSkipped -Kind 'Python launcher' -Path $pyInfo.Path -Reason ("py.exe -0p failed: {0}" -f $_.Exception.Message)
             }
         }
     }
 
     foreach ($name in @('python.exe', 'python3.exe', 'python')) {
-        $commands = @(Get-Command $name -All -ErrorAction SilentlyContinue)
-        foreach ($command in $commands) {
-            $path = $command.Source
-            if (-not [string]::IsNullOrWhiteSpace($path)) {
-                Add-PythonCandidate -List $candidates -Path $path
+        try {
+            $commands = @(Get-Command $name -All -ErrorAction Stop)
+            foreach ($command in $commands) {
+                try {
+                    $path = [string]$command.Source
+                    if (-not [string]::IsNullOrWhiteSpace($path)) {
+                        if (Test-IsAppExecutionAlias -Path $path) {
+                            Write-CandidateSkipped -Kind 'Python' -Path $path -Reason 'WindowsApps App Execution Alias'
+                            continue
+                        }
+                        Add-PythonCandidate -List $candidates -Path $path
+                    }
+                } catch {
+                    Write-CandidateSkipped -Kind 'Python' -Path $name -Reason ("command candidate failed: {0}" -f $_.Exception.Message)
+                }
             }
+        } catch {
+            Write-CandidateSkipped -Kind 'Python command' -Path $name -Reason ("Get-Command failed: {0}" -f $_.Exception.Message)
         }
     }
 
@@ -113,14 +212,27 @@ function Get-PythonCandidatePaths {
 
 function Find-SupportedPython {
     $seen = @{}
-    foreach ($candidate in (Get-PythonCandidatePaths)) {
+    try {
+        $candidatePaths = @(Get-PythonCandidatePaths)
+    } catch {
+        Write-CandidateSkipped -Kind 'Python discovery' -Path '(candidate enumeration)' -Reason $_.Exception.Message
+        $candidatePaths = @()
+    }
+
+    foreach ($candidate in $candidatePaths) {
         if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+
+        if (Test-IsAppExecutionAlias -Path $candidate) {
+            Write-CandidateSkipped -Kind 'Python' -Path $candidate -Reason 'WindowsApps App Execution Alias'
             continue
         }
 
         try {
             $fullPath = [System.IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($candidate))
         } catch {
+            Write-CandidateSkipped -Kind 'Python' -Path $candidate -Reason ("path normalization failed: {0}" -f $_.Exception.Message)
             continue
         }
         if ($seen.ContainsKey($fullPath)) {
@@ -134,16 +246,19 @@ function Find-SupportedPython {
             continue
         }
         if ($signedPython.Signature.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+            Write-CandidateSkipped -Kind 'Python' -Path $fullPath -Reason ("unexpected signer: {0}" -f $signedPython.Signature.SignerCertificate.Subject)
             continue
         }
 
         try {
             $versionOutput = @(& $signedPython.Path -c 'import json,sys; print(json.dumps({"major":sys.version_info.major,"minor":sys.version_info.minor,"micro":sys.version_info.micro,"executable":sys.executable}))' 2>$null)
             if ($LASTEXITCODE -ne 0 -or $versionOutput.Count -eq 0) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("version check failed with exit code $LASTEXITCODE")
                 continue
             }
             $versionInfo = $versionOutput[-1] | ConvertFrom-Json
             if ([int]$versionInfo.major -lt 3 -or ([int]$versionInfo.major -eq 3 -and [int]$versionInfo.minor -lt 10)) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("Python version is below 3.10: {0}.{1}.{2}" -f $versionInfo.major, $versionInfo.minor, $versionInfo.micro)
                 continue
             }
 
@@ -161,6 +276,7 @@ function Find-SupportedPython {
                 continue
             }
             if ($signedPythonw.Signature.SignerCertificate.Subject -ne $signedPython.Signature.SignerCertificate.Subject) {
+                Write-CandidateSkipped -Kind 'Python' -Path $pythonwPath -Reason 'pythonw.exe signer does not match python.exe'
                 continue
             }
 
@@ -172,6 +288,7 @@ function Find-SupportedPython {
                 SignerSubject = [string]$signedPython.Signature.SignerCertificate.Subject
             }
         } catch {
+            Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("verification failed: {0}" -f $_.Exception.Message)
             continue
         }
     }
@@ -179,17 +296,30 @@ function Find-SupportedPython {
 }
 
 function Install-PythonWithWinget {
-    $wingetCommand = Get-Command winget.exe -ErrorAction SilentlyContinue
     $wingetCandidates = New-Object 'System.Collections.Generic.List[string]'
-    if ($wingetCommand -and -not [string]::IsNullOrWhiteSpace($wingetCommand.Source)) {
-        $wingetCandidates.Add($wingetCommand.Source) | Out-Null
+    try {
+        $wingetCommand = Get-Command winget.exe -ErrorAction Stop
+        if ($wingetCommand -and -not [string]::IsNullOrWhiteSpace($wingetCommand.Source)) {
+            $wingetCandidates.Add([string]$wingetCommand.Source) | Out-Null
+        }
+    } catch {
+        Write-CandidateSkipped -Kind 'winget' -Path 'winget.exe' -Reason ("Get-Command failed: {0}" -f $_.Exception.Message)
     }
 
-    $appInstallerPackages = @(Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction SilentlyContinue |
-        Sort-Object Version -Descending)
+    try {
+        $appInstallerPackages = @(Get-AppxPackage -Name Microsoft.DesktopAppInstaller -ErrorAction Stop |
+            Sort-Object Version -Descending)
+    } catch {
+        Write-CandidateSkipped -Kind 'winget' -Path 'Microsoft.DesktopAppInstaller' -Reason ("Get-AppxPackage failed: {0}" -f $_.Exception.Message)
+        $appInstallerPackages = @()
+    }
     foreach ($package in $appInstallerPackages) {
         foreach ($fileName in @('winget.exe', 'AppInstallerCLI.exe')) {
-            $wingetCandidates.Add((Join-Path $package.InstallLocation $fileName)) | Out-Null
+            try {
+                $wingetCandidates.Add((Join-Path ([string]$package.InstallLocation) $fileName)) | Out-Null
+            } catch {
+                Write-CandidateSkipped -Kind 'winget' -Path $fileName -Reason ("package candidate failed: {0}" -f $_.Exception.Message)
+            }
         }
     }
 
@@ -199,9 +329,13 @@ function Install-PythonWithWinget {
 
     $signedWinget = $null
     foreach ($candidate in $wingetCandidates) {
-        $signedWinget = Get-SignedExecutableInfo -Path $candidate -AllowWindowsApps
-        if ($signedWinget) {
-            break
+        try {
+            $signedWinget = Get-SignedExecutableInfo -Path $candidate -AllowWindowsApps
+            if ($signedWinget) {
+                break
+            }
+        } catch {
+            Write-CandidateSkipped -Kind 'winget' -Path $candidate -Reason ("candidate inspection failed: {0}" -f $_.Exception.Message)
         }
     }
     if (-not $signedWinget) {
@@ -322,13 +456,19 @@ try {
     Write-InstallLog '------------------------------------------------------------'
     Write-InstallLog "Installer branch: $branchName"
     Write-InstallLog "Windows version: $([Environment]::OSVersion.VersionString)"
+    Set-InstallStage -Name 'startup'
 
+    Set-InstallStage -Name 'python-discovery'
     Write-Step '署名済みのPython 3.10以上を探しています。'
     $python = Find-SupportedPython
     if (-not $python) {
+        Set-InstallStage -Name 'winget-install'
         Install-PythonWithWinget
         # Do not depend on a refreshed PATH; explicit user-install locations are searched first.
+        Set-InstallStage -Name 'python-verification'
         $python = Find-SupportedPython
+    } else {
+        Set-InstallStage -Name 'python-verification'
     }
     if (-not $python) {
         throw 'Python 3.10以上の実体を確認できませんでした。Pythonの自動インストールに失敗した可能性があります。'
@@ -346,6 +486,7 @@ try {
     $extractPath = Join-Path $tempRoot 'extracted'
     New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
 
+    Set-InstallStage -Name 'source-download'
     Write-Step 'GitHubからテスト用ソースをHTTPSで取得しています。'
     try {
         Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath -UseBasicParsing
@@ -370,8 +511,10 @@ try {
         throw '取得したソースに、このテストでは実行しないバイナリまたは証明書ファイルが含まれていました。'
     }
 
+    Set-InstallStage -Name 'pip-install'
     Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.txt')
 
+    Set-InstallStage -Name 'source-install'
     Write-Step 'アプリのソースをユーザー領域へインストールしています。'
     Install-SourceTree -SourcePath $sourceRoot.FullName
     $appPath = Join-Path $installPath 'app.py'
@@ -380,12 +523,14 @@ try {
     }
     Write-InstallLog "source install path: $installPath"
 
+    Set-InstallStage -Name 'shortcut'
     Write-Step 'デスクトップショートカットを作成しています。'
     $shortcutPath = New-AppShortcut -PythonwPath $python.PythonwPath -AppPath $appPath
     Write-InstallLog "shortcut path: $shortcutPath"
     Write-InstallLog "shortcut TargetPath: $($python.PythonwPath)"
     Write-InstallLog "shortcut Arguments: `"$appPath`""
 
+    Set-InstallStage -Name 'launch'
     Write-Step 'ショートカットと同じ方法でアプリを起動しています。'
     $appArguments = '"{0}"' -f $appPath
     $process = Start-Process -FilePath $python.PythonwPath -ArgumentList $appArguments -WorkingDirectory $installPath -PassThru
@@ -400,13 +545,18 @@ try {
     Write-Host "ログ: $script:logPath"
 } catch {
     $exitCode = 1
-    $friendlyMessage = [string]$_.Exception.Message
+    $errorRecord = $_
+    $friendlyMessage = [string]$errorRecord.Exception.Message
     if ([string]::IsNullOrWhiteSpace($friendlyMessage)) {
         $friendlyMessage = 'セットアップ中に問題が発生しました。インターネット接続を確認して、もう一度お試しください。'
     }
     try {
         if (Test-Path -LiteralPath $dataPath) {
-            Write-InstallLog "ERROR: $friendlyMessage"
+            Write-InstallLog "stage: $script:currentStage"
+            Write-InstallLog "exception type: $($errorRecord.Exception.GetType().FullName)"
+            Write-InstallLog "message: $friendlyMessage"
+            Write-InstallLog "FullyQualifiedErrorId: $($errorRecord.FullyQualifiedErrorId)"
+            Write-InstallLog "stack: $($errorRecord.ScriptStackTrace)"
         }
     } catch {
         # Logging must not replace the user-facing error.
