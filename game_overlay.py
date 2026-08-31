@@ -21,8 +21,12 @@ import argparse
 import ctypes
 import json
 import os
+import queue
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -410,6 +414,11 @@ class GameOverlay:
         self._closing = False
         self._overlay_started_at = time.time()
         self._last_heartbeat_at = 0.0
+        self._effect_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._effect_ids: set[str] = set()
+        self._active_effect: dict[str, Any] | None = None
+        self._effect_stop = threading.Event()
+        self._effect_thread_started = False
 
         self.last_stats: dict[str, Any] = {
             "wins": 0,
@@ -654,6 +663,7 @@ class GameOverlay:
                 self._server_linked = True
                 self._server_state = "alive"
                 print(f"[game-overlay] linked to server.py PID {self._server_pid}")
+                self._start_effect_listener(int(runtime["port"]))
                 return True
             if now >= self._server_startup_deadline:
                 self._server_state = "stopped"
@@ -673,6 +683,94 @@ class GameOverlay:
 
         self._server_state = "alive"
         return True
+
+    def _start_effect_listener(self, port: int) -> None:
+        if self._effect_thread_started:
+            return
+        self._effect_thread_started = True
+
+        def listen() -> None:
+            while not self._effect_stop.is_set():
+                try:
+                    with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/events", timeout=5
+                    ) as response:
+                        event_name = ""
+                        data = None
+                        for raw_line in response:
+                            if self._effect_stop.is_set():
+                                return
+                            line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                            if line.startswith("event: "):
+                                event_name = line[7:]
+                            elif line.startswith("data: "):
+                                data = line[6:]
+                            elif not line and event_name == "effect" and data:
+                                try:
+                                    payload = json.loads(data)
+                                    effect_id = str(payload.get("effect_id", ""))
+                                    created = int(payload.get("created_at_ms", 0))
+                                    if (
+                                        payload.get("effect") == "milestone"
+                                        and effect_id
+                                        and effect_id not in self._effect_ids
+                                        and created >= int(self._overlay_started_at * 1000) - 2000
+                                    ):
+                                        self._effect_ids.add(effect_id)
+                                        self._effect_queue.put(payload)
+                                except (TypeError, ValueError, json.JSONDecodeError):
+                                    pass
+                                event_name = ""
+                                data = None
+                except (OSError, urllib.error.URLError, ValueError):
+                    self._effect_stop.wait(1.0)
+
+        threading.Thread(target=listen, name="overlay-effects", daemon=True).start()
+
+    def _render_milestone_effect(self, game: tuple[int, int, int, int, int]) -> None:
+        effect = self._active_effect
+        if effect is None:
+            return
+        elapsed = time.monotonic() - effect["started"]
+        milestone = int(effect["milestone"])
+        if elapsed > effect["duration"]:
+            self._active_effect = None
+            self._render()
+            return
+        width, height = max(1, game[3]), max(1, game[4])
+        self.canvas.configure(width=max(600, min(width, 1200)), height=180)
+        self.canvas.delete("all")
+        if milestone == 50 and elapsed < 1.6:
+            text, color, size = ("", "#ffffff", 1) if elapsed < 0.8 else ("", "#111111", 1)
+        else:
+            text = {
+                5: "5連勝　激アツ!!", 10: "10連勝　超激アツ!!",
+                15: "15連勝　覚醒ゾーン突入", 20: "20連勝　RUSH突入!!",
+                25: "25連勝　RUSH継続!!", 30: "30連勝!!", 35: "35連勝!!",
+                40: "40連勝!!", 45: "45連勝!!", 50: "50連勝　LEGEND",
+            }.get(milestone, f"{milestone}連勝!!")
+            color = "#ffd84a" if milestone < 30 else "#d68cff"
+            size = 42 + min(28, milestone // 2)
+            if milestone == 50 and elapsed < 3.2:
+                color, size = "#ffd84a", 76
+        if text:
+            self.canvas.create_text(
+                max(300, min(width, 1200) // 2), 90,
+                anchor="center", text=text, fill=color,
+                font=("Yu Gothic UI", size, "bold"),
+            )
+
+    def _drain_effects(self) -> None:
+        try:
+            while True:
+                payload = self._effect_queue.get_nowait()
+                self._active_effect = {
+                    "milestone": int(payload["milestone"]),
+                    "started": time.monotonic(),
+                    "duration": 6.0 if int(payload["milestone"]) == 50 else 3.5,
+                }
+        except queue.Empty:
+            pass
 
     def _publish_ready_heartbeat(self) -> None:
         now = time.time()
@@ -695,6 +793,7 @@ class GameOverlay:
         self._last_heartbeat_at = now
 
     def _tick(self) -> None:
+        self._drain_effects()
         s = read_stats()
         if s is not None:
             self.last_stats = s
@@ -702,8 +801,12 @@ class GameOverlay:
 
         game = foreground_game_client(self.process_name)
         if game is not None:
-            _hwnd, left, top, _width, _height = game
-            self._show_at_game(left, top)
+            _hwnd, left, top, width, height = game
+            if self._active_effect is not None:
+                self._render_milestone_effect(game)
+                self._show_absolute(left + width // 2 - 500, top + height // 2 - 90)
+            else:
+                self._show_at_game(left, top)
         elif self.always_show:
             self._show_absolute(self.x_offset, self.y_offset)
         else:
@@ -732,7 +835,10 @@ class GameOverlay:
         self.root.after(self.poll_ms, self._tick)
 
     def run(self) -> None:
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        finally:
+            self._effect_stop.set()
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(

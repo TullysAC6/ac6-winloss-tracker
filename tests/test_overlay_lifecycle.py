@@ -50,3 +50,12 @@ with tempfile.TemporaryDirectory() as temporary:
             os.environ["LOCALAPPDATA"] = old
 
 print("overlay ready runtime / heartbeat / owner cleanup: OK")
+
+overlay_source = (ROOT / "overlay.html").read_text(encoding="utf-8")
+game_source = (ROOT / "game_overlay.py").read_text(encoding="utf-8")
+for milestone in range(5, 51, 5):
+    assert f"{milestone}連勝" in overlay_source
+assert "_start_effect_listener" in game_source
+assert "_render_milestone_effect" in game_source
+assert "effect_id" in game_source
+print("server-sourced 5..50 effect rendering coverage: OK")

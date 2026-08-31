@@ -26,6 +26,9 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
 #milestone .inner::before,#milestone .inner::after{content:"";position:absolute;left:8%;right:8%;height:2px;background:rgba(255,230,100,.85);box-shadow:0 0 5px rgba(255,205,60,.7)}
 #milestone .inner::before{top:7px}
 #milestone .inner::after{bottom:7px}
+#milestone.effect-30 .inner,#milestone.effect-35 .inner,#milestone.effect-40 .inner,#milestone.effect-45 .inner{background:linear-gradient(180deg,rgba(75,10,100,.95),rgba(15,0,30,.90));border-color:#d68cff;box-shadow:0 0 22px rgba(190,90,255,.8),inset 0 0 14px rgba(220,150,255,.35)}
+#milestone.effect-40 .inner,#milestone.effect-45 .inner{font-size:78px;box-shadow:0 0 34px rgba(220,120,255,.95),inset 0 0 22px rgba(240,180,255,.5)}
+#milestone.effect-50 .inner{font-size:92px;background:radial-gradient(circle,#fff3a0,#f5a900 35%,#4b1600 100%);color:#fff;border-color:#fff2a0;box-shadow:0 0 55px #ffd000,inset 0 0 30px #fff}
 @keyframes slowBlink{0%,62%{opacity:1}63%,100%{opacity:.55}}
 @keyframes blink{0%,46%{opacity:1}47%,100%{opacity:.28}}
 @keyframes rushBlink{0%,42%{opacity:1}43%,100%{opacity:.18}}
@@ -54,8 +57,8 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
   try{applyConfig(await fetchConfig())}catch(e){console.error("[config]",e)}
   setInterval(async()=>{try{applyConfig(await fetchConfig())}catch(e){console.error("[config]",e)}},3000);
 
-  function milestoneText(n){if(n>=20)return"20連勝　RUSH突入！！";if(n>=15)return"15連勝　覚醒ゾーン突入";if(n>=10)return"10連勝　超激アツ！！";return"5連勝　激アツ！！"}
-  function flashMilestone(n){if(!statsEnabled||!n)return;if(milestoneTimer)clearTimeout(milestoneTimer);milestoneInner.textContent=milestoneText(Number(n));milestone.classList.remove("show");void milestone.offsetWidth;milestone.classList.add("show");milestoneTimer=setTimeout(()=>{milestone.classList.remove("show");milestoneTimer=null},1900)}
+  function milestoneText(n){return({5:"5連勝　激アツ!!",10:"10連勝　超激アツ!!",15:"15連勝　覚醒ゾーン突入",20:"20連勝　RUSH突入!!",25:"25連勝　RUSH継続!!",30:"30連勝!!",35:"35連勝!!",40:"40連勝!!",45:"45連勝!!",50:"50連勝　LEGEND"})[n]||`${n}連勝!!`}
+  function flashMilestone(n){if(!statsEnabled||!n)return;if(milestoneTimer)clearTimeout(milestoneTimer);milestone.className="";milestone.id="milestone";milestone.classList.add(`effect-${Number(n)}`);milestoneInner.textContent=milestoneText(Number(n));milestone.classList.add("show");milestoneTimer=setTimeout(()=>{milestone.classList.remove("show");milestone.className="";milestone.id="milestone";milestoneTimer=null},3000)}
   function renderStats(s){if(!statsEnabled){statsPanel.style.display="none";return}statsPanel.style.display="block";statsPanel.querySelector(".record").textContent=`WIN ${s.wins}　LOSE ${s.losses}`;statsPanel.querySelector(".rate").textContent=`　勝率 ${Number(s.win_rate).toFixed(1)}%`;statsPanel.querySelector(".streak").textContent=`　連勝 ${s.streak}`;statsPanel.querySelector(".status").textContent=s.status_level?`　${s.status}`:"";statsPanel.querySelector(".sub").textContent=`最高連勝 ${s.best_streak}`;statsPanel.className="";statsPanel.id="stats-panel";if(s.status_level)statsPanel.classList.add("hot-"+s.status_level)}
   function updateStats(s){latestStats=s;renderStats(s)}
   function updateDetector(d){const bad=d.status==="error"||d.status==="degraded";detectorWarning.style.display=bad?"block":"none";if(bad)detectorWarning.textContent=d.status==="degraded"?"勝敗自動検出 要確認":"勝敗自動検出 停止"}
