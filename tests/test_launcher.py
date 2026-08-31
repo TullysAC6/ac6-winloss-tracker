@@ -98,6 +98,7 @@ with tempfile.TemporaryDirectory() as temporary:
                 shutdown_runtime, overlay_pid, timeout=5,
                 runtime_path=runtime_path,
                 overlay_path=data / ".overlay-runtime.json",
+                dashboard_path=data / ".dashboard-runtime.json",
             )
         finally:
             if process.poll() is None:
@@ -141,7 +142,7 @@ assert "Get-NetTCPConnection -LocalPort $RuntimePort -State Listen" in installer
 assert "Test-TrackerCommandLine" in installer
 assert "(?i)^pythonw?\\.exe$" in installer
 assert "[Regex]::Escape($installPath)" in installer
-assert "(app\\.py|launcher\\.pyw)" in installer
+assert "(app\\.py|launcher\\.pyw|dashboard\\.py)" in installer
 assert "Stop-Process -Id $processId" in installer
 assert installer.index("Stop-RunningTracker") < installer.index("Install-SourceTree -SourcePath")
 print("installer Tracker-only fallback safety checks: OK")

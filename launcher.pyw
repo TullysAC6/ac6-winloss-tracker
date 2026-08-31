@@ -16,9 +16,11 @@ from pathlib import Path
 DISPLAY_NAME = "AC6 Win/Loss Tracker"
 APP_DIR = Path(__file__).resolve().parent
 APP_PATH = APP_DIR / "app.py"
+DASHBOARD_PATH = APP_DIR / "dashboard.py"
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "AC6WinLossTracker"
 RUNTIME_PATH = DATA_DIR / ".runtime.json"
 OVERLAY_RUNTIME_PATH = DATA_DIR / ".overlay-runtime.json"
+DASHBOARD_RUNTIME_PATH = DATA_DIR / ".dashboard-runtime.json"
 STARTUP_LOG = DATA_DIR / "startup.log"
 MAX_LOG_BYTES = 1024 * 1024
 STARTUP_TIMEOUT_SECONDS = 10.0
@@ -130,6 +132,27 @@ def start_application(
         )
 
 
+def open_dashboard(
+    dashboard_path: Path = DASHBOARD_PATH,
+    app_dir: Path = APP_DIR,
+    log_path: Path = STARTUP_LOG,
+) -> bool:
+    """Launch the optional dashboard with this verified Python executable."""
+    try:
+        rotate_startup_log(log_path)
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+        with log_path.open("a", encoding="utf-8", buffering=1) as startup_log:
+            subprocess.Popen(
+                [sys.executable, str(dashboard_path)], cwd=str(app_dir),
+                stdin=subprocess.DEVNULL, stdout=startup_log,
+                stderr=subprocess.STDOUT, shell=False, creationflags=creationflags,
+            )
+        return True
+    except Exception:
+        log_launcher_error(log_path)
+        return False
+
+
 def wait_for_application(
     process: subprocess.Popen,
     runtime_path: Path = RUNTIME_PATH,
@@ -217,9 +240,18 @@ def read_overlay_pid(path: Path = OVERLAY_RUNTIME_PATH) -> int:
         return 0
 
 
+def read_dashboard_pid(path: Path = DASHBOARD_RUNTIME_PATH) -> int:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")).get("pid")
+        return value if type(value) is int and value > 0 else 0
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return 0
+
+
 def request_shutdown(runtime_path: Path = RUNTIME_PATH) -> tuple[dict | None, int]:
     runtime = read_runtime(runtime_path)
     overlay_pid = read_overlay_pid()
+    dashboard_pid = read_dashboard_pid()
     if runtime is None or not runtime.get("token"):
         return None, overlay_pid
     request = urllib.request.Request(
@@ -233,23 +265,31 @@ def request_shutdown(runtime_path: Path = RUNTIME_PATH) -> tuple[dict | None, in
                 return None, overlay_pid
     except (OSError, urllib.error.URLError):
         return None, overlay_pid
+    runtime["dashboard_pid"] = dashboard_pid
     return runtime, overlay_pid
 
 
 def wait_for_complete_shutdown(
     runtime: dict, overlay_pid: int, timeout: float = 12.0,
     runtime_path: Path = RUNTIME_PATH, overlay_path: Path = OVERLAY_RUNTIME_PATH,
+    dashboard_path: Path = DASHBOARD_RUNTIME_PATH,
 ) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         server_gone = not process_is_alive(runtime["pid"])
         overlay_gone = overlay_pid <= 0 or not process_is_alive(overlay_pid)
-        files_gone = not runtime_path.exists() and not overlay_path.exists()
+        dashboard_pid = int(runtime.get("dashboard_pid", 0))
+        dashboard_gone = dashboard_pid <= 0 or not process_is_alive(dashboard_pid)
+        dashboard_file_gone = dashboard_pid <= 0 or not dashboard_path.exists()
+        files_gone = (
+            not runtime_path.exists() and not overlay_path.exists()
+            and dashboard_file_gone
+        )
         endpoints_gone = (
             not stats_server_is_ready(runtime["port"], 0.3)
             and tracker_health(runtime["port"], 0.3) is None
         )
-        if server_gone and overlay_gone and files_gone and endpoints_gone:
+        if server_gone and overlay_gone and dashboard_gone and files_gone and endpoints_gone:
             return True
         time.sleep(0.2)
     return False
@@ -275,11 +315,11 @@ def main() -> None:
     root = tk.Tk()
     root.title(DISPLAY_NAME)
     root.resizable(False, False)
-    root.geometry("400x190")
+    root.geometry("420x230")
     root.update_idletasks()
     root.geometry(
-        f"400x190+{max(0, (root.winfo_screenwidth() - 400) // 2)}"
-        f"+{max(0, (root.winfo_screenheight() - 190) // 2)}"
+        f"420x230+{max(0, (root.winfo_screenwidth() - 420) // 2)}"
+        f"+{max(0, (root.winfo_screenheight() - 230) // 2)}"
     )
 
     title = tk.Label(root, text=DISPLAY_NAME, font=("Segoe UI", 13, "bold"))
@@ -287,10 +327,22 @@ def main() -> None:
     status = tk.Label(root, text="起動しています...", font=("Segoe UI", 11))
     status.pack(padx=20)
     actions = tk.Frame(root)
-    close_button = tk.Button(actions, text="閉じる", width=12, command=root.destroy)
-    shutdown_button = tk.Button(actions, text="Trackerを終了", width=16)
-    close_button.pack(side="left", padx=6)
+    button_row = tk.Frame(actions)
+    dashboard_button = tk.Button(actions, text="ダッシュボードを開く", width=22)
+    close_button = tk.Button(button_row, text="閉じる", width=12, command=root.destroy)
+    shutdown_button = tk.Button(button_row, text="Trackerを終了", width=16)
+    dashboard_button.pack(pady=(0, 8))
     shutdown_button.pack(side="left", padx=6)
+    close_button.pack(side="left", padx=6)
+    button_row.pack()
+
+    def begin_dashboard() -> None:
+        if open_dashboard():
+            status.config(text="ダッシュボードを開きました。")
+        else:
+            status.config(text="ダッシュボードを開けませんでした。\n診断ログを確認してください。")
+
+    dashboard_button.config(command=begin_dashboard)
 
     def shutdown_finish(ok: bool) -> None:
         shutdown_button.config(state="disabled")

@@ -1,0 +1,223 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+import time
+from pathlib import Path
+from typing import Any
+
+
+class HistoryStore:
+    """Transactional lifetime history owned exclusively by server.py."""
+
+    SCHEMA_VERSION = 1
+
+    def __init__(self, root: str | Path):
+        self.path = Path(root) / "history.db"
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        self._current_session_id: int | None = None
+        self._migrate()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.path, timeout=5.0)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute("PRAGMA busy_timeout=5000")
+        connection.execute("PRAGMA journal_mode=WAL")
+        return connection
+
+    def _migrate(self) -> None:
+        with self._lock, self._connect() as connection:
+            version = int(connection.execute("PRAGMA user_version").fetchone()[0])
+            if version > self.SCHEMA_VERSION:
+                raise RuntimeError(f"unsupported history schema version: {version}")
+            if version == 0:
+                connection.executescript(
+                    """
+                    CREATE TABLE sessions (
+                        id INTEGER PRIMARY KEY,
+                        started_at REAL NOT NULL,
+                        ended_at REAL,
+                        ended_reason TEXT,
+                        wins INTEGER NOT NULL DEFAULT 0,
+                        losses INTEGER NOT NULL DEFAULT 0,
+                        draws INTEGER NOT NULL DEFAULT 0,
+                        best_streak INTEGER NOT NULL DEFAULT 0
+                    );
+                    CREATE TABLE matches (
+                        id INTEGER PRIMARY KEY,
+                        event_id TEXT UNIQUE NOT NULL,
+                        session_id INTEGER NOT NULL,
+                        created_at REAL NOT NULL,
+                        result TEXT NOT NULL CHECK(result IN ('win','loss','draw')),
+                        source TEXT,
+                        streak_after INTEGER NOT NULL DEFAULT 0,
+                        wins_after INTEGER NOT NULL DEFAULT 0,
+                        losses_after INTEGER NOT NULL DEFAULT 0,
+                        metadata_json TEXT,
+                        FOREIGN KEY(session_id) REFERENCES sessions(id)
+                    );
+                    CREATE INDEX matches_created_at_idx ON matches(created_at DESC);
+                    CREATE INDEX matches_session_id_idx ON matches(session_id, id);
+                    PRAGMA user_version=1;
+                    """
+                )
+
+    @property
+    def current_session_id(self) -> int | None:
+        with self._lock:
+            return self._current_session_id
+
+    def start_session(self, started_at: float | None = None) -> int:
+        started_at = time.time() if started_at is None else float(started_at)
+        with self._lock, self._connect() as connection:
+            connection.execute(
+                "UPDATE sessions SET ended_at=?, ended_reason=? WHERE ended_at IS NULL",
+                (started_at, "recovered"),
+            )
+            cursor = connection.execute(
+                "INSERT INTO sessions(started_at) VALUES (?)", (started_at,)
+            )
+            self._current_session_id = int(cursor.lastrowid)
+            return self._current_session_id
+
+    def close_session(self, reason: str = "shutdown", ended_at: float | None = None) -> None:
+        ended_at = time.time() if ended_at is None else float(ended_at)
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                return
+            with self._connect() as connection:
+                connection.execute(
+                    "UPDATE sessions SET ended_at=?, ended_reason=? "
+                    "WHERE id=? AND ended_at IS NULL",
+                    (ended_at, str(reason), session_id),
+                )
+            self._current_session_id = None
+
+    def reset_session(self) -> int:
+        self.close_session("manual_reset")
+        return self.start_session()
+
+    def record_result(
+        self,
+        event_id: str,
+        result: str,
+        source: str,
+        stats: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+        created_at: float | None = None,
+    ) -> bool:
+        if result not in ("win", "loss", "draw"):
+            raise ValueError("invalid history result")
+        created_at = time.time() if created_at is None else float(created_at)
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                raise RuntimeError("history session is not active")
+            metadata_json = (
+                json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
+                if metadata else None
+            )
+            with self._connect() as connection:
+                cursor = connection.execute(
+                    "INSERT OR IGNORE INTO matches("
+                    "event_id,session_id,created_at,result,source,streak_after,"
+                    "wins_after,losses_after,metadata_json) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        str(event_id), session_id, created_at, result, str(source),
+                        int(stats.get("streak", 0)), int(stats.get("wins", 0)),
+                        int(stats.get("losses", 0)), metadata_json,
+                    ),
+                )
+                if cursor.rowcount == 0:
+                    return False
+                column = {"win": "wins", "loss": "losses", "draw": "draws"}[result]
+                connection.execute(
+                    f"UPDATE sessions SET {column}={column}+1, "
+                    "best_streak=MAX(best_streak, ?) WHERE id=?",
+                    (int(stats.get("streak", 0)), session_id),
+                )
+                return True
+
+    def undo_last(self) -> dict[str, Any] | None:
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                return None
+            with self._connect() as connection:
+                row = connection.execute(
+                    "SELECT event_id FROM matches WHERE session_id=? ORDER BY id DESC LIMIT 1",
+                    (session_id,),
+                ).fetchone()
+            return self.undo_event(str(row["event_id"])) if row is not None else None
+
+    def undo_event(self, event_id: str) -> dict[str, Any] | None:
+        """Undo only the matching accepted event; never remove a neighbour."""
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                return None
+            with self._connect() as connection:
+                row = connection.execute(
+                    "SELECT id,event_id,result FROM matches "
+                    "WHERE session_id=? AND event_id=?",
+                    (session_id, str(event_id)),
+                ).fetchone()
+                if row is None:
+                    return None
+                connection.execute("DELETE FROM matches WHERE id=?", (int(row["id"]),))
+                aggregate = connection.execute(
+                    "SELECT COALESCE(SUM(result='win'),0) wins, "
+                    "COALESCE(SUM(result='loss'),0) losses, "
+                    "COALESCE(SUM(result='draw'),0) draws, "
+                    "COALESCE(MAX(streak_after),0) best_streak "
+                    "FROM matches WHERE session_id=?",
+                    (session_id,),
+                ).fetchone()
+                connection.execute(
+                    "UPDATE sessions SET wins=?,losses=?,draws=?,best_streak=? WHERE id=?",
+                    (aggregate["wins"], aggregate["losses"], aggregate["draws"],
+                     aggregate["best_streak"], session_id),
+                )
+                return {
+                    "id": int(row["id"]), "event_id": str(row["event_id"]),
+                    "result": str(row["result"]),
+                }
+
+    def lifetime_summary(self) -> dict[str, Any]:
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(SUM(wins),0) wins, COALESCE(SUM(losses),0) losses, "
+                "COALESCE(SUM(draws),0) draws, COALESCE(MAX(best_streak),0) best_streak "
+                "FROM sessions"
+            ).fetchone()
+        wins, losses, draws = int(row["wins"]), int(row["losses"]), int(row["draws"])
+        matches = wins + losses
+        return {
+            "wins": wins, "losses": losses, "draws": draws, "matches": matches,
+            "win_rate": round(wins / matches * 100.0, 1) if matches else 0.0,
+            "best_streak": int(row["best_streak"]),
+        }
+
+    def recent_matches(self, limit: int = 10) -> list[dict[str, Any]]:
+        limit = max(1, min(int(limit), 100))
+        with self._lock, self._connect() as connection:
+            rows = connection.execute(
+                "SELECT event_id,session_id,created_at,result,source,streak_after "
+                "FROM matches ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def session_metadata(self) -> dict[str, Any] | None:
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                return None
+            with self._connect() as connection:
+                row = connection.execute(
+                    "SELECT id,started_at,ended_at FROM sessions WHERE id=?", (session_id,)
+                ).fetchone()
+            return dict(row) if row is not None else None

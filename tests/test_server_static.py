@@ -23,13 +23,22 @@ assert 'publish_stats_active(s)' in s
 print("runtime control + stats health restore: OK")
 
 assert 'for n in range(5, 51, 5):' in s
-assert '"effect_id": secrets.token_urlsafe(16)' in s
+assert 'event_id = secrets.token_urlsafe(18)' in s
+assert '"effect_id": event_id' in s
 assert '"tier": min(10, milestone // 5)' in s
 bind_pos = s.index('server = ThreadingHTTPServer')
 reset_pos = s.index('stats.reset()', bind_pos)
 detector_pos = s.index('threading.Thread(target=detector_supervisor', reset_pos)
-assert bind_pos < reset_pos < detector_pos
+history_pos = s.index('store = HistoryStore(DATA_ROOT)', reset_pos)
+session_pos = s.index('store.start_session()', history_pos)
+assert bind_pos < reset_pos < history_pos < session_pos < detector_pos
 print("session reset ordering and 5..50 milestone source: OK")
+
+assert 'store.record_result(event_id, result, source, s)' in s
+assert s.index('s = stats.add(result, source)') < s.index('store.record_result(event_id, result, source, s)')
+assert 'if path == "/api/dashboard/summary":' in s
+assert 'store.reset_session()' in s
+print("history accepted-result flow / dashboard API / session reset: OK")
 
 assert 'status, level = "", 0' in s
 assert 'status, level = "通常", 0' not in s

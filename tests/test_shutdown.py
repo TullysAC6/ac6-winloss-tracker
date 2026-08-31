@@ -26,7 +26,19 @@ with tempfile.TemporaryDirectory() as temporary:
             "panel_hwnd": 1, "text_hwnd": 2,
         }), encoding="utf-8")
         server.OVERLAY_RUNTIME_PATH = overlay_runtime
+        dashboard_runtime = Path(temporary) / "AC6WinLossTracker" / ".dashboard-runtime.json"
+        server.DASHBOARD_RUNTIME_PATH = dashboard_runtime
         server.detector_fallback.update(status="waiting", error=None)
+        assert server.lifecycle_health()["ok"] is True
+        assert server.lifecycle_health()["dashboard"] == {"open": False}
+        dashboard_runtime.write_text(json.dumps({
+            "pid": os.getpid(), "server_pid": os.getpid(),
+            "heartbeat_at": __import__("time").time(), "hwnd": 3,
+        }), encoding="utf-8")
+        dashboard_health = server.lifecycle_health()
+        assert dashboard_health["ok"] is True
+        assert dashboard_health["dashboard"]["open"] is True
+        dashboard_runtime.unlink()
         assert server.lifecycle_health()["ok"] is True
         server.detector_fallback.update(status="disabled", error=None)
         assert server.lifecycle_health()["ok"] is True

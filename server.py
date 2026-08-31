@@ -13,6 +13,7 @@ from app_paths import data_dir, resource_dir, resource_path
 from config_utils import DEFAULT_CONFIG, CONFIG_PATH, get_config_health, load_config
 from diagnostics import RECORDER
 from event_bus import EventBus
+from history_store import HistoryStore
 from result_detector import ResultDetector
 from result_gate import ResultGate
 from stats_manager import StatsCorruptError, StatsManager
@@ -23,12 +24,17 @@ DATA_ROOT = data_dir()
 OVERLAY = resource_path("overlay.html")
 RUNTIME_PATH = DATA_ROOT / ".runtime.json"
 OVERLAY_RUNTIME_PATH = DATA_ROOT / ".overlay-runtime.json"
+DASHBOARD_RUNTIME_PATH = DATA_ROOT / ".dashboard-runtime.json"
 OVERLAY_HEARTBEAT_MAX_AGE = 3.0
 
 stop_event = threading.Event()
 stats = StatsManager(DATA_ROOT)
 result_lock = threading.RLock()
 result_gate = ResultGate()
+history = None
+history_lock = threading.RLock()
+history_health = {"status": "starting", "error": None}
+history_event_ids = []
 
 detector = None
 detector_lock = threading.Lock()
@@ -122,6 +128,24 @@ def lifecycle_health(now=None):
         }
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
         pass
+    dashboard = {"open": False}
+    try:
+        raw = json.loads(DASHBOARD_RUNTIME_PATH.read_text(encoding="utf-8"))
+        dashboard_pid = int(raw["pid"])
+        dashboard_server_pid = int(raw["server_pid"])
+        heartbeat_age = max(0.0, now - float(raw["heartbeat_at"]))
+        dashboard = {
+            "open": (
+                dashboard_server_pid == os.getpid()
+                and process_is_alive(dashboard_pid)
+                and heartbeat_age <= 3.0
+            ),
+            "pid": dashboard_pid,
+            "server_pid": dashboard_server_pid,
+            "heartbeat_age": round(heartbeat_age, 3),
+        }
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        pass
     ok = bool(detector_ok and overlay["ok"])
     return {
         "ok": ok,
@@ -129,6 +153,60 @@ def lifecycle_health(now=None):
         "http": {"ok": True},
         "detector": {"ok": detector_ok, **detector_health},
         "overlay": overlay,
+        "dashboard": dashboard,
+    }
+
+
+def set_history_health(status, error=None):
+    with history_lock:
+        history_health.update(
+            status=str(status), error=None if error is None else str(error)
+        )
+
+
+def history_failure(operation, error):
+    message = f"{type(error).__name__}: {error}"
+    set_history_health("degraded", message)
+    RECORDER.record("history_error", operation=operation, error=message)
+    print(f"[history] WARNING: {operation} failed: {message}")
+
+
+def dashboard_summary():
+    current = status_payload(stats.snapshot())
+    with history_lock:
+        store = history
+        health = dict(history_health)
+    empty_lifetime = {
+        "wins": 0, "losses": 0, "draws": 0, "matches": 0,
+        "win_rate": 0.0, "best_streak": 0,
+    }
+    session_meta = None
+    lifetime = empty_lifetime
+    recent = []
+    if store is not None:
+        try:
+            session_meta = store.session_metadata()
+            lifetime = store.lifetime_summary()
+            recent = store.recent_matches(10)
+            set_history_health("active")
+            with history_lock:
+                health = dict(history_health)
+        except Exception as e:
+            history_failure("dashboard_summary", e)
+            with history_lock:
+                health = dict(history_health)
+    return {
+        "system": True,
+        "session": {
+            "id": session_meta["id"] if session_meta else None,
+            "started_at": session_meta["started_at"] if session_meta else None,
+            "wins": current["wins"], "losses": current["losses"],
+            "win_rate": current["win_rate"], "streak": current["streak"],
+            "best_streak": current["best_streak"],
+        },
+        "lifetime": lifetime,
+        "recent_matches": recent,
+        "history_health": health,
     }
 
 
@@ -262,6 +340,7 @@ def record_result(result, source):
             result_gate.clear_for_manual_correction()
             raise
 
+        event_id = secrets.token_urlsafe(18)
         milestone = None
         if result == "win":
             for n in range(5, 51, 5):
@@ -276,12 +355,26 @@ def record_result(result, source):
 
         publish_stats_active(s)
 
+        with history_lock:
+            store = history
+        stored_event_id = None
+        if store is not None:
+            try:
+                if store.record_result(event_id, result, source, s):
+                    stored_event_id = event_id
+                set_history_health("active")
+            except Exception as e:
+                # Current stats and detector flow remain authoritative even if
+                # the optional lifetime store is temporarily unavailable.
+                history_failure("record_result", e)
+        history_event_ids.append(stored_event_id)
+
         if milestone:
             publish("effect", {
                 "system": True,
                 "kind": "effect",
                 "effect": "milestone",
-                "effect_id": secrets.token_urlsafe(16),
+                "effect_id": event_id,
                 "milestone": milestone,
                 "streak": s["streak"],
                 "tier": min(10, milestone // 5),
@@ -305,6 +398,15 @@ def undo_result():
         if current:
             current.after_undo()
         publish_stats_active(s)
+        stored_event_id = history_event_ids.pop() if history_event_ids else None
+        with history_lock:
+            store = history
+        if store is not None and stored_event_id is not None:
+            try:
+                store.undo_event(stored_event_id)
+                set_history_health("active")
+            except Exception as e:
+                history_failure("undo", e)
         return s, removed
 
 
@@ -317,6 +419,15 @@ def reset_stats():
         if current:
             current.external_mutation()
         publish_stats_active(s)
+        with history_lock:
+            store = history
+        if store is not None:
+            try:
+                store.reset_session()
+                set_history_health("active")
+            except Exception as e:
+                history_failure("reset_session", e)
+        history_event_ids.clear()
         return s
 
 
@@ -419,6 +530,14 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(health, 200 if health["ok"] else 503)
             return
 
+        if path == "/api/dashboard/summary":
+            try:
+                self.json_response(dashboard_summary())
+            except Exception as e:
+                history_failure("dashboard_summary", e)
+                self.json_response({"error": "history unavailable"}, 503)
+            return
+
         if path == "/events":
             client = None
             try:
@@ -516,6 +635,7 @@ def ensure_first_run_config():
 
 
 def main():
+    global history
     ensure_first_run_config()
     try:
         c = load_config(use_last_good=False)
@@ -537,6 +657,17 @@ def main():
         raise
 
     print("[lifecycle] session stats reset after server bind")
+    history_event_ids.clear()
+    try:
+        store = HistoryStore(DATA_ROOT)
+        store.start_session()
+        with history_lock:
+            history = store
+        set_history_health("active")
+        print(f"[history] session {store.current_session_id} started")
+    except Exception as e:
+        history_failure("startup", e)
+
     threading.Thread(target=detector_supervisor, daemon=True).start()
     write_runtime_file(server.server_address[1])
 
@@ -552,6 +683,13 @@ def main():
         pass
     finally:
         stop_event.set()
+        with history_lock:
+            store = history
+        if store is not None:
+            try:
+                store.close_session("shutdown")
+            except Exception as e:
+                history_failure("shutdown", e)
         server.server_close()
         remove_runtime_file()
 

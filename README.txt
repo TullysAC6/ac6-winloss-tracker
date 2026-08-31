@@ -35,6 +35,12 @@ Smart App Controlが有効な環境では、GitHub Releasesの未署名EXEや未
 OBSブラウザソース:
   http://127.0.0.1:8765/
 
+【戦績Dashboard（Python source test版）】
+Tracker起動後にデスクトップの「AC6 WinLoss Tracker」をもう一度開き、
+「ダッシュボードを開く」を選択します。現在セッション、累計戦績、最近の試合を確認できます。
+累計履歴は次の場所へ保存され、ソース更新やセッションリセットでは削除されません。
+  %LOCALAPPDATA%\AC6WinLossTracker\history.db
+
 【カウントの安全設計】
 - 手動 WIN +1 / LOSE +1 API は存在しません。
 - WIN/LOSEは自動検出経路からのみ加算されます。

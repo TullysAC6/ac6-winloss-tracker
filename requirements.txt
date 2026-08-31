@@ -1,1 +1,2 @@
 mss==10.2.0
+ttkbootstrap==2.2.2

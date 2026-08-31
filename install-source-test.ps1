@@ -524,7 +524,7 @@ function Invoke-PipInstall {
     }
     Write-InstallLog 'pip install result: success'
 
-    $dependencyCode = 'import mss; print(mss.__version__)'
+    $dependencyCode = 'from importlib.metadata import version; import mss, ttkbootstrap; print("mss=" + mss.__version__ + "; ttkbootstrap=" + version("ttkbootstrap"))'
     $dependencyResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $dependencyCode)
     Write-InstallLog "dependency verification command: $($dependencyResult.Command)"
     Write-InstallLog "dependency verification exit code: $($dependencyResult.ExitCode)"
@@ -533,7 +533,7 @@ function Invoke-PipInstall {
     if ($dependencyResult.ExitCode -ne 0) {
         throw 'インストールしたPythonライブラリを読み込めませんでした。source-install.logを添えて報告してください。'
     }
-    Write-InstallLog "dependency verification result: success (mss $($dependencyResult.StdOut.Trim()))"
+    Write-InstallLog "dependency verification result: success ($($dependencyResult.StdOut.Trim()))"
 }
 
 function Get-TrackerRuntime {
@@ -573,7 +573,7 @@ function Test-TrackerCommandLine {
     if ([string]::IsNullOrWhiteSpace($CommandLine)) {
         return $false
     }
-    $trackerEntryPattern = '(?i){0}[\\/](app\.py|launcher\.pyw)(?="|\s|$)' -f [Regex]::Escape($installPath)
+    $trackerEntryPattern = '(?i){0}[\\/](app\.py|launcher\.pyw|dashboard\.py)(?="|\s|$)' -f [Regex]::Escape($installPath)
     return $CommandLine -match $trackerEntryPattern
 }
 
@@ -654,6 +654,7 @@ function Wait-TrackerStopped {
             -not (Test-TrackerHealth -Port $RuntimePort)) {
             Remove-Item -LiteralPath (Join-Path $dataPath '.runtime.json') -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath (Join-Path $dataPath '.overlay-runtime.json') -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $dataPath '.dashboard-runtime.json') -Force -ErrorAction SilentlyContinue
             return $true
         }
         Start-Sleep -Milliseconds 250
@@ -673,6 +674,7 @@ function Stop-RunningTracker {
             Remove-Item -LiteralPath $runtimePath -Force -ErrorAction SilentlyContinue
             Write-InstallLog "removed stale runtime file: $runtimePath"
         }
+        Remove-Item -LiteralPath (Join-Path $dataPath '.dashboard-runtime.json') -Force -ErrorAction SilentlyContinue
         return
     }
 
@@ -863,6 +865,7 @@ try {
         Where-Object {
             (Test-Path -LiteralPath (Join-Path $_.FullName 'app.py')) -and
             (Test-Path -LiteralPath (Join-Path $_.FullName 'launcher.pyw')) -and
+            (Test-Path -LiteralPath (Join-Path $_.FullName 'dashboard.py')) -and
             (Test-Path -LiteralPath (Join-Path $_.FullName 'requirements.txt'))
         } |
         Select-Object -First 1
@@ -894,6 +897,10 @@ try {
     $launcherPath = Join-Path $installPath 'launcher.pyw'
     if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
         throw 'インストール後のlauncher.pywを確認できませんでした。'
+    }
+    $dashboardPath = Join-Path $installPath 'dashboard.py'
+    if (-not (Test-Path -LiteralPath $dashboardPath -PathType Leaf)) {
+        throw 'インストール後のdashboard.pyを確認できませんでした。'
     }
     Write-InstallLog "source install path: $installPath"
 
