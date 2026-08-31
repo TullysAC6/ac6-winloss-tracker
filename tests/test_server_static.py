@@ -26,7 +26,7 @@ assert 'for n in range(5, 51, 5):' in s
 assert 'event_id = secrets.token_urlsafe(18)' in s
 assert '"effect_id": event_id' in s
 assert '"tier": min(10, milestone // 5)' in s
-bind_pos = s.index('server = ThreadingHTTPServer')
+bind_pos = s.index('server = QuietThreadingHTTPServer')
 reset_pos = s.index('stats.reset()', bind_pos)
 detector_pos = s.index('threading.Thread(target=detector_supervisor', reset_pos)
 history_pos = s.index('store = HistoryStore(DATA_ROOT)', reset_pos)
@@ -39,6 +39,11 @@ assert s.index('s = stats.add(result, source)') < s.index('store.record_result(e
 assert 'if path == "/api/dashboard/summary":' in s
 assert 'store.reset_session()' in s
 print("history accepted-result flow / dashboard API / session reset: OK")
+
+assert "class QuietThreadingHTTPServer(ThreadingHTTPServer):" in s
+assert "ConnectionAbortedError" in s
+assert "super().handle_error(request, client_address)" in s
+print("benign localhost disconnect suppression: OK")
 
 assert 'status, level = "", 0' in s
 assert 'status, level = "通常", 0' not in s

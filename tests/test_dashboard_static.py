@@ -8,12 +8,17 @@ requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
 server = (ROOT / "server.py").read_text(encoding="utf-8")
 
 assert 'ttk.Window(themename="darkly")' in dashboard
+assert 'self.root.option_add("*Font", "Segoe UI 10")' not in dashboard
+assert 'tkfont.nametofont(font_name).configure(family="Segoe UI", size=10)' in dashboard
 assert 'self.root.geometry("950x650")' in dashboard
 assert 'self.root.minsize(800, 540)' in dashboard
 assert 'attributes("-topmost"' not in dashboard
 assert "threading.Thread(target=self._worker" in dashboard
 assert "POLL_SECONDS = 1.0" in dashboard
 assert 'shell=False' in launcher and 'DASHBOARD_PATH = APP_DIR / "dashboard.py"' in launcher
+assert 'DASHBOARD_LOG = DATA_DIR / "dashboard.log"' in launcher
+assert 'dashboard runtime verification: success' in launcher
+assert 'runtime["pid"] == process.pid' in launcher
 assert "ダッシュボードを開く" in launcher
 assert "ttkbootstrap==2.2.2" in requirements
 assert "import mss, ttkbootstrap" in installer

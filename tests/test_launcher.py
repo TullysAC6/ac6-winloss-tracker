@@ -106,6 +106,51 @@ with tempfile.TemporaryDirectory() as temporary:
                 process.wait(timeout=5)
 
         runtime_path.unlink(missing_ok=True)
+        dashboard_runtime = data / ".dashboard-runtime.json"
+        dashboard_log = data / "dashboard.log"
+        fake_dashboard = root / "fake_dashboard.py"
+        fake_dashboard.write_text(
+            textwrap.dedent(
+                """
+                import json, os, time
+                from pathlib import Path
+                path = Path(os.environ["LOCALAPPDATA"]) / "AC6WinLossTracker" / ".dashboard-runtime.json"
+                path.write_text(json.dumps({
+                    "pid": os.getpid(), "server_pid": os.getppid(),
+                    "heartbeat_at": time.time(), "hwnd": 123,
+                }), encoding="utf-8")
+                time.sleep(0.5)
+                path.unlink(missing_ok=True)
+                """
+            ),
+            encoding="utf-8",
+        )
+        assert launcher.open_dashboard(
+            fake_dashboard, root, dashboard_log, dashboard_runtime, timeout=2
+        ) is True
+        assert "dashboard runtime verification: success" in dashboard_log.read_text(encoding="utf-8")
+
+        dashboard_runtime.write_text(json.dumps({
+            "pid": os.getpid(), "server_pid": os.getpid(),
+            "heartbeat_at": __import__("time").time(), "hwnd": 456,
+        }), encoding="utf-8")
+        assert launcher.open_dashboard(
+            root / "must-not-launch.py", root, dashboard_log, dashboard_runtime, timeout=1
+        ) is True
+        dashboard_runtime.unlink(missing_ok=True)
+
+        failing_dashboard = root / "failing_dashboard.py"
+        failing_dashboard.write_text(
+            "raise RuntimeError('intentional dashboard startup failure')\n", encoding="utf-8"
+        )
+        assert launcher.open_dashboard(
+            failing_dashboard, root, dashboard_log, dashboard_runtime, timeout=2
+        ) is False
+        dashboard_log_text = dashboard_log.read_text(encoding="utf-8")
+        assert "intentional dashboard startup failure" in dashboard_log_text
+        assert "dashboard exit code: 1" in dashboard_log_text
+        assert "dashboard runtime verification: failed" in dashboard_log_text
+
         failing_app = root / "failing_app.py"
         failing_app.write_text(
             "raise RuntimeError('intentional launcher failure')\n", encoding="utf-8"

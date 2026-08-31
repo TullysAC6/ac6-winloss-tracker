@@ -2,6 +2,7 @@ import json
 import os
 import queue
 import secrets
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -51,6 +52,16 @@ detector_fallback = {
 
 
 event_bus = EventBus(history_size=300)
+
+
+class QuietThreadingHTTPServer(ThreadingHTTPServer):
+    """Suppress only expected short-lived localhost client disconnect noise."""
+
+    def handle_error(self, request, client_address):
+        error = sys.exc_info()[1]
+        if isinstance(error, (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
 
 
 def create_control_token():
@@ -644,7 +655,7 @@ def main():
         input("Enterキーで終了...")
         return
 
-    server = ThreadingHTTPServer(("127.0.0.1", c["port"]), Handler)
+    server = QuietThreadingHTTPServer(("127.0.0.1", c["port"]), Handler)
 
     # Binding the configured port is the ownership boundary: never reset
     # another running instance's stats before this succeeds.

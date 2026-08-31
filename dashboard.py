@@ -6,6 +6,7 @@ import os
 import queue
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -18,6 +19,7 @@ from app_paths import DISPLAY_NAME, data_dir
 DATA_ROOT = data_dir()
 RUNTIME_PATH = DATA_ROOT / ".runtime.json"
 DASHBOARD_RUNTIME_PATH = DATA_ROOT / ".dashboard-runtime.json"
+DASHBOARD_LOG_PATH = DATA_ROOT / "dashboard.log"
 POLL_SECONDS = 1.0
 HEARTBEAT_SECONDS = 1.0
 STALE_HEARTBEAT_SECONDS = 4.0
@@ -201,6 +203,7 @@ class HistoryFrame:
 class DashboardApp:
     def __init__(self, runtime: dict[str, Any]):
         import ttkbootstrap as ttk
+        import tkinter.font as tkfont
         from ttkbootstrap.dialogs import Messagebox
 
         self.ttk = ttk
@@ -210,7 +213,10 @@ class DashboardApp:
         self.root.title(f"{DISPLAY_NAME} - Dashboard")
         self.root.geometry("950x650")
         self.root.minsize(800, 540)
-        self.root.option_add("*Font", "Segoe UI 10")
+        # Configure Tk named fonts structurally.  A raw option database string
+        # such as "Segoe UI 10" is tokenized by Tcl and treats "UI" as size.
+        for font_name in ("TkDefaultFont", "TkTextFont"):
+            tkfont.nametofont(font_name).configure(family="Segoe UI", size=10)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self._closing = False
         self._responses: queue.Queue[tuple[str, Any]] = queue.Queue()
@@ -336,4 +342,16 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except SystemExit:
+        raise
+    except Exception:
+        try:
+            DASHBOARD_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with DASHBOARD_LOG_PATH.open("a", encoding="utf-8") as log:
+                log.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] dashboard fatal error\n")
+                traceback.print_exc(file=log)
+        except Exception:
+            pass
+        raise

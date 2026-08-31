@@ -22,6 +22,7 @@ RUNTIME_PATH = DATA_DIR / ".runtime.json"
 OVERLAY_RUNTIME_PATH = DATA_DIR / ".overlay-runtime.json"
 DASHBOARD_RUNTIME_PATH = DATA_DIR / ".dashboard-runtime.json"
 STARTUP_LOG = DATA_DIR / "startup.log"
+DASHBOARD_LOG = DATA_DIR / "dashboard.log"
 MAX_LOG_BYTES = 1024 * 1024
 STARTUP_TIMEOUT_SECONDS = 10.0
 
@@ -135,22 +136,75 @@ def start_application(
 def open_dashboard(
     dashboard_path: Path = DASHBOARD_PATH,
     app_dir: Path = APP_DIR,
-    log_path: Path = STARTUP_LOG,
+    log_path: Path = DASHBOARD_LOG,
+    runtime_path: Path = DASHBOARD_RUNTIME_PATH,
+    timeout: float = 7.0,
 ) -> bool:
-    """Launch the optional dashboard with this verified Python executable."""
+    """Return True only after a live dashboard HWND publishes a fresh heartbeat."""
+    existing = read_dashboard_runtime(runtime_path)
+    if existing is not None and process_is_alive(existing["pid"]):
+        focus_dashboard_window(existing["hwnd"])
+        return True
     try:
         rotate_startup_log(log_path)
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
         with log_path.open("a", encoding="utf-8", buffering=1) as startup_log:
-            subprocess.Popen(
+            process = subprocess.Popen(
                 [sys.executable, str(dashboard_path)], cwd=str(app_dir),
                 stdin=subprocess.DEVNULL, stdout=startup_log,
                 stderr=subprocess.STDOUT, shell=False, creationflags=creationflags,
             )
-        return True
+            startup_log.write(f"dashboard launch PID: {process.pid}\n")
+            startup_log.flush()
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                exit_code = process.poll()
+                if exit_code is not None:
+                    startup_log.write(f"dashboard exit code: {exit_code}\n")
+                    startup_log.write("dashboard runtime verification: failed\n")
+                    return False
+                runtime = read_dashboard_runtime(runtime_path)
+                if runtime is not None and runtime["pid"] == process.pid:
+                    startup_log.write("dashboard runtime verification: success\n")
+                    return True
+                time.sleep(0.1)
+            startup_log.write("dashboard runtime verification: failed (timeout)\n")
+            try:
+                process.terminate()
+            except OSError:
+                pass
+            return False
     except Exception:
         log_launcher_error(log_path)
         return False
+
+
+def read_dashboard_runtime(
+    path: Path = DASHBOARD_RUNTIME_PATH,
+    max_heartbeat_age: float = 4.0,
+) -> dict | None:
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        pid = raw["pid"]
+        server_pid = raw["server_pid"]
+        heartbeat_at = float(raw["heartbeat_at"])
+        hwnd = raw["hwnd"]
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return None
+    if type(pid) is not int or pid <= 0 or type(server_pid) is not int or server_pid <= 0:
+        return None
+    if type(hwnd) is not int or hwnd <= 0:
+        return None
+    if time.time() - heartbeat_at > max_heartbeat_age:
+        return None
+    return {"pid": pid, "server_pid": server_pid, "heartbeat_at": heartbeat_at, "hwnd": hwnd}
+
+
+def focus_dashboard_window(hwnd: int) -> None:
+    if os.name != "nt" or hwnd <= 0:
+        return
+    ctypes.windll.user32.ShowWindow(hwnd, 9)
+    ctypes.windll.user32.SetForegroundWindow(hwnd)
 
 
 def wait_for_application(
@@ -336,11 +390,20 @@ def main() -> None:
     close_button.pack(side="left", padx=6)
     button_row.pack()
 
-    def begin_dashboard() -> None:
-        if open_dashboard():
+    def dashboard_finish(ok: bool) -> None:
+        dashboard_button.config(state="normal")
+        if ok:
             status.config(text="ダッシュボードを開きました。")
         else:
             status.config(text="ダッシュボードを開けませんでした。\n診断ログを確認してください。")
+
+    def begin_dashboard() -> None:
+        dashboard_button.config(state="disabled")
+        status.config(text="ダッシュボードを開いています...")
+        threading.Thread(
+            target=lambda: root.after(0, dashboard_finish, open_dashboard()),
+            daemon=True,
+        ).start()
 
     dashboard_button.config(command=begin_dashboard)
 
