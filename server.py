@@ -5,6 +5,7 @@ import secrets
 import sys
 import threading
 import time
+from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -26,7 +27,9 @@ OVERLAY = resource_path("overlay.html")
 RUNTIME_PATH = DATA_ROOT / ".runtime.json"
 OVERLAY_RUNTIME_PATH = DATA_ROOT / ".overlay-runtime.json"
 DASHBOARD_RUNTIME_PATH = DATA_ROOT / ".dashboard-runtime.json"
-OVERLAY_HEARTBEAT_MAX_AGE = 3.0
+OVERLAY_HEARTBEAT_MAX_AGE = 5.0
+SSE_KEEPALIVE_SECONDS = 2.0
+SSE_KEEPALIVE = b": keepalive\n\n"
 
 stop_event = threading.Event()
 stats = StatsManager(DATA_ROOT)
@@ -36,6 +39,8 @@ history = None
 history_lock = threading.RLock()
 history_health = {"status": "starting", "error": None}
 history_event_ids = []
+dashboard_cache_lock = threading.Lock()
+dashboard_cache = None
 
 detector = None
 detector_lock = threading.Lock()
@@ -149,7 +154,7 @@ def lifecycle_health(now=None):
             "open": (
                 dashboard_server_pid == os.getpid()
                 and process_is_alive(dashboard_pid)
-                and heartbeat_age <= 3.0
+                and heartbeat_age <= 5.0
             ),
             "pid": dashboard_pid,
             "server_pid": dashboard_server_pid,
@@ -168,11 +173,25 @@ def lifecycle_health(now=None):
     }
 
 
+def invalidate_dashboard_summary():
+    global dashboard_cache
+    with dashboard_cache_lock:
+        dashboard_cache = None
+
+
 def set_history_health(status, error=None):
+    changed = False
     with history_lock:
+        next_health = {
+            "status": str(status),
+            "error": None if error is None else str(error),
+        }
+        changed = next_health != history_health
         history_health.update(
-            status=str(status), error=None if error is None else str(error)
+            status=next_health["status"], error=next_health["error"]
         )
+    if changed:
+        invalidate_dashboard_summary()
 
 
 def history_failure(operation, error):
@@ -182,7 +201,7 @@ def history_failure(operation, error):
     print(f"[history] WARNING: {operation} failed: {message}")
 
 
-def dashboard_summary():
+def _dashboard_summary_uncached():
     current = status_payload(stats.snapshot())
     with history_lock:
         store = history
@@ -206,7 +225,7 @@ def dashboard_summary():
             history_failure("dashboard_summary", e)
             with history_lock:
                 health = dict(history_health)
-    return {
+    summary = {
         "system": True,
         "session": {
             "id": session_meta["id"] if session_meta else None,
@@ -219,6 +238,24 @@ def dashboard_summary():
         "recent_matches": recent,
         "history_health": health,
     }
+    return summary
+
+
+def dashboard_summary():
+    global dashboard_cache
+    with dashboard_cache_lock:
+        if dashboard_cache is not None:
+            return deepcopy(dashboard_cache)
+    # All authoritative stats/history mutations also hold result_lock. This
+    # prevents a stale snapshot from being cached after a concurrent result.
+    with result_lock:
+        with dashboard_cache_lock:
+            if dashboard_cache is not None:
+                return deepcopy(dashboard_cache)
+        summary = _dashboard_summary_uncached()
+        with dashboard_cache_lock:
+            dashboard_cache = deepcopy(summary)
+        return summary
 
 
 def status_payload(s, milestone=None):
@@ -347,6 +384,7 @@ def record_result(result, source):
         try:
             before = stats.snapshot()
             s = stats.add(result, source)
+            invalidate_dashboard_summary()
         except Exception:
             result_gate.clear_for_manual_correction()
             raise
@@ -392,6 +430,7 @@ def record_result(result, source):
                 "created_at_ms": int(time.time() * 1000),
             }, remember=False)
 
+        RECORDER.flush_frame_context("result_accepted")
         RECORDER.record("result_accepted", result=result, source=source, wins=s["wins"], losses=s["losses"], streak=s["streak"])
         print(
             f"[result] {result.upper()} ({source}) | "
@@ -403,6 +442,7 @@ def record_result(result, source):
 def undo_result():
     with result_lock:
         s, removed = stats.undo()
+        invalidate_dashboard_summary()
         result_gate.clear_for_manual_correction()
         with detector_lock:
             current = detector
@@ -424,6 +464,7 @@ def undo_result():
 def reset_stats():
     with result_lock:
         s = stats.reset()
+        invalidate_dashboard_summary()
         result_gate.lock_now()
         with detector_lock:
             current = detector
@@ -576,15 +617,20 @@ class Handler(BaseHTTPRequestHandler):
                         # browser's last successfully delivered Event-ID.
                         break
                     try:
-                        record = client.queue.get(timeout=1.0)
+                        record = client.queue.get(timeout=SSE_KEEPALIVE_SECONDS)
                     except queue.Empty:
+                        self.wfile.write(SSE_KEEPALIVE)
+                        self.wfile.flush()
                         continue
                     if client.overflow.is_set():
                         break
                     self.wfile.write(encode_sse(record))
                     self.wfile.flush()
 
-            except (BrokenPipeError, ConnectionResetError, OSError):
+            except (
+                BrokenPipeError, ConnectionResetError,
+                ConnectionAbortedError, OSError,
+            ):
                 pass
             finally:
                 if client is not None:
@@ -672,6 +718,7 @@ def main():
     try:
         store = HistoryStore(DATA_ROOT)
         store.start_session()
+        invalidate_dashboard_summary()
         with history_lock:
             history = store
         set_history_health("active")

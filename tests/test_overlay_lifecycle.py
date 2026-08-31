@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory() as temporary:
         assert first["state"] == "ready"
         assert first["panel_hwnd"] == 101 and first["text_hwnd"] == 202
 
-        time.sleep(0.8)
+        time.sleep(game_overlay.HEARTBEAT_SECONDS + 0.1)
         overlay._publish_ready_heartbeat()
         second = json.loads(path.read_text(encoding="utf-8"))
         assert second["heartbeat_at"] > first["heartbeat_at"]
@@ -59,6 +59,10 @@ assert "_start_effect_listener" in game_source
 assert "_render_milestone_effect" in game_source
 assert "effect_id" in game_source
 assert 'self.effect_canvas.delete("milestone")' in game_source
+assert "self._stats_queue.put(stats_payload)" in game_source
+assert "if not self._sse_connected.is_set()" in game_source
+assert "fallback_stats = read_stats()" in game_source
+assert "\n        s = read_stats()\n" not in game_source[game_source.index("def _tick(self)"):]
 assert 'self.canvas.delete("milestone")' not in game_source
 assert 'self.canvas.delete("all")' in game_source
 assert 'self._show_at_game(left, top)' in game_source
@@ -69,9 +73,20 @@ print("server-sourced 5..50 effect rendering coverage: OK")
 class FakeCanvas:
     def __init__(self):
         self.deleted = []
+        self.rectangles = 0
+        self.texts = 0
+
+    def configure(self, **kwargs):
+        pass
 
     def delete(self, tag):
         self.deleted.append(tag)
+
+    def create_rectangle(self, *args, **kwargs):
+        self.rectangles += 1
+
+    def create_text(self, *args, **kwargs):
+        self.texts += 1
 
 
 class FakeUser32:
@@ -115,3 +130,51 @@ finally:
         game_overlay.SW_HIDE = original_sw_hide
 
 print("transient effect cleanup leaves persistent HUD untouched: OK")
+
+
+# Identical animation frames reuse the existing canvas; only the four exact
+# 50-win visual stage transitions redraw it.
+names = ("user32", "HWND_TOPMOST", "SWP_NOACTIVATE", "SWP_SHOWWINDOW", "SW_SHOWNOACTIVATE")
+saved = {name: getattr(game_overlay, name, missing) for name in names}
+original_monotonic = game_overlay.time.monotonic
+try:
+    fake_user32 = FakeUser32()
+    game_overlay.user32 = fake_user32
+    game_overlay.HWND_TOPMOST = -1
+    game_overlay.SWP_NOACTIVATE = 0x10
+    game_overlay.SWP_SHOWWINDOW = 0x40
+    game_overlay.SW_SHOWNOACTIVATE = 4
+    overlay = game_overlay.GameOverlay.__new__(game_overlay.GameOverlay)
+    overlay.effect_canvas = FakeCanvas()
+    overlay.effect_hwnd = 303
+    overlay._effect_visible = False
+    overlay._active_effect = {
+        "effect_id": "five", "milestone": 5, "started": 0.0,
+        "duration": 3.5, "render_key": None,
+    }
+    game_overlay.time.monotonic = lambda: 0.5
+    overlay._render_milestone_effect((1, 0, 0, 1920, 1080))
+    overlay._render_milestone_effect((1, 0, 0, 1920, 1080))
+    assert overlay.effect_canvas.deleted == ["milestone"]
+
+    overlay.effect_canvas = FakeCanvas()
+    overlay._active_effect = {
+        "effect_id": "fifty", "milestone": 50, "started": 0.0,
+        "duration": 6.0, "render_key": None,
+    }
+    for moment in (0.1, 0.5, 1.0, 2.0, 4.0):
+        game_overlay.time.monotonic = lambda value=moment: value
+        overlay._render_milestone_effect((1, 0, 0, 1920, 1080))
+    assert len(overlay.effect_canvas.deleted) == 4
+finally:
+    game_overlay.time.monotonic = original_monotonic
+    for name, value in saved.items():
+        if value is missing:
+            try:
+                delattr(game_overlay, name)
+            except AttributeError:
+                pass
+        else:
+            setattr(game_overlay, name, value)
+
+print("milestone visual stages redraw only on transitions: OK")

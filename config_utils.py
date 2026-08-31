@@ -14,6 +14,7 @@ CONFIG_VERSION = 17
 
 _lock = threading.Lock()
 _last_good = None
+_last_good_signature = None
 _health = {"status": "starting", "error": None, "last_error_at": None}
 _last_error_signature = None
 
@@ -104,9 +105,18 @@ def get_config_health():
         return dict(_health)
 
 
+def _config_signature():
+    stat = CONFIG_PATH.stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
 def load_config(use_last_good=True):
-    global _last_good
+    global _last_good, _last_good_signature
     try:
+        signature = _config_signature()
+        with _lock:
+            if _last_good is not None and signature == _last_good_signature:
+                return dict(_last_good)
         with CONFIG_PATH.open("r", encoding="utf-8") as f:
             raw = json.load(f)
         migrated_raw, migrated_from = _migrate_known_config(raw)
@@ -114,6 +124,7 @@ def load_config(use_last_good=True):
         if migrated_from is not None:
             _write_migrated_config(migrated_raw, migrated_from)
             print(f"[config] migrated config version {migrated_from} -> {CONFIG_VERSION}")
+            signature = _config_signature()
     except (OSError, json.JSONDecodeError, ValueError) as e:
         _set_health("degraded", str(e))
         if use_last_good:
@@ -123,5 +134,6 @@ def load_config(use_last_good=True):
         raise
     with _lock:
         _last_good = dict(c)
+        _last_good_signature = signature
     _set_health("active", None)
     return c

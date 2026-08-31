@@ -18,7 +18,9 @@ assert 'threading.Thread(target=self.server.shutdown, daemon=True).start()' in s
 assert 'self.headers.get("X-Control-Token", "") != CONTROL_TOKEN' in s
 assert 'if path == "/health":' in s
 assert 'def lifecycle_health(' in s
-assert 'OVERLAY_HEARTBEAT_MAX_AGE = 3.0' in s
+assert 'OVERLAY_HEARTBEAT_MAX_AGE = 5.0' in s
+assert 'SSE_KEEPALIVE_SECONDS = 2.0' in s
+assert 'SSE_KEEPALIVE = b": keepalive\\n\\n"' in s
 assert 'publish_stats_active(s)' in s
 print("runtime control + stats health restore: OK")
 

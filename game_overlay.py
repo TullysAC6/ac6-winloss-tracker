@@ -47,6 +47,8 @@ DEFAULT_POLL_MS = 250
 DEFAULT_PANEL_OPACITY = 10
 DEFAULT_SERVER_CHECK_MS = 500
 DEFAULT_SERVER_STARTUP_GRACE_SEC = 20.0
+HEARTBEAT_SECONDS = 1.5
+STATS_FALLBACK_SECONDS = 3.0
 TRANSPARENT_KEY = "#010203"
 PANEL_BG = "#101216"
 TEXT_FG = "#f5f7fa"
@@ -128,14 +130,17 @@ def read_server_runtime(path: Path = RUNTIME_PATH) -> dict[str, Any] | None:
     return {"pid": pid, "port": port, "started_at": started_at}
 
 
-def write_overlay_runtime(payload: dict[str, Any], path: Path | None = None) -> None:
+def write_overlay_runtime(
+    payload: dict[str, Any], path: Path | None = None, durable: bool = False,
+) -> None:
     path = OVERLAY_RUNTIME_PATH if path is None else path
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
     with tmp.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False)
         handle.flush()
-        os.fsync(handle.fileno())
+        if durable:
+            os.fsync(handle.fileno())
     os.replace(tmp, path)
 
 
@@ -415,6 +420,9 @@ class GameOverlay:
         self._overlay_started_at = time.time()
         self._last_heartbeat_at = 0.0
         self._effect_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._stats_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._sse_connected = threading.Event()
+        self._next_stats_fallback_at = time.monotonic() + STATS_FALLBACK_SECONDS
         self._effect_ids: set[str] = set()
         self._active_effect: dict[str, Any] | None = None
         self._effect_visible = False
@@ -430,6 +438,9 @@ class GameOverlay:
             "status": "",
             "status_level": 0,
         }
+        startup_stats = read_stats()
+        if startup_stats is not None:
+            self.last_stats = startup_stats
         self.visible = False
         self._last_render_key: tuple[Any, ...] | None = None
 
@@ -732,6 +743,26 @@ class GameOverlay:
         self._server_state = "alive"
         return True
 
+    def _queue_sse_event(self, event_name: str, data: str) -> None:
+        payload = json.loads(data)
+        if event_name == "stats":
+            stats_payload = normalize_stats(payload)
+            if stats_payload is not None:
+                self._stats_queue.put(stats_payload)
+            return
+        if event_name != "effect":
+            return
+        effect_id = str(payload.get("effect_id", ""))
+        created = int(payload.get("created_at_ms", 0))
+        if (
+            payload.get("effect") == "milestone"
+            and effect_id
+            and effect_id not in self._effect_ids
+            and created >= int(self._overlay_started_at * 1000) - 2000
+        ):
+            self._effect_ids.add(effect_id)
+            self._effect_queue.put(payload)
+
     def _start_effect_listener(self, port: int) -> None:
         if self._effect_thread_started:
             return
@@ -743,6 +774,7 @@ class GameOverlay:
                     with urllib.request.urlopen(
                         f"http://127.0.0.1:{port}/events", timeout=5
                     ) as response:
+                        self._sse_connected.set()
                         event_name = ""
                         data = None
                         for raw_line in response:
@@ -753,25 +785,17 @@ class GameOverlay:
                                 event_name = line[7:]
                             elif line.startswith("data: "):
                                 data = line[6:]
-                            elif not line and event_name == "effect" and data:
+                            elif not line and event_name and data:
                                 try:
-                                    payload = json.loads(data)
-                                    effect_id = str(payload.get("effect_id", ""))
-                                    created = int(payload.get("created_at_ms", 0))
-                                    if (
-                                        payload.get("effect") == "milestone"
-                                        and effect_id
-                                        and effect_id not in self._effect_ids
-                                        and created >= int(self._overlay_started_at * 1000) - 2000
-                                    ):
-                                        self._effect_ids.add(effect_id)
-                                        self._effect_queue.put(payload)
+                                    self._queue_sse_event(event_name, data)
                                 except (TypeError, ValueError, json.JSONDecodeError):
                                     pass
                                 event_name = ""
                                 data = None
                 except (OSError, urllib.error.URLError, ValueError):
                     self._effect_stop.wait(1.0)
+                finally:
+                    self._sse_connected.clear()
 
         threading.Thread(target=listen, name="overlay-effects", daemon=True).start()
 
@@ -787,16 +811,12 @@ class GameOverlay:
         width, height = max(1, game[3]), max(1, game[4])
         effect_width = max(600, min(width, 1000))
         effect_height = 240
-        self.effect_canvas.configure(width=effect_width, height=effect_height)
-        self.effect_canvas.delete("milestone")
         if milestone == 50 and elapsed < 1.6:
             flash = "#ffffff" if elapsed < 0.8 else "#111111"
-            self.effect_canvas.create_rectangle(
-                0, 0, effect_width, effect_height,
-                fill=flash, outline=flash, tags="milestone",
-            )
+            stage = "flash-white" if elapsed < 0.8 else "flash-dark"
             text, color, size = "", flash, 1
         else:
+            stage = "legend-gold" if milestone == 50 and elapsed < 3.2 else "banner"
             text = {
                 5: "5連勝　激アツ!!", 10: "10連勝　超激アツ!!",
                 15: "15連勝　覚醒ゾーン突入", 20: "20連勝　RUSH突入!!",
@@ -807,19 +827,29 @@ class GameOverlay:
             size = 42 + min(28, milestone // 2)
             if milestone == 50 and elapsed < 3.2:
                 color, size = "#ffd84a", 76
-        if text:
-            # A compact banner sits slightly below center, away from game UI.
-            banner_fill = "#21142e" if milestone >= 30 else "#2b2108"
-            self.effect_canvas.create_rectangle(
-                70, 65, effect_width - 70, 175,
-                fill=banner_fill, outline=color, width=3, tags="milestone",
-            )
-            self.effect_canvas.create_text(
-                effect_width // 2, 120,
-                anchor="center", text=text, fill=color,
-                font=("Yu Gothic UI", size, "bold"),
-                tags="milestone",
-            )
+        render_key = (milestone, stage, effect_width)
+        if effect.get("render_key") != render_key:
+            effect["render_key"] = render_key
+            self.effect_canvas.configure(width=effect_width, height=effect_height)
+            self.effect_canvas.delete("milestone")
+            if not text:
+                self.effect_canvas.create_rectangle(
+                    0, 0, effect_width, effect_height,
+                    fill=color, outline=color, tags="milestone",
+                )
+            else:
+                # A compact banner sits slightly below center, away from game UI.
+                banner_fill = "#21142e" if milestone >= 30 else "#2b2108"
+                self.effect_canvas.create_rectangle(
+                    70, 65, effect_width - 70, 175,
+                    fill=banner_fill, outline=color, width=3, tags="milestone",
+                )
+                self.effect_canvas.create_text(
+                    effect_width // 2, 120,
+                    anchor="center", text=text, fill=color,
+                    font=("Yu Gothic UI", size, "bold"),
+                    tags="milestone",
+                )
         left, top = game[1], game[2]
         x = left + (width - effect_width) // 2
         y = top + int(height * 0.62) - effect_height // 2
@@ -833,6 +863,12 @@ class GameOverlay:
     def _drain_effects(self) -> None:
         try:
             while True:
+                self.last_stats = self._stats_queue.get_nowait()
+                self._render()
+        except queue.Empty:
+            pass
+        try:
+            while True:
                 payload = self._effect_queue.get_nowait()
                 if self._active_effect is not None:
                     self._finish_effect()
@@ -841,6 +877,7 @@ class GameOverlay:
                     "milestone": int(payload["milestone"]),
                     "started": time.monotonic(),
                     "duration": 6.0 if int(payload["milestone"]) == 50 else 3.5,
+                    "render_key": None,
                 }
         except queue.Empty:
             pass
@@ -849,8 +886,9 @@ class GameOverlay:
         now = time.time()
         if not self._server_linked or self._server_state != "alive" or not self._server_pid:
             return
-        if now - self._last_heartbeat_at < 0.75:
+        if now - self._last_heartbeat_at < HEARTBEAT_SECONDS:
             return
+        first_heartbeat = self._last_heartbeat_at == 0.0
         write_overlay_runtime({
             "pid": os.getpid(),
             "server_pid": self._server_pid,
@@ -860,17 +898,20 @@ class GameOverlay:
             "panel_hwnd": self.panel_hwnd,
             "text_hwnd": self.text_hwnd,
             "target_process": self.process_name,
-        })
-        if self._last_heartbeat_at == 0.0:
+        }, durable=first_heartbeat)
+        if first_heartbeat:
             print(f"[lifecycle] overlay ready: PID {os.getpid()}, server PID {self._server_pid}")
         self._last_heartbeat_at = now
 
     def _tick(self) -> None:
         self._drain_effects()
-        s = read_stats()
-        if s is not None:
-            self.last_stats = s
-            self._render()
+        now = time.monotonic()
+        if not self._sse_connected.is_set() and now >= self._next_stats_fallback_at:
+            self._next_stats_fallback_at = now + STATS_FALLBACK_SECONDS
+            fallback_stats = read_stats()
+            if fallback_stats is not None:
+                self.last_stats = fallback_stats
+                self._render()
 
         game = foreground_game_client(self.process_name)
         if game is not None:

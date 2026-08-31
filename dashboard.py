@@ -21,8 +21,8 @@ RUNTIME_PATH = DATA_ROOT / ".runtime.json"
 DASHBOARD_RUNTIME_PATH = DATA_ROOT / ".dashboard-runtime.json"
 DASHBOARD_LOG_PATH = DATA_ROOT / "dashboard.log"
 POLL_SECONDS = 1.0
-HEARTBEAT_SECONDS = 1.0
-STALE_HEARTBEAT_SECONDS = 4.0
+HEARTBEAT_SECONDS = 1.5
+STALE_HEARTBEAT_SECONDS = 5.0
 MUTEX_NAME = "Local\\AC6WinLossTrackerDashboard"
 
 
@@ -62,7 +62,10 @@ def read_server_runtime(path: Path = RUNTIME_PATH) -> dict[str, Any] | None:
     return {"pid": pid, "port": port, "token": token}
 
 
-def write_runtime(server_pid: int, hwnd: int, path: Path = DASHBOARD_RUNTIME_PATH) -> None:
+def write_runtime(
+    server_pid: int, hwnd: int, path: Path = DASHBOARD_RUNTIME_PATH,
+    durable: bool = False,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "pid": os.getpid(), "server_pid": int(server_pid),
@@ -74,7 +77,8 @@ def write_runtime(server_pid: int, hwnd: int, path: Path = DASHBOARD_RUNTIME_PAT
     with temporary.open("w", encoding="utf-8") as stream:
         json.dump(payload, stream, ensure_ascii=False, indent=2)
         stream.flush()
-        os.fsync(stream.fileno())
+        if durable:
+            os.fsync(stream.fileno())
     os.replace(temporary, path)
 
 
@@ -221,6 +225,7 @@ class DashboardApp:
         self._closing = False
         self._responses: queue.Queue[tuple[str, Any]] = queue.Queue()
         self._poll_in_flight = False
+        self._last_heartbeat_at = 0.0
 
         header = ttk.Frame(self.root, padding=(24, 18))
         header.pack(fill="x")
@@ -249,7 +254,8 @@ class DashboardApp:
         return int(self.root.winfo_id())
 
     def start(self):
-        write_runtime(self.runtime["pid"], self.hwnd())
+        write_runtime(self.runtime["pid"], self.hwnd(), durable=True)
+        self._last_heartbeat_at = time.monotonic()
         self.root.after(100, self._tick)
         self.root.mainloop()
 
@@ -266,7 +272,10 @@ class DashboardApp:
         if current is None or current["pid"] != self.runtime["pid"] or not process_is_alive(self.runtime["pid"]):
             self.close()
             return
-        write_runtime(self.runtime["pid"], self.hwnd())
+        now = time.monotonic()
+        if now - self._last_heartbeat_at >= HEARTBEAT_SECONDS:
+            write_runtime(self.runtime["pid"], self.hwnd())
+            self._last_heartbeat_at = now
         try:
             while True:
                 state, payload = self._responses.get_nowait()

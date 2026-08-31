@@ -1137,6 +1137,7 @@ class ResultDetector:
         self._last_debug_reject_capture = 0.0
         self._last_motion_signature = None
         self._last_gate_reject_log = 0.0
+        self._last_diagnostic_visual = None
 
     def external_mutation(self):
         self.state.external_mutation()
@@ -1262,11 +1263,36 @@ class ResultDetector:
                         self.health.touch_capture(time.time())
                         self.health.update(status="active", error=None)
 
+                        if self.diagnostics:
+                            compact = {
+                                "frame_state": frame_state,
+                                "motion_score": None if motion_score is None else round(float(motion_score), 4),
+                                "gameplay_activity": bool(gameplay_activity),
+                                "dark_ratio": round(float(debug.get("dark_ratio", 0.0)), 4),
+                                "mean_gray": round(float(debug.get("mean_gray", 0.0)), 2),
+                                "win_1d": round(float(debug.get("win_final_score", 0.0)), 4),
+                                "win_2d": round(float(debug.get("win_final_grid_score", 0.0)), 4),
+                                "loss_1d": round(float(debug.get("loss_final_score", 0.0)), 4),
+                                "loss_2d": round(float(debug.get("loss_final_grid_score", 0.0)), 4),
+                                "state_before": self.state.snapshot(),
+                            }
+                            self.diagnostics.buffer_frame(**compact)
+
                         if frame_state in (PHASE, FINAL_WIN, FINAL_LOSS, FINAL_DRAW):
                             self._save_debug_result_roi(shot, frame_state)
-                            if self.diagnostics and frame_state in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW):
+                            if (
+                                self.diagnostics
+                                and frame_state in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW)
+                                and frame_state != self._last_diagnostic_visual
+                            ):
+                                self.diagnostics.flush_frame_context(
+                                    f"visual_{frame_state.lower()}"
+                                )
                                 image = self.diagnostics.capture_roi(shot, frame_state)
                                 self.diagnostics.record("result_visual", frame_state=frame_state, roi=image)
+                            self._last_diagnostic_visual = frame_state
+                        else:
+                            self._last_diagnostic_visual = None
 
                         suspicious_reject = (
                             frame_state == NON_CLEAR
@@ -1278,11 +1304,12 @@ class ResultDetector:
                         )
                         if suspicious_reject:
                             self._save_debug_rejected_roi(shot)
-                            if self.diagnostics:
-                                image = self.diagnostics.capture_roi(shot, "rejected")
-                                self.diagnostics.record("suspicious_reject", roi=image, win_1d=debug.get("win_final_score", 0.0), win_2d=debug.get("win_final_grid_score", 0.0), loss_1d=debug.get("loss_final_score", 0.0), loss_2d=debug.get("loss_final_grid_score", 0.0))
                             now = time.monotonic()
                             if now - self._last_reject_log >= 2.0:
+                                if self.diagnostics:
+                                    self.diagnostics.flush_frame_context("suspicious_reject")
+                                    image = self.diagnostics.capture_roi(shot, "rejected")
+                                    self.diagnostics.record("suspicious_reject", roi=image, win_1d=debug.get("win_final_score", 0.0), win_2d=debug.get("win_final_grid_score", 0.0), loss_1d=debug.get("loss_final_score", 0.0), loss_2d=debug.get("loss_final_grid_score", 0.0))
                                 print(
                                     "[result] result-like frame rejected "
                                     f"(win1d={debug.get('win_final_score', 0):.2f}, "
@@ -1294,21 +1321,6 @@ class ResultDetector:
                                 )
                                 self._last_reject_log = now
 
-                        if self.diagnostics:
-                            compact = {
-                                "frame_state": frame_state,
-                                "motion_score": round(float(motion_score), 4),
-                                "gameplay_activity": bool(gameplay_activity),
-                                "dark_ratio": round(float(debug.get("dark_ratio", 0.0)), 4),
-                                "mean_gray": round(float(debug.get("mean_gray", 0.0)), 2),
-                                "win_1d": round(float(debug.get("win_final_score", 0.0)), 4),
-                                "win_2d": round(float(debug.get("win_final_grid_score", 0.0)), 4),
-                                "loss_1d": round(float(debug.get("loss_final_score", 0.0)), 4),
-                                "loss_2d": round(float(debug.get("loss_final_grid_score", 0.0)), 4),
-                                "state_before": self.state.snapshot(),
-                            }
-                            self.diagnostics.record("frame", **compact)
-
                         result = self.state.observe(
                             frame_state,
                             CONFIRM_HITS,
@@ -1317,7 +1329,16 @@ class ResultDetector:
                             gameplay_activity=gameplay_activity,
                         )
 
-                        if self.diagnostics and (result is not None or self.state.last_reject_reason):
+                        if self.diagnostics and result is not None:
+                            self.diagnostics.flush_frame_context("state_decision")
+                            image = self.diagnostics.capture_roi(
+                                shot, f"confirmed_{result}"
+                            )
+                            self.diagnostics.record(
+                                "result_confirmed_visual",
+                                result=result,
+                                roi=image,
+                            )
                             self.diagnostics.record(
                                 "state_decision",
                                 result=result,
@@ -1398,6 +1419,9 @@ class ResultDetector:
                     except Exception as e:
                         msg = f"{type(e).__name__}: {e}"
                         print(f"[result] detector error: {msg}")
+                        if self.diagnostics:
+                            self.diagnostics.flush_frame_context("detector_error")
+                            self.diagnostics.record("detector_error", error=msg)
                         self.state.reset_unarmed()
                         self.health.update(status="error", error=msg)
                         self.stop_event.wait(2.0)
@@ -1405,4 +1429,7 @@ class ResultDetector:
         except Exception as e:
             msg = f"{type(e).__name__}: {e}"
             print(f"[result] detector init failed: {msg}")
+            if self.diagnostics:
+                self.diagnostics.flush_frame_context("detector_init_error")
+                self.diagnostics.record("detector_init_error", error=msg)
             self.health.update(status="error", error=msg)

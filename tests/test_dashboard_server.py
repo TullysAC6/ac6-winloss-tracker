@@ -69,15 +69,22 @@ with tempfile.TemporaryDirectory() as temporary:
             def record_result(self, *args, **kwargs):
                 raise OSError("intentional history failure")
 
+            def session_metadata(self):
+                raise OSError("intentional history failure")
+
         healthy_history = server.history
         server.history = FailingHistory()
         server.result_gate.clear_for_manual_correction()
         assert server.record_result("win", "history-failure-test") is True
         assert server.stats.snapshot()["wins"] == 1
         assert server.history_health["status"] == "degraded"
+        failure_summary = server.dashboard_summary()
+        assert failure_summary["session"]["wins"] == 1
+        assert failure_summary["history_health"]["status"] == "degraded"
         server.history = healthy_history
         server.undo_result()
         assert server.stats.snapshot()["wins"] == 0
+        assert server.dashboard_summary()["session"]["wins"] == 0
         assert len(healthy_history.recent_matches(10)) == 5
 
         httpd.shutdown()
