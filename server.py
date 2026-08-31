@@ -264,7 +264,7 @@ def record_result(result, source):
 
         milestone = None
         if result == "win":
-            for n in (5, 10, 15, 20):
+            for n in range(5, 51, 5):
                 if before["streak"] < n <= s["streak"]:
                     milestone = n
                     break
@@ -281,7 +281,10 @@ def record_result(result, source):
                 "system": True,
                 "kind": "effect",
                 "effect": "milestone",
+                "effect_id": secrets.token_urlsafe(16),
                 "milestone": milestone,
+                "streak": s["streak"],
+                "tier": min(10, milestone // 5),
                 "created_at_ms": int(time.time() * 1000),
             }, remember=False)
 
@@ -521,20 +524,20 @@ def main():
         input("Enterキーで終了...")
         return
 
-    # First run is self-initializing; no setup script is required.
-    if not stats.path.exists():
-        stats.reset()
-        RECORDER.record("first_run_stats_initialized")
-
-    # Stats and detector failures are isolated from the local HTTP server.
-    try:
-        stats.snapshot()
-    except StatsCorruptError as e:
-        print(f"[stats] WARNING: {e}")
-
-    threading.Thread(target=detector_supervisor, daemon=True).start()
-
     server = ThreadingHTTPServer(("127.0.0.1", c["port"]), Handler)
+
+    # Binding the configured port is the ownership boundary: never reset
+    # another running instance's stats before this succeeds.
+    try:
+        stats.reset()
+        stats.snapshot()
+    except Exception as e:
+        print(f"[startup] stats reset failed: {type(e).__name__}: {e}")
+        server.server_close()
+        raise
+
+    print("[lifecycle] session stats reset after server bind")
+    threading.Thread(target=detector_supervisor, daemon=True).start()
     write_runtime_file(server.server_address[1])
 
     print("=" * 68)

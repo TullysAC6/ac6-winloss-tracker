@@ -22,6 +22,15 @@ assert 'OVERLAY_HEARTBEAT_MAX_AGE = 3.0' in s
 assert 'publish_stats_active(s)' in s
 print("runtime control + stats health restore: OK")
 
+assert 'for n in range(5, 51, 5):' in s
+assert '"effect_id": secrets.token_urlsafe(16)' in s
+assert '"tier": min(10, milestone // 5)' in s
+bind_pos = s.index('server = ThreadingHTTPServer')
+reset_pos = s.index('stats.reset()', bind_pos)
+detector_pos = s.index('threading.Thread(target=detector_supervisor', reset_pos)
+assert bind_pos < reset_pos < detector_pos
+print("session reset ordering and 5..50 milestone source: OK")
+
 assert 'status, level = "", 0' in s
 assert 'status, level = "通常", 0' not in s
 assert '"next_target"' not in s
