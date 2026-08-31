@@ -58,4 +58,60 @@ for milestone in range(5, 51, 5):
 assert "_start_effect_listener" in game_source
 assert "_render_milestone_effect" in game_source
 assert "effect_id" in game_source
+assert 'self.effect_canvas.delete("milestone")' in game_source
+assert 'self.canvas.delete("milestone")' not in game_source
+assert 'self.canvas.delete("all")' in game_source
+assert 'self._show_at_game(left, top)' in game_source
+assert 'int(height * 0.62)' in game_source
 print("server-sourced 5..50 effect rendering coverage: OK")
+
+
+class FakeCanvas:
+    def __init__(self):
+        self.deleted = []
+
+    def delete(self, tag):
+        self.deleted.append(tag)
+
+
+class FakeUser32:
+    def __init__(self):
+        self.hidden = []
+
+    def ShowWindow(self, hwnd, command):
+        self.hidden.append((hwnd, command))
+
+    def SetWindowPos(self, *args):
+        return True
+
+
+missing = object()
+original_user32 = getattr(game_overlay, "user32", missing)
+original_sw_hide = getattr(game_overlay, "SW_HIDE", missing)
+try:
+    fake_user32 = FakeUser32()
+    game_overlay.user32 = fake_user32
+    game_overlay.SW_HIDE = 0
+    overlay = game_overlay.GameOverlay.__new__(game_overlay.GameOverlay)
+    overlay.effect_canvas = FakeCanvas()
+    overlay.effect_hwnd = 303
+    overlay.text_hwnd = 202
+    overlay._effect_visible = True
+    overlay._active_effect = {"effect_id": "once", "milestone": 5}
+    overlay.visible = False
+    overlay._finish_effect()
+    assert overlay._active_effect is None
+    assert overlay._effect_visible is False
+    assert overlay.effect_canvas.deleted == ["milestone"]
+    assert fake_user32.hidden == [(303, game_overlay.SW_HIDE)]
+finally:
+    if original_user32 is missing:
+        del game_overlay.user32
+    else:
+        game_overlay.user32 = original_user32
+    if original_sw_hide is missing:
+        del game_overlay.SW_HIDE
+    else:
+        game_overlay.SW_HIDE = original_sw_hide
+
+print("transient effect cleanup leaves persistent HUD untouched: OK")

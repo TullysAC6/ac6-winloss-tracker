@@ -417,6 +417,7 @@ class GameOverlay:
         self._effect_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self._effect_ids: set[str] = set()
         self._active_effect: dict[str, Any] | None = None
+        self._effect_visible = False
         self._effect_stop = threading.Event()
         self._effect_thread_started = False
 
@@ -475,6 +476,32 @@ class GameOverlay:
         )
         self.canvas.pack()
 
+        # Window 3 is exclusively for transient milestone effects.  It never
+        # owns or clears persistent HUD items, so stats continue rendering
+        # while an effect is visible and need no restoration afterwards.
+        effect_window = tk.Toplevel(panel_root)
+        self.effect_window = effect_window
+        effect_window.title("AC6 Milestone Effect")
+        effect_window.overrideredirect(True)
+        effect_window.configure(bg=TRANSPARENT_KEY)
+        effect_window.attributes("-topmost", True)
+        effect_window.attributes("-transparentcolor", TRANSPARENT_KEY)
+        try:
+            effect_window.attributes("-alpha", 1.0)
+        except tk.TclError:
+            pass
+        effect_window.geometry("+32000+32000")
+        self.effect_canvas = tk.Canvas(
+            effect_window,
+            width=1000,
+            height=240,
+            bg=TRANSPARENT_KEY,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+        )
+        self.effect_canvas.pack()
+
         # Map both once off-screen so Tk creates the real Win32 wrapper HWNDs.
         panel_root.update_idletasks()
         panel_root.update()
@@ -482,9 +509,13 @@ class GameOverlay:
         self.panel_hwnd = _tk_toplevel_hwnd(self.panel_widget_hwnd)
         self.text_widget_hwnd = int(text_window.winfo_id())
         self.text_hwnd = _tk_toplevel_hwnd(self.text_widget_hwnd)
+        self.effect_widget_hwnd = int(effect_window.winfo_id())
+        self.effect_hwnd = _tk_toplevel_hwnd(self.effect_widget_hwnd)
 
         self._apply_clickthrough_style(self.panel_hwnd)
         self._apply_clickthrough_style(self.text_hwnd)
+        self._apply_clickthrough_style(self.effect_hwnd)
+        user32.ShowWindow(self.effect_hwnd, SW_HIDE)
         user32.ShowWindow(self.text_hwnd, SW_HIDE)
         user32.ShowWindow(self.panel_hwnd, SW_HIDE)
         self.visible = False
@@ -632,10 +663,27 @@ class GameOverlay:
             user32.ShowWindow(self.panel_hwnd, SW_HIDE)
             self.visible = False
 
+    def _hide_effect(self) -> None:
+        self.effect_canvas.delete("milestone")
+        user32.ShowWindow(self.effect_hwnd, SW_HIDE)
+        self._effect_visible = False
+
+    def _finish_effect(self) -> None:
+        """Remove all transient state without touching the persistent HUD."""
+        self._hide_effect()
+        self._active_effect = None
+        # Reassert the independent HUD z-order; no HUD redraw is required.
+        if self.visible:
+            user32.SetWindowPos(
+                self.text_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+
     def _shutdown_for_server_stop(self, reason: str) -> None:
         if self._closing:
             return
         self._closing = True
+        self._finish_effect()
         self._hide()
         print(f"[game-overlay] {reason}; closing overlay")
         try:
@@ -734,14 +782,20 @@ class GameOverlay:
         elapsed = time.monotonic() - effect["started"]
         milestone = int(effect["milestone"])
         if elapsed > effect["duration"]:
-            self._active_effect = None
-            self._render()
+            self._finish_effect()
             return
         width, height = max(1, game[3]), max(1, game[4])
-        self.canvas.configure(width=max(600, min(width, 1200)), height=180)
-        self.canvas.delete("all")
+        effect_width = max(600, min(width, 1000))
+        effect_height = 240
+        self.effect_canvas.configure(width=effect_width, height=effect_height)
+        self.effect_canvas.delete("milestone")
         if milestone == 50 and elapsed < 1.6:
-            text, color, size = ("", "#ffffff", 1) if elapsed < 0.8 else ("", "#111111", 1)
+            flash = "#ffffff" if elapsed < 0.8 else "#111111"
+            self.effect_canvas.create_rectangle(
+                0, 0, effect_width, effect_height,
+                fill=flash, outline=flash, tags="milestone",
+            )
+            text, color, size = "", flash, 1
         else:
             text = {
                 5: "5連勝　激アツ!!", 10: "10連勝　超激アツ!!",
@@ -754,17 +808,36 @@ class GameOverlay:
             if milestone == 50 and elapsed < 3.2:
                 color, size = "#ffd84a", 76
         if text:
-            self.canvas.create_text(
-                max(300, min(width, 1200) // 2), 90,
+            # A compact banner sits slightly below center, away from game UI.
+            banner_fill = "#21142e" if milestone >= 30 else "#2b2108"
+            self.effect_canvas.create_rectangle(
+                70, 65, effect_width - 70, 175,
+                fill=banner_fill, outline=color, width=3, tags="milestone",
+            )
+            self.effect_canvas.create_text(
+                effect_width // 2, 120,
                 anchor="center", text=text, fill=color,
                 font=("Yu Gothic UI", size, "bold"),
+                tags="milestone",
             )
+        left, top = game[1], game[2]
+        x = left + (width - effect_width) // 2
+        y = top + int(height * 0.62) - effect_height // 2
+        user32.SetWindowPos(
+            self.effect_hwnd, HWND_TOPMOST, x, y, effect_width, effect_height,
+            SWP_NOACTIVATE | SWP_SHOWWINDOW,
+        )
+        user32.ShowWindow(self.effect_hwnd, SW_SHOWNOACTIVATE)
+        self._effect_visible = True
 
     def _drain_effects(self) -> None:
         try:
             while True:
                 payload = self._effect_queue.get_nowait()
+                if self._active_effect is not None:
+                    self._finish_effect()
                 self._active_effect = {
+                    "effect_id": str(payload["effect_id"]),
                     "milestone": int(payload["milestone"]),
                     "started": time.monotonic(),
                     "duration": 6.0 if int(payload["milestone"]) == 50 else 3.5,
@@ -802,14 +875,21 @@ class GameOverlay:
         game = foreground_game_client(self.process_name)
         if game is not None:
             _hwnd, left, top, width, height = game
+            # The persistent HUD remains positioned and updated throughout the
+            # effect.  The transient window is simply layered over the game.
+            self._show_at_game(left, top)
             if self._active_effect is not None:
                 self._render_milestone_effect(game)
-                self._show_absolute(left + width // 2 - 500, top + height // 2 - 90)
-            else:
-                self._show_at_game(left, top)
+            elif self._effect_visible:
+                self._hide_effect()
         elif self.always_show:
             self._show_absolute(self.x_offset, self.y_offset)
+            if self._active_effect is not None:
+                preview = (0, self.x_offset, self.y_offset, 1920, 1080)
+                self._render_milestone_effect(preview)
         else:
+            if self._effect_visible:
+                self._hide_effect()
             self._hide()
 
         if self.debug:
@@ -839,6 +919,8 @@ class GameOverlay:
             self.root.mainloop()
         finally:
             self._effect_stop.set()
+            if not self._closing:
+                self._finish_effect()
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
