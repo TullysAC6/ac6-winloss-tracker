@@ -4,6 +4,7 @@ from pathlib import Path
 
 HERE=Path(__file__).resolve().parent
 files=[
+    "test_launcher.py",
     "test_profile_optimization.py",
     "test_detector.py",
     "test_state_machine.py",

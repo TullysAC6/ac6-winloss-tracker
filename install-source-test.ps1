@@ -564,10 +564,44 @@ function Install-SourceTree {
     }
 }
 
+function Wait-AppRuntimeReady {
+    param([int]$TimeoutSeconds = 15)
+
+    $runtimePath = Join-Path $dataPath '.runtime.json'
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        try {
+            if (Test-Path -LiteralPath $runtimePath -PathType Leaf) {
+                $runtime = Get-Content -LiteralPath $runtimePath -Raw -ErrorAction Stop | ConvertFrom-Json
+                $runtimePid = [int]$runtime.pid
+                $runtimePort = [int]$runtime.port
+                if ($runtimePid -gt 0 -and $runtimePort -ge 1 -and $runtimePort -le 65535) {
+                    $runtimeProcess = Get-Process -Id $runtimePid -ErrorAction Stop
+                    if ($runtimeProcess -and -not $runtimeProcess.HasExited) {
+                        $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/stats" -f $runtimePort) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+                        if ([int]$response.StatusCode -eq 200) {
+                            Write-InstallLog "application runtime path: $runtimePath"
+                            Write-InstallLog "application runtime PID: $runtimePid"
+                            Write-InstallLog "application runtime port: $runtimePort"
+                            Write-InstallLog 'application HTTP /stats status: 200'
+                            return $true
+                        }
+                    }
+                }
+            }
+        } catch {
+            # Startup is asynchronous. Keep polling until the deadline.
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    Write-InstallLog "application runtime readiness timed out after $TimeoutSeconds seconds"
+    return $false
+}
+
 function New-AppShortcut {
     param(
         [Parameter(Mandatory = $true)][string]$PythonwPath,
-        [Parameter(Mandatory = $true)][string]$AppPath
+        [Parameter(Mandatory = $true)][string]$LauncherPath
     )
 
     $desktopPath = [Environment]::GetFolderPath('Desktop')
@@ -581,7 +615,7 @@ function New-AppShortcut {
     try {
         $shortcut = $shell.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $PythonwPath
-        $shortcut.Arguments = '"{0}"' -f $AppPath
+        $shortcut.Arguments = '"{0}"' -f $LauncherPath
         $shortcut.WorkingDirectory = $installPath
         $shortcut.Description = 'AC6 Win/Loss Tracker (Python source test)'
         $shortcut.Save()
@@ -648,6 +682,7 @@ try {
     $sourceRoot = Get-ChildItem -LiteralPath $extractPath -Directory |
         Where-Object {
             (Test-Path -LiteralPath (Join-Path $_.FullName 'app.py')) -and
+            (Test-Path -LiteralPath (Join-Path $_.FullName 'launcher.pyw')) -and
             (Test-Path -LiteralPath (Join-Path $_.FullName 'requirements.txt'))
         } |
         Select-Object -First 1
@@ -671,22 +706,25 @@ try {
     if (-not (Test-Path -LiteralPath $appPath -PathType Leaf)) {
         throw 'インストール後のapp.pyを確認できませんでした。'
     }
+    $launcherPath = Join-Path $installPath 'launcher.pyw'
+    if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
+        throw 'インストール後のlauncher.pywを確認できませんでした。'
+    }
     Write-InstallLog "source install path: $installPath"
 
     Set-InstallStage -Name 'shortcut'
     Write-Step 'デスクトップショートカットを作成しています。'
-    $shortcutPath = New-AppShortcut -PythonwPath $python.PythonwPath -AppPath $appPath
+    $shortcutPath = New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcherPath
     Write-InstallLog "shortcut path: $shortcutPath"
     Write-InstallLog "shortcut TargetPath: $($python.PythonwPath)"
-    Write-InstallLog "shortcut Arguments: `"$appPath`""
+    Write-InstallLog "shortcut Arguments: `"$launcherPath`""
 
     Set-InstallStage -Name 'launch'
     Write-Step 'ショートカットと同じ方法でアプリを起動しています。'
-    $appArguments = '"{0}"' -f $appPath
-    $process = Start-Process -FilePath $python.PythonwPath -ArgumentList $appArguments -WorkingDirectory $installPath -PassThru
-    Start-Sleep -Seconds 3
-    if ($process.HasExited) {
-        throw "アプリが起動直後に終了しました（終了コード: $($process.ExitCode)）。ログを確認してください。"
+    $launcherArguments = '"{0}"' -f $launcherPath
+    Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments -WorkingDirectory $installPath | Out-Null
+    if (-not (Wait-AppRuntimeReady -TimeoutSeconds 15)) {
+        throw 'アプリの起動を確認できませんでした。startup.logを確認してください。'
     }
 
     Write-InstallLog 'application launch result: success'
