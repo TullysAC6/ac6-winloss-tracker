@@ -18,6 +18,36 @@ with tempfile.TemporaryDirectory() as temporary:
     try:
         import server
 
+        overlay_runtime = Path(temporary) / "AC6WinLossTracker" / ".overlay-runtime.json"
+        overlay_runtime.parent.mkdir(parents=True, exist_ok=True)
+        overlay_runtime.write_text(json.dumps({
+            "pid": os.getpid(), "server_pid": os.getpid(),
+            "heartbeat_at": __import__("time").time(), "state": "ready",
+            "panel_hwnd": 1, "text_hwnd": 2,
+        }), encoding="utf-8")
+        server.OVERLAY_RUNTIME_PATH = overlay_runtime
+        server.detector_fallback.update(status="waiting", error=None)
+        assert server.lifecycle_health()["ok"] is True
+        server.detector_fallback.update(status="disabled", error=None)
+        assert server.lifecycle_health()["ok"] is True
+        server.detector_fallback.update(status="error", error="fatal")
+        assert server.lifecycle_health()["ok"] is False
+        server.detector_fallback.update(status="waiting", error=None)
+        stale = json.loads(overlay_runtime.read_text(encoding="utf-8"))
+        stale["heartbeat_at"] -= 10
+        overlay_runtime.write_text(json.dumps(stale), encoding="utf-8")
+        assert server.lifecycle_health()["ok"] is False
+        stale["heartbeat_at"] = __import__("time").time()
+        stale["server_pid"] = os.getpid() + 1
+        overlay_runtime.write_text(json.dumps(stale), encoding="utf-8")
+        assert server.lifecycle_health()["ok"] is False
+        stale["server_pid"] = os.getpid()
+        stale["pid"] = 2147483647
+        overlay_runtime.write_text(json.dumps(stale), encoding="utf-8")
+        assert server.lifecycle_health()["ok"] is False
+        stale["pid"] = os.getpid()
+        overlay_runtime.write_text(json.dumps(stale), encoding="utf-8")
+
         server.CONTROL_TOKEN = "shutdown-test-token"
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         thread = threading.Thread(target=httpd.serve_forever, daemon=True)

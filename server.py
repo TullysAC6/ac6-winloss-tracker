@@ -22,6 +22,8 @@ ROOT = resource_dir()
 DATA_ROOT = data_dir()
 OVERLAY = resource_path("overlay.html")
 RUNTIME_PATH = DATA_ROOT / ".runtime.json"
+OVERLAY_RUNTIME_PATH = DATA_ROOT / ".overlay-runtime.json"
+OVERLAY_HEARTBEAT_MAX_AGE = 3.0
 
 stop_event = threading.Event()
 stats = StatsManager(DATA_ROOT)
@@ -74,6 +76,60 @@ def remove_runtime_file():
         pass
     except OSError as e:
         print(f"[runtime] WARNING: could not remove .runtime.json: {e}")
+
+
+def process_is_alive(pid):
+    if type(pid) is not int or pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def lifecycle_health(now=None):
+    now = time.time() if now is None else float(now)
+    detector_health = detector_snapshot()
+    detector_status = str(detector_health.get("status", "error"))
+    detector_ok = detector_status != "error"
+    overlay = {"ok": False, "state": "missing"}
+    try:
+        raw = json.loads(OVERLAY_RUNTIME_PATH.read_text(encoding="utf-8"))
+        overlay_pid = int(raw["pid"])
+        server_pid = int(raw["server_pid"])
+        heartbeat_age = max(0.0, now - float(raw["heartbeat_at"]))
+        state = str(raw.get("state", ""))
+        overlay_ok = (
+            state == "ready"
+            and server_pid == os.getpid()
+            and heartbeat_age <= OVERLAY_HEARTBEAT_MAX_AGE
+            and process_is_alive(overlay_pid)
+        )
+        overlay = {
+            "ok": overlay_ok, "pid": overlay_pid, "state": state,
+            "heartbeat_age": round(heartbeat_age, 3), "server_pid": server_pid,
+            "panel_hwnd": int(raw.get("panel_hwnd", 0)),
+            "text_hwnd": int(raw.get("text_hwnd", 0)),
+            "target_process": str(raw.get("target_process", "")),
+        }
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        pass
+    ok = bool(detector_ok and overlay["ok"])
+    return {
+        "ok": ok,
+        "server": {"ok": True, "pid": os.getpid()},
+        "http": {"ok": True},
+        "detector": {"ok": detector_ok, **detector_health},
+        "overlay": overlay,
+    }
 
 
 def status_payload(s, milestone=None):
@@ -353,6 +409,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(status_payload(stats.snapshot()))
             except StatsCorruptError as e:
                 self.json_response({"error": str(e)}, 503)
+            return
+
+        if path == "/health":
+            health = lifecycle_health()
+            self.json_response(health, 200 if health["ok"] else 503)
             return
 
         if path == "/events":

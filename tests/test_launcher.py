@@ -18,6 +18,7 @@ FAKE_SERVER = textwrap.dedent(
     """
     import json
     import os
+    import threading
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
     from pathlib import Path
 
@@ -30,16 +31,30 @@ FAKE_SERVER = textwrap.dedent(
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b"{}")
+            elif self.path == "/health":
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"ok": true}')
             else:
                 self.send_response(404)
                 self.end_headers()
         def log_message(self, *args):
             pass
+        def do_POST(self):
+            if self.path == "/api/system/shutdown" and self.headers.get("X-Control-Token") == "test-token":
+                self.send_response(200)
+                self.end_headers()
+                threading.Thread(target=server.shutdown, daemon=True).start()
+            else:
+                self.send_response(403)
+                self.end_headers()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    runtime = {"pid": os.getpid(), "port": server.server_address[1]}
+    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": "test-token"}
     (data / ".runtime.json").write_text(json.dumps(runtime), encoding="utf-8")
     server.serve_forever()
+    server.server_close()
+    (data / ".runtime.json").unlink(missing_ok=True)
     """
 )
 
@@ -75,9 +90,19 @@ with tempfile.TemporaryDirectory() as temporary:
             )
             assert second_result == "already_running"
             assert process.poll() is None
-        finally:
-            process.terminate()
+
+            shutdown_runtime, overlay_pid = launcher.request_shutdown(runtime_path)
+            assert shutdown_runtime is not None and overlay_pid == 0
             process.wait(timeout=5)
+            assert launcher.wait_for_complete_shutdown(
+                shutdown_runtime, overlay_pid, timeout=5,
+                runtime_path=runtime_path,
+                overlay_path=data / ".overlay-runtime.json",
+            )
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
 
         runtime_path.unlink(missing_ok=True)
         failing_app = root / "failing_app.py"
@@ -108,6 +133,7 @@ assert "$shortcut.Arguments = '\"{0}\"' -f $LauncherPath" in installer
 assert "New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcherPath" in installer
 assert "Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments" in installer
 assert "Wait-AppRuntimeReady -TimeoutSeconds 15" in installer
+assert '"http://127.0.0.1:{0}/health"' in installer
 print("launcher shortcut and installer readiness checks: OK")
 
 assert "Get-CimInstance Win32_Process" in installer

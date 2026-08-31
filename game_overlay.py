@@ -32,6 +32,7 @@ ROOT = data_dir()
 STATS_PATH = ROOT / "stats.json"
 CONFIG_PATH = ROOT / "config.json"
 RUNTIME_PATH = ROOT / ".runtime.json"
+OVERLAY_RUNTIME_PATH = ROOT / ".overlay-runtime.json"
 
 # These settings are local to the independent in-game overlay.
 DEFAULT_PROCESS = "armoredcore6.exe"
@@ -121,6 +122,27 @@ def read_server_runtime(path: Path = RUNTIME_PATH) -> dict[str, Any] | None:
     if pid <= 0 or not 1 <= port <= 65535 or started_at < 0:
         return None
     return {"pid": pid, "port": port, "started_at": started_at}
+
+
+def write_overlay_runtime(payload: dict[str, Any], path: Path | None = None) -> None:
+    path = OVERLAY_RUNTIME_PATH if path is None else path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    with tmp.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(tmp, path)
+
+
+def remove_owned_overlay_runtime(path: Path | None = None) -> None:
+    path = OVERLAY_RUNTIME_PATH if path is None else path
+    try:
+        current = json.loads(path.read_text(encoding="utf-8"))
+        if int(current.get("pid", 0)) == os.getpid():
+            path.unlink()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        pass
 
 
 if os.name == "nt":
@@ -280,6 +302,18 @@ def _process_is_alive(pid: int) -> bool:
         kernel32.CloseHandle(handle)
 
 
+def remove_stale_overlay_runtime(path: Path | None = None) -> None:
+    path = OVERLAY_RUNTIME_PATH if path is None else path
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        pid = int(raw.get("pid", 0))
+        heartbeat = float(raw.get("heartbeat_at", 0.0))
+        if not _process_is_alive(pid) or time.time() - heartbeat > 3.0:
+            path.unlink()
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        pass
+
+
 def foreground_game_client(process_name: str) -> tuple[int, int, int, int, int] | None:
     """Return hwnd,left,top,width,height only when the target game is foreground."""
     if os.name != "nt":
@@ -374,6 +408,8 @@ class GameOverlay:
         self._server_startup_deadline = time.monotonic() + DEFAULT_SERVER_STARTUP_GRACE_SEC
         self._next_server_check_at = 0.0
         self._closing = False
+        self._overlay_started_at = time.time()
+        self._last_heartbeat_at = 0.0
 
         self.last_stats: dict[str, Any] = {
             "wins": 0,
@@ -638,6 +674,26 @@ class GameOverlay:
         self._server_state = "alive"
         return True
 
+    def _publish_ready_heartbeat(self) -> None:
+        now = time.time()
+        if not self._server_linked or self._server_state != "alive" or not self._server_pid:
+            return
+        if now - self._last_heartbeat_at < 0.75:
+            return
+        write_overlay_runtime({
+            "pid": os.getpid(),
+            "server_pid": self._server_pid,
+            "started_at": self._overlay_started_at,
+            "heartbeat_at": now,
+            "state": "ready",
+            "panel_hwnd": self.panel_hwnd,
+            "text_hwnd": self.text_hwnd,
+            "target_process": self.process_name,
+        })
+        if self._last_heartbeat_at == 0.0:
+            print(f"[lifecycle] overlay ready: PID {os.getpid()}, server PID {self._server_pid}")
+        self._last_heartbeat_at = now
+
     def _tick(self) -> None:
         s = read_stats()
         if s is not None:
@@ -672,6 +728,7 @@ class GameOverlay:
         # known-good foreground/visibility decision above.
         if not self._poll_server_lifecycle():
             return
+        self._publish_ready_heartbeat()
         self.root.after(self.poll_ms, self._tick)
 
     def run(self) -> None:
@@ -741,6 +798,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     _enable_dpi_awareness()
+    remove_stale_overlay_runtime()
     args = parse_args(argv)
     print("[game-overlay] started")
     print(f"[game-overlay] target: {args.process}")
@@ -768,6 +826,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         return 0
     finally:
+        remove_owned_overlay_runtime()
         if mutex not in (None, False):
             try:
                 kernel32.CloseHandle(mutex)

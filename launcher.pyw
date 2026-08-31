@@ -18,12 +18,13 @@ APP_DIR = Path(__file__).resolve().parent
 APP_PATH = APP_DIR / "app.py"
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "AC6WinLossTracker"
 RUNTIME_PATH = DATA_DIR / ".runtime.json"
+OVERLAY_RUNTIME_PATH = DATA_DIR / ".overlay-runtime.json"
 STARTUP_LOG = DATA_DIR / "startup.log"
 MAX_LOG_BYTES = 1024 * 1024
 STARTUP_TIMEOUT_SECONDS = 10.0
 
 
-def read_runtime(path: Path = RUNTIME_PATH) -> dict[str, int] | None:
+def read_runtime(path: Path = RUNTIME_PATH) -> dict | None:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         pid = raw["pid"]
@@ -34,7 +35,8 @@ def read_runtime(path: Path = RUNTIME_PATH) -> dict[str, int] | None:
         return None
     if type(port) is not int or not 1 <= port <= 65535:
         return None
-    return {"pid": pid, "port": port}
+    token = raw.get("token")
+    return {"pid": pid, "port": port, "token": token if isinstance(token, str) else ""}
 
 
 def process_is_alive(pid: int) -> bool:
@@ -66,13 +68,24 @@ def stats_server_is_ready(port: int, timeout: float = 0.75) -> bool:
         return False
 
 
+def tracker_health(port: int, timeout: float = 0.75) -> dict | None:
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/health", timeout=timeout
+        ) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            return payload if response.status == 200 and payload.get("ok") is True else None
+    except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
+        return None
+
+
 def running_instance(path: Path = RUNTIME_PATH) -> dict[str, int] | None:
     runtime = read_runtime(path)
     if runtime is None:
         return None
     if not process_is_alive(runtime["pid"]):
         return None
-    if not stats_server_is_ready(runtime["port"]):
+    if tracker_health(runtime["port"]) is None:
         return None
     return runtime
 
@@ -131,7 +144,7 @@ def wait_for_application(
             runtime is not None
             and runtime["pid"] == process.pid
             and process_is_alive(runtime["pid"])
-            and stats_server_is_ready(runtime["port"])
+            and tracker_health(runtime["port"]) is not None
         ):
             return True
         time.sleep(0.2)
@@ -166,6 +179,19 @@ def launch_once(
         log_launcher_error(log_path)
         return "failed"
     if wait_for_application(process, runtime_path, timeout):
+        try:
+            runtime = read_runtime(runtime_path)
+            health = tracker_health(runtime["port"]) if runtime else None
+            with log_path.open("a", encoding="utf-8") as log:
+                if health:
+                    log.write(
+                        f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] server ready; "
+                        f"detector={health['detector'].get('status')} "
+                        f"overlay PID={health['overlay'].get('pid')} overlay ready; "
+                        "overall health ready\n"
+                    )
+        except (OSError, KeyError, TypeError):
+            pass
         return "started"
     if process.poll() is None:
         try:
@@ -183,35 +209,117 @@ def launch_once(
     return "failed"
 
 
+def read_overlay_pid(path: Path = OVERLAY_RUNTIME_PATH) -> int:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8")).get("pid")
+        return value if type(value) is int and value > 0 else 0
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return 0
+
+
+def request_shutdown(runtime_path: Path = RUNTIME_PATH) -> tuple[dict | None, int]:
+    runtime = read_runtime(runtime_path)
+    overlay_pid = read_overlay_pid()
+    if runtime is None or not runtime.get("token"):
+        return None, overlay_pid
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{runtime['port']}/api/system/shutdown",
+        data=b"", method="POST",
+        headers={"X-Control-Token": runtime["token"]},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            if response.status != 200:
+                return None, overlay_pid
+    except (OSError, urllib.error.URLError):
+        return None, overlay_pid
+    return runtime, overlay_pid
+
+
+def wait_for_complete_shutdown(
+    runtime: dict, overlay_pid: int, timeout: float = 12.0,
+    runtime_path: Path = RUNTIME_PATH, overlay_path: Path = OVERLAY_RUNTIME_PATH,
+) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        server_gone = not process_is_alive(runtime["pid"])
+        overlay_gone = overlay_pid <= 0 or not process_is_alive(overlay_pid)
+        files_gone = not runtime_path.exists() and not overlay_path.exists()
+        endpoints_gone = (
+            not stats_server_is_ready(runtime["port"], 0.3)
+            and tracker_health(runtime["port"], 0.3) is None
+        )
+        if server_gone and overlay_gone and files_gone and endpoints_gone:
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def shutdown_tracker(log_path: Path = STARTUP_LOG) -> bool:
+    runtime, overlay_pid = request_shutdown()
+    if runtime is None:
+        return False
+    result = wait_for_complete_shutdown(runtime, overlay_pid)
+    try:
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] shutdown requested\n")
+            log.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] overall shutdown {'complete' if result else 'failed'}\n")
+    except OSError:
+        pass
+    return result
+
+
 def main() -> None:
     import tkinter as tk
 
     root = tk.Tk()
     root.title(DISPLAY_NAME)
     root.resizable(False, False)
-    root.geometry("380x150")
+    root.geometry("400x190")
     root.update_idletasks()
     root.geometry(
-        f"380x150+{max(0, (root.winfo_screenwidth() - 380) // 2)}"
-        f"+{max(0, (root.winfo_screenheight() - 150) // 2)}"
+        f"400x190+{max(0, (root.winfo_screenwidth() - 400) // 2)}"
+        f"+{max(0, (root.winfo_screenheight() - 190) // 2)}"
     )
 
     title = tk.Label(root, text=DISPLAY_NAME, font=("Segoe UI", 13, "bold"))
     title.pack(pady=(24, 12))
     status = tk.Label(root, text="起動しています...", font=("Segoe UI", 11))
     status.pack(padx=20)
+    actions = tk.Frame(root)
+    close_button = tk.Button(actions, text="閉じる", width=12, command=root.destroy)
+    shutdown_button = tk.Button(actions, text="Trackerを終了", width=16)
+    close_button.pack(side="left", padx=6)
+    shutdown_button.pack(side="left", padx=6)
+
+    def shutdown_finish(ok: bool) -> None:
+        shutdown_button.config(state="disabled")
+        if ok:
+            status.config(text="AC6 Win/Loss Trackerを\n完全に終了しました。")
+            root.after(2000, root.destroy)
+        else:
+            status.config(text="AC6 Win/Loss Trackerを\n完全に終了できませんでした。\n診断ログを確認してください。")
+
+    def begin_shutdown() -> None:
+        actions.pack_forget()
+        status.config(text="終了しています...")
+        threading.Thread(
+            target=lambda: root.after(0, shutdown_finish, shutdown_tracker()), daemon=True
+        ).start()
+
+    shutdown_button.config(command=begin_shutdown)
 
     def finish(result: str) -> None:
         if result == "started":
-            status.config(text="AC6 Win/Loss Trackerを起動しました。")
+            status.config(text="AC6 Win/Loss Trackerを\n正常に起動しました。")
             root.after(2000, root.destroy)
         elif result == "already_running":
-            status.config(text="AC6 Win/Loss Trackerは\n既に起動しています。")
-            root.after(2500, root.destroy)
+            status.config(text="AC6 Win/Loss Trackerは\n正常に起動中です。")
+            actions.pack(pady=16)
         else:
             status.config(
-                text="AC6 Win/Loss Trackerを起動できませんでした。\n"
-                "診断ログを確認してください。"
+                text="AC6 Win/Loss Trackerを\n完全に起動できませんでした。\n"
+                "ゲームオーバーレイまたは診断ログを確認してください。"
             )
 
     def worker() -> None:

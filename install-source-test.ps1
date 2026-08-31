@@ -630,6 +630,16 @@ function Test-TrackerHttp {
     }
 }
 
+function Test-TrackerHealth {
+    param([int]$Port)
+    if ($Port -lt 1 -or $Port -gt 65535) { return $false }
+    try {
+        $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/health" -f $Port) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        $health = $response.Content | ConvertFrom-Json
+        return [int]$response.StatusCode -eq 200 -and $health.ok -eq $true
+    } catch { return $false }
+}
+
 function Wait-TrackerStopped {
     param(
         [int]$RuntimePort = 0,
@@ -639,7 +649,11 @@ function Wait-TrackerStopped {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     while ([DateTime]::UtcNow -lt $deadline) {
         $trackerProcesses = @(Get-TrackerProcesses -RuntimePort $RuntimePort)
-        if ($trackerProcesses.Count -eq 0 -and -not (Test-TrackerHttp -Port $RuntimePort)) {
+        if ($trackerProcesses.Count -eq 0 -and
+            -not (Test-TrackerHttp -Port $RuntimePort) -and
+            -not (Test-TrackerHealth -Port $RuntimePort)) {
+            Remove-Item -LiteralPath (Join-Path $dataPath '.runtime.json') -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $dataPath '.overlay-runtime.json') -Force -ErrorAction SilentlyContinue
             return $true
         }
         Start-Sleep -Milliseconds 250
@@ -743,12 +757,13 @@ function Wait-AppRuntimeReady {
                 if ($runtimePid -gt 0 -and $runtimePort -ge 1 -and $runtimePort -le 65535) {
                     $runtimeProcess = Get-Process -Id $runtimePid -ErrorAction Stop
                     if ($runtimeProcess -and -not $runtimeProcess.HasExited) {
-                        $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/stats" -f $runtimePort) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
-                        if ([int]$response.StatusCode -eq 200) {
+                        $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/health" -f $runtimePort) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+                        $health = $response.Content | ConvertFrom-Json
+                        if ([int]$response.StatusCode -eq 200 -and $health.ok -eq $true) {
                             Write-InstallLog "application runtime path: $runtimePath"
                             Write-InstallLog "application runtime PID: $runtimePid"
                             Write-InstallLog "application runtime port: $runtimePort"
-                            Write-InstallLog 'application HTTP /stats status: 200'
+                            Write-InstallLog 'application HTTP /health status: 200; overall health ready'
                             return $true
                         }
                     }

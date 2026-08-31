@@ -4,6 +4,8 @@ from pathlib import Path
 
 HERE=Path(__file__).resolve().parent
 files=[
+    "test_app_overlay_dispatch.py",
+    "test_overlay_lifecycle.py",
     "test_launcher.py",
     "test_shutdown.py",
     "test_profile_optimization.py",
