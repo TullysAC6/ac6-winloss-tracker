@@ -1146,6 +1146,38 @@ class ResultDetector:
     def after_undo(self):
         self.state.after_undo()
 
+    def _observe_self_identity(
+        self, sct, client, shot, frame_state, gameplay_activity
+    ):
+        """Run optional two-stage identity observation without detector impact."""
+        if self.identity_tracker is None:
+            return False
+        try:
+            capture_requested = self.identity_tracker.observe_detector_frame(
+                shot.raw,
+                shot.width,
+                shot.height,
+                frame_state,
+                gameplay_activity,
+                pixel_format="bgra",
+            )
+            if not capture_requested:
+                return False
+            identity_shot = sct.grab(client)
+            self.identity_tracker.observe_frame(
+                identity_shot.raw,
+                identity_shot.width,
+                identity_shot.height,
+                pixel_format="bgra",
+            )
+            return True
+        except Exception as e:
+            # Identity is optional enrichment. It must never reset the result
+            # detector, ResultGate, or stats path.
+            self.identity_tracker.note_optional_error(e)
+            print(f"[identity] optional observation failed: {type(e).__name__}: {e}")
+            return False
+
     def _save_debug_result_roi(self, shot, frame_state):
         if to_png is None:
             return
@@ -1261,21 +1293,9 @@ class ResultDetector:
                         debug["motion_score"] = motion_score
                         debug["gameplay_activity"] = gameplay_activity
 
-                        # Phase 1 self identity capture reuses this detector's
-                        # thread and mss session.  It is bounded to startup/lobby
-                        # observation and stops immediately when gameplay is
-                        # observed; battle capture is never continuous.
-                        if self.identity_tracker is not None:
-                            if gameplay_activity:
-                                self.identity_tracker.note_gameplay_activity()
-                            elif self.identity_tracker.should_observe():
-                                identity_shot = sct.grab(client)
-                                self.identity_tracker.observe_frame(
-                                    identity_shot.raw,
-                                    identity_shot.width,
-                                    identity_shot.height,
-                                    pixel_format="bgra",
-                                )
+                        self._observe_self_identity(
+                            sct, client, shot, frame_state, gameplay_activity
+                        )
 
                         self.health.touch_capture(time.time())
                         self.health.update(status="active", error=None)
@@ -1422,8 +1442,6 @@ class ResultDetector:
                             self.health.update(
                                 last_result="draw", status="active", error=None
                             )
-                            if self.identity_tracker is not None:
-                                self.identity_tracker.reset_runtime_state()
                         elif result:
                             accepted = self.on_result(result, "auto")
                             if accepted:
@@ -1432,8 +1450,6 @@ class ResultDetector:
                                     status="active",
                                     error=None,
                                 )
-                                if self.identity_tracker is not None:
-                                    self.identity_tracker.reset_runtime_state()
 
                         self.stop_event.wait(poll)
 
