@@ -9,9 +9,18 @@ from typing import Any
 
 
 class HistoryStore:
-    """Transactional lifetime history owned exclusively by server.py."""
+    """Transactional lifetime history owned exclusively by server.py.
 
-    SCHEMA_VERSION = 2
+    Identity semantics:
+    - matches.id is SQLite's internal integer key.
+    - matches.event_id is the stable detector/result-event identity and the
+      canonical FK for future match-level enrichment tables.
+    - match_contexts.context_id identifies only the context row itself.
+    - A future game_match_id is AC6 result-screen metadata and must remain
+      distinct from both event_id and context_id.
+    """
+
+    SCHEMA_VERSION = 3
     MATCH_CONTEXT_VERSION = 1
     MATCH_CONTEXT_FIELDS = {
         "started_at", "ended_at", "self_reference_id", "self_side",
@@ -122,6 +131,71 @@ class HistoryStore:
                     PRAGMA user_version=2;
                     """
                 )
+                version = 2
+            if version == 2:
+                try:
+                    connection.executescript(
+                        """
+                        BEGIN IMMEDIATE;
+                        ALTER TABLE match_contexts RENAME TO match_contexts_v2;
+                        CREATE TABLE match_contexts (
+                            context_id TEXT PRIMARY KEY,
+                            event_id TEXT UNIQUE NOT NULL,
+                            session_id INTEGER NOT NULL,
+                            started_at REAL,
+                            result_detected_at REAL NOT NULL,
+                            ended_at REAL,
+                            result TEXT NOT NULL CHECK(result IN ('win','loss','draw')),
+                            self_reference_id TEXT,
+                            self_side TEXT CHECK(self_side IN ('left','right','unknown')),
+                            opponent_side TEXT CHECK(opponent_side IN ('left','right','unknown')),
+                            opponent_capture TEXT,
+                            opponent_recognition_status TEXT NOT NULL DEFAULT 'unknown',
+                            game_display_name TEXT,
+                            game_name_confidence REAL CHECK(
+                                game_name_confidence IS NULL OR
+                                game_name_confidence BETWEEN 0.0 AND 1.0
+                            ),
+                            steam_id64 TEXT,
+                            steam_persona_name TEXT,
+                            steam_correlation_confidence REAL CHECK(
+                                steam_correlation_confidence IS NULL OR
+                                steam_correlation_confidence BETWEEN 0.0 AND 1.0
+                            ),
+                            recognition_version INTEGER NOT NULL DEFAULT 1,
+                            created_at REAL NOT NULL,
+                            updated_at REAL NOT NULL,
+                            FOREIGN KEY(event_id) REFERENCES matches(event_id) ON DELETE CASCADE,
+                            FOREIGN KEY(session_id) REFERENCES sessions(id)
+                        );
+                        INSERT INTO match_contexts(
+                            context_id,event_id,session_id,started_at,
+                            result_detected_at,ended_at,result,self_reference_id,
+                            self_side,opponent_side,opponent_capture,
+                            opponent_recognition_status,game_display_name,
+                            game_name_confidence,steam_id64,steam_persona_name,
+                            steam_correlation_confidence,recognition_version,
+                            created_at,updated_at
+                        )
+                        SELECT
+                            match_id,event_id,session_id,started_at,
+                            result_detected_at,ended_at,result,self_reference_id,
+                            self_side,opponent_side,opponent_capture,
+                            opponent_recognition_status,game_display_name,
+                            game_name_confidence,steam_id64,steam_persona_name,
+                            steam_correlation_confidence,recognition_version,
+                            created_at,updated_at
+                        FROM match_contexts_v2;
+                        DROP TABLE match_contexts_v2;
+                        CREATE INDEX match_contexts_session_idx
+                            ON match_contexts(session_id, result_detected_at DESC);
+                        PRAGMA user_version=3;
+                        COMMIT;
+                        """
+                    )
+                except Exception:
+                    connection.rollback()
+                    raise
 
     @property
     def current_session_id(self) -> int | None:
@@ -251,17 +325,17 @@ class HistoryStore:
 
     def create_match_context(
         self,
-        match_id: str,
+        context_id: str,
         event_id: str,
         result_detected_at: float | None = None,
         started_at: float | None = None,
         ended_at: float | None = None,
     ) -> bool:
         """Create optional enrichment only after the authoritative result exists."""
-        match_id = str(match_id).strip()
+        context_id = str(context_id).strip()
         event_id = str(event_id).strip()
-        if not match_id or not event_id:
-            raise ValueError("match_id and event_id are required")
+        if not context_id or not event_id:
+            raise ValueError("context_id and event_id are required")
         detected_at = (
             time.time() if result_detected_at is None
             else self._optional_timestamp(result_detected_at, "result_detected_at")
@@ -279,36 +353,36 @@ class HistoryStore:
                 raise KeyError("authoritative history result does not exist")
             cursor = connection.execute(
                 "INSERT OR IGNORE INTO match_contexts("
-                "match_id,event_id,session_id,started_at,result_detected_at,ended_at,"
+                "context_id,event_id,session_id,started_at,result_detected_at,ended_at,"
                 "result,opponent_recognition_status,recognition_version,created_at,updated_at"
                 ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (
-                    match_id, event_id, int(match["session_id"]), started_at,
+                    context_id, event_id, int(match["session_id"]), started_at,
                     detected_at, ended_at, str(match["result"]), "unknown",
                     self.MATCH_CONTEXT_VERSION, now, now,
                 ),
             )
             return cursor.rowcount == 1
 
-    def update_match_context(self, match_id: str, **fields: Any) -> bool:
+    def update_match_context(self, context_id: str, **fields: Any) -> bool:
         """Safely add optional recognition fields without touching match result."""
         cleaned = self._clean_context_updates(fields)
         if not cleaned:
             return False
         assignments = ",".join(f"{field}=?" for field in cleaned)
         values = list(cleaned.values())
-        values.extend((time.time(), str(match_id)))
+        values.extend((time.time(), str(context_id)))
         with self._lock, self._connect() as connection:
             cursor = connection.execute(
-                f"UPDATE match_contexts SET {assignments},updated_at=? WHERE match_id=?",
+                f"UPDATE match_contexts SET {assignments},updated_at=? WHERE context_id=?",
                 values,
             )
             return cursor.rowcount == 1
 
-    def match_context(self, match_id: str) -> dict[str, Any] | None:
+    def match_context(self, context_id: str) -> dict[str, Any] | None:
         with self._lock, self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM match_contexts WHERE match_id=?", (str(match_id),)
+                "SELECT * FROM match_contexts WHERE context_id=?", (str(context_id),)
             ).fetchone()
         return dict(row) if row is not None else None
 

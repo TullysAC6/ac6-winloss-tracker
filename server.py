@@ -379,9 +379,10 @@ def record_result(result, source):
             print(f"[result] duplicate/conflict ignored: {result} from {source}")
             return False
 
-        # Allocate the future enrichment identity before authoritative writes,
-        # but do not let optional context creation participate in those writes.
-        match_id = secrets.token_urlsafe(18)
+        # Allocate the context-row identity before authoritative writes, but do
+        # not let optional context creation participate in those writes. The
+        # stable logical match relation remains the result event_id.
+        context_id = secrets.token_urlsafe(18)
 
         # Only keep the cooldown reservation when the stats mutation actually
         # succeeds. If disk I/O or stats validation fails, release the gate so
@@ -424,7 +425,7 @@ def record_result(result, source):
         if store is not None and stored_event_id is not None:
             try:
                 store.create_match_context(
-                    match_id,
+                    context_id,
                     stored_event_id,
                     result_detected_at=result_detected_at,
                 )
@@ -433,7 +434,7 @@ def record_result(result, source):
                 # above remains authoritative even if this separate write fails.
                 RECORDER.record(
                     "match_context_error",
-                    match_id=match_id,
+                    context_id=context_id,
                     error=f"{type(e).__name__}: {e}",
                 )
         history_event_ids.append(stored_event_id)
@@ -451,7 +452,7 @@ def record_result(result, source):
             }, remember=False)
 
         RECORDER.flush_frame_context("result_accepted")
-        RECORDER.record("result_accepted", match_id=match_id, result=result, source=source, wins=s["wins"], losses=s["losses"], streak=s["streak"])
+        RECORDER.record("result_accepted", context_id=context_id, result=result, source=source, wins=s["wins"], losses=s["losses"], streak=s["streak"])
         print(
             f"[result] {result.upper()} ({source}) | "
             f"WIN {s['wins']} LOSE {s['losses']} | 連勝 {s['streak']}"
