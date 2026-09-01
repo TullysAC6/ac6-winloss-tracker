@@ -38,6 +38,9 @@ print("session reset ordering and 5..50 milestone source: OK")
 
 assert 'store.record_result(event_id, result, source, s)' in s
 assert s.index('s = stats.add(result, source)') < s.index('store.record_result(event_id, result, source, s)')
+assert 'store.create_match_context(' in s
+assert s.index('store.record_result(event_id, result, source, s)') < s.index('store.create_match_context(')
+assert '"match_context_error"' in s
 assert 'if path == "/api/dashboard/summary":' in s
 assert 'store.reset_session()' in s
 print("history accepted-result flow / dashboard API / session reset: OK")

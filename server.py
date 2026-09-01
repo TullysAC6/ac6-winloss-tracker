@@ -368,6 +368,7 @@ def publish_stats_active(s):
 
 def record_result(result, source):
     now = time.monotonic()
+    result_detected_at = time.time()
     with result_lock:
         c = load_config()
         cooldown = 5.0
@@ -377,6 +378,10 @@ def record_result(result, source):
         if not result_gate.try_accept(cooldown, now=now):
             print(f"[result] duplicate/conflict ignored: {result} from {source}")
             return False
+
+        # Allocate the future enrichment identity before authoritative writes,
+        # but do not let optional context creation participate in those writes.
+        match_id = secrets.token_urlsafe(18)
 
         # Only keep the cooldown reservation when the stats mutation actually
         # succeeds. If disk I/O or stats validation fails, release the gate so
@@ -416,6 +421,21 @@ def record_result(result, source):
                 # Current stats and detector flow remain authoritative even if
                 # the optional lifetime store is temporarily unavailable.
                 history_failure("record_result", e)
+        if store is not None and stored_event_id is not None:
+            try:
+                store.create_match_context(
+                    match_id,
+                    stored_event_id,
+                    result_detected_at=result_detected_at,
+                )
+            except Exception as e:
+                # Phase 0 context is enrichment. The accepted stats/history row
+                # above remains authoritative even if this separate write fails.
+                RECORDER.record(
+                    "match_context_error",
+                    match_id=match_id,
+                    error=f"{type(e).__name__}: {e}",
+                )
         history_event_ids.append(stored_event_id)
 
         if milestone:
@@ -431,7 +451,7 @@ def record_result(result, source):
             }, remember=False)
 
         RECORDER.flush_frame_context("result_accepted")
-        RECORDER.record("result_accepted", result=result, source=source, wins=s["wins"], losses=s["losses"], streak=s["streak"])
+        RECORDER.record("result_accepted", match_id=match_id, result=result, source=source, wins=s["wins"], losses=s["losses"], streak=s["streak"])
         print(
             f"[result] {result.upper()} ({source}) | "
             f"WIN {s['wins']} LOSE {s['losses']} | 連勝 {s['streak']}"

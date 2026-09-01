@@ -11,7 +11,15 @@ from typing import Any
 class HistoryStore:
     """Transactional lifetime history owned exclusively by server.py."""
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
+    MATCH_CONTEXT_VERSION = 1
+    MATCH_CONTEXT_FIELDS = {
+        "started_at", "ended_at", "self_reference_id", "self_side",
+        "opponent_side", "opponent_capture", "opponent_recognition_status",
+        "game_display_name", "game_name_confidence", "steam_id64",
+        "steam_persona_name", "steam_correlation_confidence",
+        "recognition_version",
+    }
 
     def __init__(self, root: str | Path):
         self.path = Path(root) / "history.db"
@@ -62,6 +70,56 @@ class HistoryStore:
                     CREATE INDEX matches_created_at_idx ON matches(created_at DESC);
                     CREATE INDEX matches_session_id_idx ON matches(session_id, id);
                     PRAGMA user_version=1;
+                    """
+                )
+                version = 1
+            if version == 1:
+                connection.executescript(
+                    """
+                    CREATE TABLE match_contexts (
+                        match_id TEXT PRIMARY KEY,
+                        event_id TEXT UNIQUE NOT NULL,
+                        session_id INTEGER NOT NULL,
+                        started_at REAL,
+                        result_detected_at REAL NOT NULL,
+                        ended_at REAL,
+                        result TEXT NOT NULL CHECK(result IN ('win','loss','draw')),
+                        self_reference_id TEXT,
+                        self_side TEXT CHECK(self_side IN ('left','right','unknown')),
+                        opponent_side TEXT CHECK(opponent_side IN ('left','right','unknown')),
+                        opponent_capture TEXT,
+                        opponent_recognition_status TEXT NOT NULL DEFAULT 'unknown',
+                        game_display_name TEXT,
+                        game_name_confidence REAL CHECK(
+                            game_name_confidence IS NULL OR
+                            game_name_confidence BETWEEN 0.0 AND 1.0
+                        ),
+                        steam_id64 TEXT,
+                        steam_persona_name TEXT,
+                        steam_correlation_confidence REAL CHECK(
+                            steam_correlation_confidence IS NULL OR
+                            steam_correlation_confidence BETWEEN 0.0 AND 1.0
+                        ),
+                        recognition_version INTEGER NOT NULL DEFAULT 1,
+                        created_at REAL NOT NULL,
+                        updated_at REAL NOT NULL,
+                        FOREIGN KEY(event_id) REFERENCES matches(event_id) ON DELETE CASCADE,
+                        FOREIGN KEY(session_id) REFERENCES sessions(id)
+                    );
+                    CREATE INDEX match_contexts_session_idx
+                        ON match_contexts(session_id, result_detected_at DESC);
+                    INSERT INTO match_contexts(
+                        match_id,event_id,session_id,started_at,
+                        result_detected_at,ended_at,result,
+                        opponent_recognition_status,recognition_version,
+                        created_at,updated_at
+                    )
+                    SELECT
+                        event_id,event_id,session_id,NULL,
+                        created_at,created_at,result,
+                        'unknown',1,created_at,created_at
+                    FROM matches;
+                    PRAGMA user_version=2;
                     """
                 )
 
@@ -141,6 +199,118 @@ class HistoryStore:
                     (int(stats.get("streak", 0)), session_id),
                 )
                 return True
+
+    @staticmethod
+    def _optional_timestamp(value: Any, field: str) -> float | None:
+        if value is None:
+            return None
+        if type(value) is bool:
+            raise ValueError(f"{field} must be a timestamp or null")
+        timestamp = float(value)
+        if timestamp < 0:
+            raise ValueError(f"{field} must be non-negative")
+        return timestamp
+
+    @staticmethod
+    def _optional_confidence(value: Any, field: str) -> float | None:
+        if value is None:
+            return None
+        if type(value) is bool:
+            raise ValueError(f"{field} must be 0.0..1.0 or null")
+        confidence = float(value)
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError(f"{field} must be 0.0..1.0 or null")
+        return confidence
+
+    @classmethod
+    def _clean_context_updates(cls, fields: dict[str, Any]) -> dict[str, Any]:
+        unknown = set(fields) - cls.MATCH_CONTEXT_FIELDS
+        if unknown:
+            raise ValueError("unknown match context field(s): " + ", ".join(sorted(unknown)))
+        cleaned = dict(fields)
+        for field in ("started_at", "ended_at"):
+            if field in cleaned:
+                cleaned[field] = cls._optional_timestamp(cleaned[field], field)
+        for field in ("game_name_confidence", "steam_correlation_confidence"):
+            if field in cleaned:
+                cleaned[field] = cls._optional_confidence(cleaned[field], field)
+        for field in ("self_side", "opponent_side"):
+            if field in cleaned and cleaned[field] not in (None, "left", "right", "unknown"):
+                raise ValueError(f"{field} must be left, right, unknown or null")
+        if "recognition_version" in cleaned:
+            value = cleaned["recognition_version"]
+            if type(value) is not int or value < 1:
+                raise ValueError("recognition_version must be a positive integer")
+        for field in (
+            "self_reference_id", "opponent_capture", "opponent_recognition_status",
+            "game_display_name", "steam_id64", "steam_persona_name",
+        ):
+            if field in cleaned and cleaned[field] is not None:
+                cleaned[field] = str(cleaned[field])[:1024]
+        return cleaned
+
+    def create_match_context(
+        self,
+        match_id: str,
+        event_id: str,
+        result_detected_at: float | None = None,
+        started_at: float | None = None,
+        ended_at: float | None = None,
+    ) -> bool:
+        """Create optional enrichment only after the authoritative result exists."""
+        match_id = str(match_id).strip()
+        event_id = str(event_id).strip()
+        if not match_id or not event_id:
+            raise ValueError("match_id and event_id are required")
+        detected_at = (
+            time.time() if result_detected_at is None
+            else self._optional_timestamp(result_detected_at, "result_detected_at")
+        )
+        started_at = self._optional_timestamp(started_at, "started_at")
+        ended_at = self._optional_timestamp(ended_at, "ended_at")
+        if ended_at is None:
+            ended_at = detected_at
+        now = time.time()
+        with self._lock, self._connect() as connection:
+            match = connection.execute(
+                "SELECT session_id,result FROM matches WHERE event_id=?", (event_id,)
+            ).fetchone()
+            if match is None:
+                raise KeyError("authoritative history result does not exist")
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO match_contexts("
+                "match_id,event_id,session_id,started_at,result_detected_at,ended_at,"
+                "result,opponent_recognition_status,recognition_version,created_at,updated_at"
+                ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    match_id, event_id, int(match["session_id"]), started_at,
+                    detected_at, ended_at, str(match["result"]), "unknown",
+                    self.MATCH_CONTEXT_VERSION, now, now,
+                ),
+            )
+            return cursor.rowcount == 1
+
+    def update_match_context(self, match_id: str, **fields: Any) -> bool:
+        """Safely add optional recognition fields without touching match result."""
+        cleaned = self._clean_context_updates(fields)
+        if not cleaned:
+            return False
+        assignments = ",".join(f"{field}=?" for field in cleaned)
+        values = list(cleaned.values())
+        values.extend((time.time(), str(match_id)))
+        with self._lock, self._connect() as connection:
+            cursor = connection.execute(
+                f"UPDATE match_contexts SET {assignments},updated_at=? WHERE match_id=?",
+                values,
+            )
+            return cursor.rowcount == 1
+
+    def match_context(self, match_id: str) -> dict[str, Any] | None:
+        with self._lock, self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM match_contexts WHERE match_id=?", (str(match_id),)
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     def undo_last(self) -> dict[str, Any] | None:
         with self._lock:

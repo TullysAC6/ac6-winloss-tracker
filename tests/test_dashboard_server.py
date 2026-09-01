@@ -1,6 +1,7 @@
 import importlib
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import threading
@@ -35,6 +36,25 @@ with tempfile.TemporaryDirectory() as temporary:
         assert summary["lifetime"]["wins"] == 3
         assert summary["lifetime"]["losses"] == 2
         assert len(summary["recent_matches"]) == 5
+        with sqlite3.connect(server.history.path) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM match_contexts").fetchone()[0] == 5
+
+        # MatchContext is a post-result enrichment transaction. Its failure
+        # cannot roll back accepted stats or the authoritative history row.
+        original_create_context = server.history.create_match_context
+        server.history.create_match_context = lambda *args, **kwargs: (_ for _ in ()).throw(
+            OSError("intentional context failure")
+        )
+        server.result_gate.clear_for_manual_correction()
+        assert server.record_result("loss", "context-failure-test") is True
+        assert server.stats.snapshot()["losses"] == 3
+        assert len(server.history.recent_matches(100)) == 6
+        with sqlite3.connect(server.history.path) as connection:
+            assert connection.execute("SELECT COUNT(*) FROM match_contexts").fetchone()[0] == 5
+        server.history.create_match_context = original_create_context
+        server.undo_result()
+        assert server.stats.snapshot()["losses"] == 2
+        assert len(server.history.recent_matches(100)) == 5
 
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         thread = threading.Thread(target=httpd.serve_forever, daemon=True)
