@@ -1117,13 +1117,14 @@ class DetectorHealth:
 
 
 class ResultDetector:
-    def __init__(self, root, config_loader, on_result, event_callback, stop_event, diagnostic_recorder=None):
+    def __init__(self, root, config_loader, on_result, event_callback, stop_event, diagnostic_recorder=None, identity_tracker=None):
         self.root = Path(root)
         self.config_loader = config_loader
         self.on_result = on_result
         self.event_callback = event_callback
         self.stop_event = stop_event
         self.diagnostics = diagnostic_recorder
+        self.identity_tracker = identity_tracker
         self.classifier = ResultClassifier(self.root / "detector_templates.json")
         self.state = ResultStateMachine()
         self.health = DetectorHealth(event_callback)
@@ -1259,6 +1260,22 @@ class ResultDetector:
                         )
                         debug["motion_score"] = motion_score
                         debug["gameplay_activity"] = gameplay_activity
+
+                        # Phase 1 self identity capture reuses this detector's
+                        # thread and mss session.  It is bounded to startup/lobby
+                        # observation and stops immediately when gameplay is
+                        # observed; battle capture is never continuous.
+                        if self.identity_tracker is not None:
+                            if gameplay_activity:
+                                self.identity_tracker.note_gameplay_activity()
+                            elif self.identity_tracker.should_observe():
+                                identity_shot = sct.grab(client)
+                                self.identity_tracker.observe_frame(
+                                    identity_shot.raw,
+                                    identity_shot.width,
+                                    identity_shot.height,
+                                    pixel_format="bgra",
+                                )
 
                         self.health.touch_capture(time.time())
                         self.health.update(status="active", error=None)
@@ -1405,6 +1422,8 @@ class ResultDetector:
                             self.health.update(
                                 last_result="draw", status="active", error=None
                             )
+                            if self.identity_tracker is not None:
+                                self.identity_tracker.reset_runtime_state()
                         elif result:
                             accepted = self.on_result(result, "auto")
                             if accepted:
@@ -1413,6 +1432,8 @@ class ResultDetector:
                                     status="active",
                                     error=None,
                                 )
+                                if self.identity_tracker is not None:
+                                    self.identity_tracker.reset_runtime_state()
 
                         self.stop_event.wait(poll)
 

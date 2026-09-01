@@ -18,6 +18,7 @@ from event_bus import EventBus
 from history_store import HistoryStore
 from result_detector import ResultDetector
 from result_gate import ResultGate
+from self_identity import SelfIdentityTracker
 from stats_manager import StatsCorruptError, StatsManager
 
 
@@ -35,6 +36,7 @@ stop_event = threading.Event()
 stats = StatsManager(DATA_ROOT)
 result_lock = threading.RLock()
 result_gate = ResultGate()
+self_identity = SelfIdentityTracker(diagnostics=RECORDER)
 history = None
 history_lock = threading.RLock()
 history_health = {"status": "starting", "error": None}
@@ -170,6 +172,8 @@ def lifecycle_health(now=None):
         "detector": {"ok": detector_ok, **detector_health},
         "overlay": overlay,
         "dashboard": dashboard,
+        # Optional enrichment health: never participates in the overall ok.
+        "self_identity": self_identity.health_snapshot(),
     }
 
 
@@ -523,6 +527,7 @@ def detector_supervisor():
                     publish,
                     stop_event,
                     diagnostic_recorder=RECORDER,
+                    identity_tracker=self_identity,
                 )
             except Exception as e:
                 msg = f"{type(e).__name__}: {e}"

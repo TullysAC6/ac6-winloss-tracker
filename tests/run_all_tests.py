@@ -14,6 +14,7 @@ files=[
     "test_stats_manager.py",
     "test_event_bus.py",
     "test_resource_optimization.py",
+    "test_self_identity.py",
     "test_result_gate.py",
     "test_config.py",
     "test_history_store.py",
