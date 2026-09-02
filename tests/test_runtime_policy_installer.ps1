@@ -36,6 +36,16 @@ if ((Select-SupportedPythonCandidate @((Candidate '3.14.1' preferred), (Candidat
 if ((Select-SupportedPythonCandidate @((Candidate '3.13.1' fallback), (Candidate '3.13.9' fallback))).Version -ne '3.13.9') { throw 'newest 3.13 selection failed' }
 if (Select-SupportedPythonCandidate @()) { throw 'empty candidate selection must fail closed' }
 
+# Windows PowerShell 5.1 must not array-subexpress a Generic List directly.
+$genericCandidates = New-Object 'System.Collections.Generic.List[object]'
+$genericCandidates.Add((Candidate '3.13.9' fallback)) | Out-Null
+$genericCandidates.Add((Candidate '3.14.9' preferred)) | Out-Null
+if ((Select-SupportedPythonCandidate -Candidates $genericCandidates.ToArray()).Version -ne '3.14.9') { throw 'Generic List candidate conversion failed' }
+$fallbackCandidates = New-Object 'System.Collections.Generic.List[object]'
+$fallbackCandidates.Add((Candidate '3.13.9' fallback)) | Out-Null
+if ((Select-SupportedPythonCandidate -Candidates $fallbackCandidates.ToArray()).Version -ne '3.13.9') { throw 'Generic List fallback conversion failed' }
+if ((Get-SupportedPythonRole -Major 3 -Minor 12 -ReleaseLevel final -GilDisabled 0) -ne $null) { throw 'Python 3.12 must lead to Python 3.14 preparation' }
+
 function SignedInfo($Status, $SignatureType, $Subject) {
     [PSCustomObject]@{ Signature=[PSCustomObject]@{ Status=$Status; SignatureType=$SignatureType; SignerCertificate=[PSCustomObject]@{ Subject=$Subject } } }
 }
@@ -47,6 +57,10 @@ $installer = Get-Content -LiteralPath $installerPath -Raw
 foreach ($required in @('Get-AuthenticodeSignature', 'pythonw.exe signer does not match python.exe', "`$pythonWingetPackage = 'Python.Python.3.14'", "'--source', 'winget'")) {
     if (-not $installer.Contains($required)) { throw "Installer safety check missing: $required" }
 }
+if (-not $installer.Contains('Select-SupportedPythonCandidate -Candidates $supported.ToArray()')) { throw 'PowerShell 5.1-safe Generic List conversion missing' }
+$prepare = $installer.IndexOf('Install-PythonWithWinget')
+$stop = $installer.IndexOf('Stop-RunningTracker', $prepare)
+if ($prepare -lt 0 -or $stop -le $prepare) { throw 'Python preparation must remain before Tracker shutdown' }
 foreach ($removed in @('runtime-policy.json', 'runtime_policy.py', 'minimum_patch', 'python_policy_version')) {
     if ($installer.Contains($removed)) { throw "Overbuilt runtime policy remains: $removed" }
 }

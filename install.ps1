@@ -562,7 +562,7 @@ function Find-SupportedPython {
             continue
         }
     }
-    return Select-SupportedPythonCandidate -Candidates @($supported)
+    return Select-SupportedPythonCandidate -Candidates $supported.ToArray()
 }
 
 function Install-PythonWithWinget {

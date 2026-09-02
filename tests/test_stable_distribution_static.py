@@ -91,6 +91,7 @@ assert "python-version: ${{ matrix.python-version }}" in workflow
 assert "python tests/run_all_tests.py" in workflow
 assert "tests/test_runtime_policy_installer.ps1" in workflow
 assert "tests/test_uninstaller.ps1" in workflow
+assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1" in workflow
 assert "matrix.python-version != '3.12'" in workflow
 assert "release/**" in workflow and "workflow_dispatch:" in workflow
 assert "test/python-source-install" in workflow

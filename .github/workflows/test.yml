@@ -73,6 +73,13 @@ jobs:
         shell: pwsh
         run: ./tests/test_runtime_policy_installer.ps1
 
+      - name: Validate installer selection with Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -Command '$PSVersionTable.PSVersion'
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 installer test failed with exit code $LASTEXITCODE" }
+
       - name: Validate uninstaller safety and reinstall preservation
         shell: pwsh
         run: ./tests/test_uninstaller.ps1
