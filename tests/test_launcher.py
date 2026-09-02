@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import textwrap
+import time
 from pathlib import Path
 
 
@@ -129,6 +130,13 @@ with tempfile.TemporaryDirectory() as temporary:
             fake_dashboard, root, dashboard_log, dashboard_runtime, timeout=2
         ) is True
         assert "dashboard runtime verification: success" in dashboard_log.read_text(encoding="utf-8")
+        # open_dashboard intentionally returns while the dashboard owns the
+        # log handle. Wait for this short-lived fixture to exit before the
+        # TemporaryDirectory cleanup (Windows does not unlink open files).
+        fixture_deadline = time.monotonic() + 3.0
+        while dashboard_runtime.exists() and time.monotonic() < fixture_deadline:
+            time.sleep(0.05)
+        assert not dashboard_runtime.exists()
 
         dashboard_runtime.write_text(json.dumps({
             "pid": os.getpid(), "server_pid": os.getpid(),
