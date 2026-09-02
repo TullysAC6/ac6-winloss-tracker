@@ -52,8 +52,15 @@ def process_is_alive(pid: int) -> bool:
         )
         if not handle:
             return False
-        ctypes.windll.kernel32.CloseHandle(handle)
-        return True
+        try:
+            exit_code = ctypes.c_ulong(0)
+            if not ctypes.windll.kernel32.GetExitCodeProcess(
+                handle, ctypes.byref(exit_code)
+            ):
+                return False
+            return exit_code.value == 259  # STILL_ACTIVE
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except (OSError, ValueError):
