@@ -18,11 +18,17 @@ $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
 $installParent = Split-Path -Parent $installPath
 $tempRoot = $null
 $python = $null
+$script:runtimePolicy = $null
 $exitCode = 0
 $script:currentStage = 'startup'
 $script:sourceSwapped = $false
 $script:hadPreviousInstall = $false
 $script:backupPath = "$installPath.previous"
+$script:shortcutPath = $null
+$script:shortcutBackupPath = $null
+$script:shortcutExisted = $false
+$script:shortcutChanged = $false
+$script:previousPythonwPath = $null
 
 function Write-InstallLog {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -101,7 +107,10 @@ function Resolve-StableCommit {
 }
 
 function Write-InstalledMetadata {
-    param([Parameter(Mandatory = $true)][string]$Commit)
+    param(
+        [Parameter(Mandatory = $true)][string]$Commit,
+        [Parameter(Mandatory = $true)]$Python
+    )
     $metadataPath = Join-Path $dataPath 'installed-version.json'
     $temporaryPath = Join-Path $dataPath 'installed-version.json.tmp'
     $metadata = [ordered]@{
@@ -109,11 +118,61 @@ function Write-InstalledMetadata {
         version = $version
         resolved_commit = $Commit
         installed_at = [DateTimeOffset]::UtcNow.ToString('o')
+        python_version = [string]$Python.Version
+        python_policy_version = [int]$script:runtimePolicy.policy_version
     } | ConvertTo-Json
     [System.IO.File]::WriteAllText(
         $temporaryPath, $metadata, (New-Object System.Text.UTF8Encoding($false))
     )
     Move-Item -LiteralPath $temporaryPath -Destination $metadataPath -Force
+}
+
+function Read-RuntimePolicy {
+    param([Parameter(Mandatory = $true)][string]$SourcePath)
+
+    $policyPath = Join-Path $SourcePath 'runtime-policy.json'
+    if (-not (Test-Path -LiteralPath $policyPath -PathType Leaf)) {
+        throw '取得したソースにruntime-policy.jsonがありません。現在のTrackerは変更していません。'
+    }
+    try {
+        $policy = Get-Content -LiteralPath $policyPath -Raw -ErrorAction Stop | ConvertFrom-Json
+        if ([int]$policy.policy_version -lt 1 -or
+            [bool]$policy.allow_prerelease -ne $false -or
+            [bool]$policy.allow_free_threaded -ne $false) {
+            throw 'Stable policy flags are invalid'
+        }
+        foreach ($role in @('preferred', 'fallback')) {
+            $entry = $policy.$role
+            if (-not $entry -or [int]$entry.major -lt 3 -or [int]$entry.minor -lt 0 -or [int]$entry.minimum_patch -lt 0) {
+                throw "Runtime policy $role entry is invalid"
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$policy.preferred.winget_package_id)) {
+            throw 'Preferred winget package ID is missing'
+        }
+        return $policy
+    } catch {
+        throw "Runtime Policyを安全に読み込めませんでした。現在のTrackerは変更していません。$($_.Exception.Message)"
+    }
+}
+
+function Get-RuntimePolicyRole {
+    param(
+        [int]$Major,
+        [int]$Minor,
+        [int]$Patch,
+        [string]$ReleaseLevel,
+        [string]$GilDisabled
+    )
+
+    if ($ReleaseLevel -ne 'final' -or $GilDisabled -ne '0') { return $null }
+    foreach ($role in @('preferred', 'fallback')) {
+        $entry = $script:runtimePolicy.$role
+        if ($Major -eq [int]$entry.major -and $Minor -eq [int]$entry.minor -and $Patch -ge [int]$entry.minimum_patch) {
+            return $role
+        }
+    }
+    return $null
 }
 
 function Write-CandidateSkipped {
@@ -295,11 +354,25 @@ function Add-PythonCandidate {
     $List.Add($Path) | Out-Null
 }
 
+function Test-IsPythonFoundationSigner {
+    param($SignedExecutable)
+    return (
+        $null -ne $SignedExecutable -and
+        $null -ne $SignedExecutable.Signature -and
+        $SignedExecutable.Signature.Status -eq 'Valid' -and
+        $SignedExecutable.Signature.SignatureType -eq 'Authenticode' -and
+        $null -ne $SignedExecutable.Signature.SignerCertificate -and
+        $SignedExecutable.Signature.SignerCertificate.Subject -match 'Python Software Foundation'
+    )
+}
+
 function Get-PythonCandidatePaths {
     $candidates = New-Object 'System.Collections.Generic.List[string]'
     $pythonBase = Join-Path $env:LOCALAPPDATA 'Programs\Python'
 
     try {
+        Add-PythonCandidate -List $candidates -Path (Join-Path $pythonBase 'Python314\python.exe')
+        Add-PythonCandidate -List $candidates -Path (Join-Path $pythonBase 'Python313\python.exe')
         Add-PythonCandidate -List $candidates -Path (Join-Path $pythonBase 'Python312\python.exe')
         if (Test-Path -LiteralPath $pythonBase -PathType Container -ErrorAction Stop) {
             $pythonDirectories = @(Get-ChildItem -LiteralPath $pythonBase -Directory -Filter 'Python3*' -ErrorAction Stop |
@@ -384,8 +457,8 @@ function Get-PythonCandidatePaths {
 function Invoke-PythonVerification {
     param([Parameter(Mandatory = $true)][string]$PythonPath)
 
-    # Keep the Python snippet free of nested quotes and JSON escaping.
-    $verificationCode = 'import sys; print(sys.version_info.major); print(sys.version_info.minor); print(sys.version_info.micro); print(sys.executable)'
+    # Output one scalar per line so PowerShell never evaluates Python-provided code.
+    $verificationCode = 'import platform,sys,sysconfig; print(sys.version_info.major); print(sys.version_info.minor); print(sys.version_info.micro); print(sys.version_info.releaselevel); print(1 if sysconfig.get_config_var("Py_GIL_DISABLED") else 0); print(sys.executable); print(platform.machine())'
     $result = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $verificationCode)
     Write-InstallLog "Python verification candidate path: $PythonPath"
     Write-InstallLog "Python verification exit code: $($result.ExitCode)"
@@ -394,8 +467,19 @@ function Invoke-PythonVerification {
     return $result
 }
 
+function Select-SupportedPythonCandidate {
+    param([AllowEmptyCollection()][object[]]$Candidates)
+    if (-not $Candidates -or $Candidates.Count -eq 0) { return $null }
+    return @($Candidates | Sort-Object `
+        @{ Expression = { $_.Priority }; Descending = $true }, `
+        @{ Expression = { $_.Major }; Descending = $true }, `
+        @{ Expression = { $_.Minor }; Descending = $true }, `
+        @{ Expression = { $_.Patch }; Descending = $true })[0]
+}
+
 function Find-SupportedPython {
     $seen = @{}
+    $supported = New-Object 'System.Collections.Generic.List[object]'
     try {
         $candidatePaths = @(Get-PythonCandidatePaths)
     } catch {
@@ -429,7 +513,7 @@ function Find-SupportedPython {
         if (-not $signedPython) {
             continue
         }
-        if ($signedPython.Signature.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+        if (-not (Test-IsPythonFoundationSigner -SignedExecutable $signedPython)) {
             Write-CandidateSkipped -Kind 'Python' -Path $fullPath -Reason ("unexpected signer: {0}" -f $signedPython.Signature.SignerCertificate.Subject)
             continue
         }
@@ -442,8 +526,8 @@ function Find-SupportedPython {
             }
 
             $versionLines = @($verification.Stdout -split '\r?\n' | Where-Object { $_ -ne '' })
-            if ($versionLines.Count -ne 4) {
-                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("version check returned {0} lines instead of 4; see Python verification log" -f $versionLines.Count)
+            if ($versionLines.Count -ne 7) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("runtime check returned {0} lines instead of 7; see Python verification log" -f $versionLines.Count)
                 continue
             }
 
@@ -456,18 +540,21 @@ function Find-SupportedPython {
                 Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason 'version check returned invalid numeric fields; see Python verification log'
                 continue
             }
-            if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 10)) {
-                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("Python version is below 3.10: {0}.{1}.{2}" -f $major, $minor, $micro)
+            $releaseLevel = $versionLines[3].Trim()
+            $gilDisabled = $versionLines[4].Trim()
+            $role = Get-RuntimePolicyRole -Major $major -Minor $minor -Patch $micro -ReleaseLevel $releaseLevel -GilDisabled $gilDisabled
+            if (-not $role) {
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("unsupported runtime policy: {0}.{1}.{2}, releaselevel={3}, Py_GIL_DISABLED={4}" -f $major, $minor, $micro, $releaseLevel, $gilDisabled)
                 continue
             }
 
-            $actualPython = (Resolve-Path -LiteralPath $versionLines[3].Trim()).Path
+            $actualPython = (Resolve-Path -LiteralPath $versionLines[5].Trim()).Path
             if ($actualPython -ne $signedPython.Path) {
                 $signedPython = Get-SignedExecutableInfo -Path $actualPython
                 if (-not $signedPython) {
                     continue
                 }
-                if ($signedPython.Signature.SignerCertificate.Subject -notmatch 'Python Software Foundation') {
+                if (-not (Test-IsPythonFoundationSigner -SignedExecutable $signedPython)) {
                     Write-CandidateSkipped -Kind 'Python' -Path $actualPython -Reason ("unexpected signer: {0}" -f $signedPython.Signature.SignerCertificate.Subject)
                     continue
                 }
@@ -482,20 +569,32 @@ function Find-SupportedPython {
                 Write-CandidateSkipped -Kind 'Python' -Path $pythonwPath -Reason 'pythonw.exe signer does not match python.exe'
                 continue
             }
+            if ((Split-Path -Parent $signedPythonw.Path) -ne (Split-Path -Parent $signedPython.Path)) {
+                Write-CandidateSkipped -Kind 'Python' -Path $pythonwPath -Reason 'pythonw.exe is not from the selected Python installation'
+                continue
+            }
 
-            return [PSCustomObject]@{
+            $supported.Add([PSCustomObject]@{
                 PythonPath = $signedPython.Path
                 PythonwPath = $signedPythonw.Path
-                Version = '{0}.{1}.{2}' -f $major, $minor, $micro
+                Version = ('{0}.{1}.{2}' -f $major, $minor, $micro)
+                Major = $major
+                Minor = $minor
+                Patch = $micro
+                ReleaseLevel = $releaseLevel
+                FreeThreaded = $false
+                Architecture = $versionLines[6].Trim()
+                Role = $role
+                Priority = $(if ($role -eq 'preferred') { 2 } else { 1 })
                 SignatureStatus = [string]$signedPython.Signature.Status
                 SignerSubject = [string]$signedPython.Signature.SignerCertificate.Subject
-            }
+            }) | Out-Null
         } catch {
             Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("verification failed: {0}" -f $_.Exception.Message)
             continue
         }
     }
-    return $null
+    return Select-SupportedPythonCandidate -Candidates @($supported)
 }
 
 function Install-PythonWithWinget {
@@ -545,9 +644,10 @@ function Install-PythonWithWinget {
         throw '安全性を確認できるwingetが見つかりませんでした。Windows Updateを実行してから、もう一度お試しください。'
     }
 
-    Write-Step 'Python 3.12を現在のユーザー用に自動インストールしています。'
+    $packageId = [string]$script:runtimePolicy.preferred.winget_package_id
+    Write-Step '検証済みPreferred RuntimeのPython 3.14を現在のユーザー用に自動インストールしています。'
     $wingetResult = Invoke-NativeCommand -FilePath $signedWinget.Path -ArgumentList @(
-        'install', '--exact', '--id', 'Python.Python.3.12', '--scope', 'user', '--silent',
+        'install', '--exact', '--id', $packageId, '--source', 'winget', '--scope', 'user', '--silent',
         '--accept-package-agreements', '--accept-source-agreements'
     )
     Write-InstallLog "winget command: $($wingetResult.Command)"
@@ -606,7 +706,7 @@ function Invoke-PipInstall {
     }
     Write-InstallLog 'pip install result: success'
 
-    $dependencyCode = 'from importlib.metadata import version; import mss, ttkbootstrap; print("mss=" + mss.__version__ + "; ttkbootstrap=" + version("ttkbootstrap"))'
+    $dependencyCode = 'from importlib.metadata import version; import mss, ttkbootstrap, PIL, tkinter, sqlite3; print("mss=" + mss.__version__ + "; ttkbootstrap=" + version("ttkbootstrap") + "; pillow=" + version("Pillow") + "; sqlite=" + sqlite3.sqlite_version)'
     $dependencyResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $dependencyCode)
     Write-InstallLog "dependency verification command: $($dependencyResult.Command)"
     Write-InstallLog "dependency verification exit code: $($dependencyResult.ExitCode)"
@@ -880,6 +980,41 @@ function Wait-AppRuntimeReady {
     return $false
 }
 
+function Backup-AppShortcut {
+    $desktopPath = [Environment]::GetFolderPath('Desktop')
+    if ([string]::IsNullOrWhiteSpace($desktopPath)) {
+        throw 'デスクトップの場所を確認できなかったため、ショートカットを保護できませんでした。'
+    }
+    $script:shortcutPath = Join-Path $desktopPath 'AC6 WinLoss Tracker.lnk'
+    $script:shortcutBackupPath = Join-Path $tempRoot 'shortcut.previous.lnk'
+    $script:shortcutExisted = Test-Path -LiteralPath $script:shortcutPath -PathType Leaf
+    if ($script:shortcutExisted) {
+        Copy-Item -LiteralPath $script:shortcutPath -Destination $script:shortcutBackupPath -Force
+        $shell = New-Object -ComObject WScript.Shell
+        $oldShortcut = $null
+        try {
+            $oldShortcut = $shell.CreateShortcut($script:shortcutPath)
+            $script:previousPythonwPath = [string]$oldShortcut.TargetPath
+        } finally {
+            if ($oldShortcut) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($oldShortcut) }
+            [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
+        }
+        Write-InstallLog 'previous shortcut backed up for transaction rollback'
+    }
+}
+
+function Restore-AppShortcut {
+    if (-not $script:shortcutChanged) { return }
+    if ($script:shortcutExisted -and (Test-Path -LiteralPath $script:shortcutBackupPath -PathType Leaf)) {
+        Copy-Item -LiteralPath $script:shortcutBackupPath -Destination $script:shortcutPath -Force
+        Write-InstallLog 'transaction rollback restored previous shortcut'
+    } elseif ($script:shortcutPath -and (Test-Path -LiteralPath $script:shortcutPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $script:shortcutPath -Force
+        Write-InstallLog 'transaction rollback removed new shortcut'
+    }
+    $script:shortcutChanged = $false
+}
+
 function New-AppShortcut {
     param(
         [Parameter(Mandatory = $true)][string]$PythonwPath,
@@ -901,6 +1036,7 @@ function New-AppShortcut {
         $shortcut.WorkingDirectory = $installPath
         $shortcut.Description = 'AC6 Win/Loss Tracker Stable'
         $shortcut.Save()
+        $script:shortcutChanged = $true
     } finally {
         if ($shortcut) {
             [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shortcut)
@@ -954,7 +1090,7 @@ try {
         throw '取得したZIPの内容を確認できませんでした。現在のTrackerは変更していません。'
     }
     $sourceRoot = Get-Item -LiteralPath $expectedSourceRoot
-    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.txt')) {
+    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.txt', 'runtime-policy.json', 'runtime_policy.py')) {
         if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot.FullName $requiredFile) -PathType Leaf)) {
             throw "取得したZIPに必要なファイル $requiredFile がありません。現在のTrackerは変更していません。"
         }
@@ -971,9 +1107,14 @@ try {
         throw '取得したソースに、配布対象外の実行バイナリまたは証明書ファイルが含まれていました。現在のTrackerは変更していません。'
     }
     Write-InstallLog "archive validation: success; immutable revision $resolvedCommit"
+    $script:runtimePolicy = Read-RuntimePolicy -SourcePath $sourceRoot.FullName
+    Write-InstallLog ("runtime policy: version={0}; preferred={1}.{2}.{3}+; fallback={4}.{5}.{6}+" -f `
+        $script:runtimePolicy.policy_version,
+        $script:runtimePolicy.preferred.major, $script:runtimePolicy.preferred.minor, $script:runtimePolicy.preferred.minimum_patch,
+        $script:runtimePolicy.fallback.major, $script:runtimePolicy.fallback.minor, $script:runtimePolicy.fallback.minimum_patch)
 
     Set-InstallStage -Name 'python-discovery'
-    Write-Step '署名済みのPython 3.10以上を探しています。'
+    Write-Step 'Stableで検証済みのPSF署名Python Runtimeを探しています。'
     $python = Find-SupportedPython
     if (-not $python) {
         Set-InstallStage -Name 'winget-install'
@@ -985,18 +1126,35 @@ try {
         Set-InstallStage -Name 'python-verification'
     }
     if (-not $python) {
-        throw '[ENV-PYTHON-NOT-FOUND] Python 3.10以上の署名済み実体を確認できませんでした。install.ps1を再実行してください。'
+        throw ('[ENV-PYTHON-UNSUPPORTED] Python {0}.{1}.{2}+または{3}.{4}.{5}+の署名済みstandard-GIL Runtimeを確認できませんでした。install.ps1を再実行してください。' -f `
+            $script:runtimePolicy.preferred.major, $script:runtimePolicy.preferred.minor, $script:runtimePolicy.preferred.minimum_patch,
+            $script:runtimePolicy.fallback.major, $script:runtimePolicy.fallback.minor, $script:runtimePolicy.fallback.minimum_patch)
     }
 
-    Write-Host "Python $($python.Version): $($python.PythonPath)"
+    Write-Host "Python $($python.Version) ($($python.Role)): $($python.PythonPath)"
     Write-InstallLog "selected Python version: $($python.Version)"
     Write-InstallLog "selected Python path: $($python.PythonPath)"
     Write-InstallLog "selected Pythonw path: $($python.PythonwPath)"
     Write-InstallLog "selected Python Authenticode Status: $($python.SignatureStatus)"
     Write-InstallLog "selected Python signer: $($python.SignerSubject)"
+    Write-InstallLog "selected Python policy role: $($python.Role)"
+    Write-InstallLog "selected Python free-threaded: $($python.FreeThreaded)"
+    Write-InstallLog "selected Python architecture: $($python.Architecture)"
 
     Set-InstallStage -Name 'pip-install'
     Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.txt')
+    Set-InstallStage -Name 'python-verification'
+    $confirmedPython = Find-SupportedPython
+    if (-not $confirmedPython -or
+        $confirmedPython.PythonPath -ne $python.PythonPath -or
+        $confirmedPython.PythonwPath -ne $python.PythonwPath -or
+        $confirmedPython.Version -ne $python.Version -or
+        $confirmedPython.Role -ne $python.Role) {
+        throw '[ENV-PYTHON-UNSUPPORTED] 依存確認後にselected Python Runtimeの完全性を再確認できませんでした。現在のTrackerは変更していません。'
+    }
+    $python = $confirmedPython
+    Write-InstallLog 'selected Python post-dependency validation: success'
+    Backup-AppShortcut
 
     if (Test-Path -LiteralPath $installPath -PathType Container) {
         Set-InstallStage -Name 'stop-running-app'
@@ -1036,7 +1194,7 @@ try {
     }
 
     Write-InstallLog 'application launch result: success'
-    Write-InstalledMetadata -Commit $resolvedCommit
+    Write-InstalledMetadata -Commit $resolvedCommit -Python $python
     Write-InstallLog "installed revision: $resolvedCommit"
     Complete-SourceInstall
     Write-Host "`nセットアップが完了しました。" -ForegroundColor Green
@@ -1053,13 +1211,27 @@ try {
         }
         try {
             Restore-PreviousSource
+        } catch {
+            try { Write-InstallLog "source rollback failed: $($_.Exception.Message)" } catch {}
+        }
+        try {
+            Restore-AppShortcut
+        } catch {
+            try { Write-InstallLog "shortcut rollback failed: $($_.Exception.Message)" } catch {}
+        }
+        try {
             if ($script:hadPreviousInstall -and $python -and (Test-Path -LiteralPath (Join-Path $installPath 'launcher.pyw'))) {
                 $previousLauncher = Join-Path $installPath 'launcher.pyw'
-                Start-Process -FilePath $python.PythonwPath -ArgumentList ('"{0}"' -f $previousLauncher) -WorkingDirectory $installPath | Out-Null
+                $rollbackPythonw = if ($script:previousPythonwPath -and (Test-Path -LiteralPath $script:previousPythonwPath -PathType Leaf)) { $script:previousPythonwPath } else { $python.PythonwPath }
+                Start-Process -FilePath $rollbackPythonw -ArgumentList ('"{0}"' -f $previousLauncher) -WorkingDirectory $installPath | Out-Null
                 Write-InstallLog 'transaction rollback restarted previous source'
             }
         } catch {
-            try { Write-InstallLog "transaction rollback failed: $($_.Exception.Message)" } catch {}
+            try { Write-InstallLog "transaction rollback restart failed: $($_.Exception.Message)" } catch {}
+        }
+    } elseif ($script:shortcutChanged) {
+        try { Restore-AppShortcut } catch {
+            try { Write-InstallLog "shortcut rollback failed: $($_.Exception.Message)" } catch {}
         }
     }
     $friendlyMessage = [string]$errorRecord.Exception.Message

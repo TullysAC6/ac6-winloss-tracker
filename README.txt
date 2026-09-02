@@ -11,9 +11,17 @@ Windows PowerShellへ次の1行をそのまま貼り付けて実行してくだ�
   powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/heads/main/install.ps1')"
 
 インストーラーはGitHub APIでmainのHEADを1回だけ解決し、40桁SHAを検証して、その変更不能な
-リビジョンのZIPを取得します。Python 3.10以上を探索し、Python Software Foundationの有効な
-Authenticode署名を確認できるpython.exe / pythonw.exeだけを使用します。見つからない場合は
-wingetから公式Python 3.12をユーザー領域へ導入します。venvや独自バイナリは使用しません。
+リビジョンのZIPを取得します。Stable installerはPython Software Foundationの有効な
+Authenticode署名を持つ、明示的に検証済みのRuntimeだけを選択または自動準備します。
+
+  Preferred: Python 3.14.7以上（3.14.xのfinal・通常GIL build）
+  Fallback : Python 3.13.15以上（3.13.xのfinal・通常GIL build）
+
+同じ系列ではminimum patch以上の最新候補を選び、3.14を3.13より優先します。alpha、beta、rc、
+free-threaded build、Python 3.12.x以下、Python 3.15.x以上はStable v1.0.0のapproved runtimeでは
+ありません。既存Pythonが3.12だけの場合は、wingetから公式Python 3.14をユーザー領域へ準備し、
+署名・version・pythonw.exe・GIL buildを再検証します。既存の3.12や他アプリ用Pythonは削除しません。
+Windows x64が正式検証済みです。venvや独自バイナリは使用しません。
 AppLocker、WDAC、Group PolicyでPowerShellやPythonが制限されている場合、そのポリシーを迂回せず
 管理者へ確認してください。インストーラーはExecutionPolicyを永続変更しません。
 
@@ -25,7 +33,8 @@ AppLocker、WDAC、Group PolicyでPowerShellやPythonが制限されている場
 
 設定、現在戦績、累計履歴、診断データはソース本体とは分離されています。再インストールや更新時も
 config.json、stats.json、history.db、diagnostics\ は削除しません。更新は新ソースの取得・検証と
-依存確認が完了してから行い、起動確認に失敗した場合は直前のソースへ戻します。
+依存確認が完了してから行い、起動確認に失敗した場合は直前のソースとショートカットへ戻します。
+更新後のショートカットは、選択された検証済みRuntimeのpythonw.exeを直接使用します。
 
 【使い方】
 セットアップ完了後はデスクトップの「AC6 WinLoss Tracker」を開きます。起動中にもう一度開くと

@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from app_paths import data_dir
+from runtime_policy import require_supported_runtime
 
 ROOT = data_dir()
 STATS_PATH = ROOT / "stats.json"
@@ -1017,6 +1018,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    require_supported_runtime()
     if os.name != "nt":
         print("[game-overlay] Windows only.", file=sys.stderr)
         return 2

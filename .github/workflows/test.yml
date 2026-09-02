@@ -47,6 +47,10 @@ jobs:
       - name: Check installed dependencies
         run: python -m pip check
 
+      - name: Audit dependencies
+        if: matrix.python-version != '3.12'
+        run: python -m pip install pip-audit && python -m pip_audit -r requirements.txt
+
       - name: Compile Python sources
         run: python -m compileall -q .
 
@@ -63,8 +67,17 @@ jobs:
             throw "install.ps1 has PowerShell syntax errors"
           }
 
+      - name: Validate Runtime Policy
+        run: python tests/test_runtime_policy.py && python tests/test_runtime_guard.py
+
+      - name: Validate installer Runtime Policy
+        shell: pwsh
+        run: ./tests/test_runtime_policy_installer.ps1
+
       - name: Run launcher tests
+        if: matrix.python-version != '3.12'
         run: python tests/test_launcher.py
 
       - name: Run full regression suite after launcher passes
+        if: matrix.python-version != '3.12'
         run: python tests/run_all_tests.py

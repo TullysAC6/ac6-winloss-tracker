@@ -3,6 +3,22 @@ chcp 65001 >nul
 set PYTHONUTF8=1
 cd /d "%~dp0"
 
+set "PY="
+py -3 -c "import runtime_policy; runtime_policy.require_supported_runtime()" >nul 2>&1
+if not errorlevel 1 set "PY=py -3"
+
+if not defined PY (
+  python -c "import runtime_policy; runtime_policy.require_supported_runtime()" >nul 2>&1
+  if not errorlevel 1 set "PY=python"
+)
+
+if not defined PY (
+  echo [ERROR] Stable v1.0.0 supported Python runtime was not found.
+  echo Run install.ps1 to select or prepare an approved runtime.
+  pause
+  exit /b 1
+)
+
 if not exist "config.json" (
   if not exist "config.example.json" (
     echo [ERROR] config.example.json not found.
@@ -11,22 +27,6 @@ if not exist "config.json" (
   )
   copy /y "config.example.json" "config.json" >nul
   echo Created config.json from config.example.json.
-)
-
-set "PY="
-py -3 -c "import sys; assert sys.version_info >= (3,10); print(sys.executable)" >nul 2>&1
-if not errorlevel 1 set "PY=py -3"
-
-if not defined PY (
-  python -c "import sys; assert sys.version_info >= (3,10); print(sys.executable)" >nul 2>&1
-  if not errorlevel 1 set "PY=python"
-)
-
-if not defined PY (
-  echo [ERROR] Python 3.10 or later was not found.
-  echo Microsoft Store App Execution Alias alone is not sufficient.
-  pause
-  exit /b 1
 )
 
 %PY% -m venv .venv

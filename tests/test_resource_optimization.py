@@ -161,6 +161,11 @@ with tempfile.TemporaryDirectory() as temporary:
             assert "frame-buffer.jsonl" in bundle.namelist()
             buffered = bundle.read("frame-buffer.jsonl").decode("utf-8")
             assert '"sample":99' in buffered
+            diagnostic_manifest = json.loads(bundle.read("manifest.json").decode("utf-8"))
+            assert diagnostic_manifest["python_policy_status"] == "supported"
+            assert diagnostic_manifest["python_runtime_role"] in ("preferred", "fallback")
+            assert diagnostic_manifest["python_free_threaded"] is False
+            assert diagnostic_manifest["python_policy_version"] == 1
         assert not (recorder.root / "frame-buffer.jsonl").exists()
         print("diagnostics memory ring/context flush/export: OK")
 

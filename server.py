@@ -13,6 +13,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+from runtime_policy import UnsupportedRuntimeError, require_supported_runtime
+
+# Direct server.py execution must fail before diagnostics, stats, history, or
+# detector modules can initialize user-data state.
+require_supported_runtime()
 
 from app_paths import data_dir, resource_dir, resource_path
 from config_utils import (
@@ -762,12 +767,14 @@ def inspect_startup_config():
 
 def inspect_startup_environment():
     """Perform non-mutating runtime/dependency checks before ownership."""
-    if sys.version_info < (3, 10):
+    try:
+        require_supported_runtime()
+    except UnsupportedRuntimeError as error:
         raise StartupEnvironmentError(
-            "ENV-PYTHON-VERSION",
-            "Python 3.10以上が必要です。",
-            "公式Pythonを更新してからinstall.ps1を再実行してください。",
-        )
+            "ENV-PYTHON-UNSUPPORTED",
+            str(error).replace("[ENV-PYTHON-UNSUPPORTED] ", "", 1),
+            "Stable installerを再実行してください。",
+        ) from error
     for module_name in ("mss", "ttkbootstrap", "tkinter"):
         if importlib.util.find_spec(module_name) is None:
             raise StartupEnvironmentError(

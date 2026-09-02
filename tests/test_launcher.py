@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 LOADER = importlib.machinery.SourceFileLoader("source_launcher", str(ROOT / "launcher.pyw"))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 launcher = importlib.util.module_from_spec(SPEC)
