@@ -3,8 +3,13 @@ $root = Split-Path -Parent $PSScriptRoot
 $installerPath = Join-Path $root 'install.ps1'
 $tokens = $null
 $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($installerPath, [ref]$tokens, [ref]$errors)
-if ($errors.Count -gt 0) { throw 'install.ps1 syntax is invalid' }
+$utf8 = New-Object System.Text.UTF8Encoding($false)
+$installerSource = [System.IO.File]::ReadAllText($installerPath, $utf8)
+$ast = [System.Management.Automation.Language.Parser]::ParseInput($installerSource, [ref]$tokens, [ref]$errors)
+if ($errors.Count -gt 0) {
+    $errors | Format-List -Force
+    throw 'install.ps1 syntax is invalid'
+}
 
 foreach ($name in @('Get-SupportedPythonRole', 'Select-SupportedPythonCandidate', 'Test-IsPythonFoundationSigner')) {
     $functionAst = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
@@ -53,7 +58,7 @@ if (-not (Test-IsPythonFoundationSigner (SignedInfo Valid Authenticode 'CN=Pytho
 if (Test-IsPythonFoundationSigner (SignedInfo NotSigned None 'CN=Python Software Foundation')) { throw 'unsigned Python accepted' }
 if (Test-IsPythonFoundationSigner (SignedInfo Valid Authenticode 'CN=Unexpected Signer')) { throw 'unexpected signer accepted' }
 
-$installer = Get-Content -LiteralPath $installerPath -Raw
+$installer = $installerSource
 foreach ($required in @('Get-AuthenticodeSignature', 'pythonw.exe signer does not match python.exe', "`$pythonWingetPackage = 'Python.Python.3.14'", "'--source', 'winget'")) {
     if (-not $installer.Contains($required)) { throw "Installer safety check missing: $required" }
 }
