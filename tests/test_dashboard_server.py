@@ -7,7 +7,6 @@ import tempfile
 import threading
 import urllib.request
 from contextlib import contextmanager
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,7 +66,7 @@ with tempfile.TemporaryDirectory() as temporary:
         assert server.stats.snapshot()["losses"] == 2
         assert len(server.history.recent_matches(100)) == 5
 
-        httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        httpd = server.QuietThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         thread = threading.Thread(target=httpd.serve_forever, daemon=True)
         thread.start()
         with urllib.request.urlopen(
@@ -80,7 +79,9 @@ with tempfile.TemporaryDirectory() as temporary:
         # A second bind failure is before all startup mutation boundaries.
         sessions_before = len(server.history.recent_matches(100))
         try:
-            ThreadingHTTPServer(("127.0.0.1", httpd.server_address[1]), server.Handler)
+            server.QuietThreadingHTTPServer(
+                ("127.0.0.1", httpd.server_address[1]), server.Handler
+            )
             raise AssertionError("duplicate server unexpectedly bound")
         except OSError:
             pass

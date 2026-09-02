@@ -4,6 +4,7 @@ import importlib.util
 import os
 import queue
 import secrets
+import socket
 import sys
 import threading
 import time
@@ -65,6 +66,18 @@ event_bus = EventBus(history_size=300)
 
 class QuietThreadingHTTPServer(ThreadingHTTPServer):
     """Suppress only expected short-lived localhost client disconnect noise."""
+
+    # Windows SO_REUSEADDR can permit two listeners on one address. Require
+    # exclusive ownership there so the HTTP bind remains the single-instance
+    # boundary before stats/history mutation.
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(
+                socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1
+            )
+        super().server_bind()
 
     def handle_error(self, request, client_address):
         error = sys.exc_info()[1]

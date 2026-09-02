@@ -53,6 +53,8 @@ assert 'store.reset_session()' in s
 print("history accepted-result flow / dashboard API / session reset: OK")
 
 assert "class QuietThreadingHTTPServer(ThreadingHTTPServer):" in s
+assert "socket.SO_EXCLUSIVEADDRUSE" in s
+assert 'allow_reuse_address = os.name != "nt"' in s
 assert "ConnectionAbortedError" in s
 assert "super().handle_error(request, client_address)" in s
 print("benign localhost disconnect suppression: OK")
