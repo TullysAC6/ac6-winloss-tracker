@@ -27,6 +27,13 @@ MAX_LOG_BYTES = 1024 * 1024
 STARTUP_TIMEOUT_SECONDS = 10.0
 
 
+def utf8_python_environment() -> dict[str, str]:
+    environment = os.environ.copy()
+    environment["PYTHONUTF8"] = "1"
+    environment["PYTHONIOENCODING"] = "utf-8"
+    return environment
+
+
 def read_runtime(path: Path = RUNTIME_PATH) -> dict | None:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -137,6 +144,7 @@ def start_application(
             stderr=subprocess.STDOUT,
             shell=False,
             creationflags=creationflags,
+            env=utf8_python_environment(),
         )
 
 
@@ -160,6 +168,7 @@ def open_dashboard(
                 [sys.executable, str(dashboard_path)], cwd=str(app_dir),
                 stdin=subprocess.DEVNULL, stdout=startup_log,
                 stderr=subprocess.STDOUT, shell=False, creationflags=creationflags,
+                env=utf8_python_environment(),
             )
             startup_log.write(f"dashboard launch PID: {process.pid}\n")
             startup_log.flush()

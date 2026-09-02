@@ -184,6 +184,8 @@ print("launcher startup / duplicate / stale runtime / failure logging: OK")
 launcher_source = (ROOT / "launcher.pyw").read_text(encoding="utf-8")
 assert "GetExitCodeProcess" in launcher_source
 assert "exit_code.value == 259" in launcher_source
+assert 'environment["PYTHONUTF8"] = "1"' in launcher_source
+assert 'environment["PYTHONIOENCODING"] = "utf-8"' in launcher_source
 
 installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
 assert "$shortcut.TargetPath = $PythonwPath" in installer
