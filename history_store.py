@@ -4,6 +4,7 @@ import json
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -14,9 +15,13 @@ def read_history_schema_version(root: str | Path) -> int:
     if not path.exists():
         return 0
     uri = path.resolve().as_uri() + "?mode=ro"
-    with sqlite3.connect(uri, uri=True, timeout=1.0) as connection:
+    connection = sqlite3.connect(uri, uri=True, timeout=1.0)
+    try:
+        connection.execute("PRAGMA query_only=ON")
         row = connection.execute("PRAGMA user_version").fetchone()
         return int(row[0])
+    finally:
+        connection.close()
 
 
 class HistoryStore:
@@ -56,8 +61,17 @@ class HistoryStore:
         connection.execute("PRAGMA journal_mode=WAL")
         return connection
 
+    @contextmanager
+    def _connection(self):
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _migrate(self) -> None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             version = int(connection.execute("PRAGMA user_version").fetchone()[0])
             if version > self.SCHEMA_VERSION:
                 raise RuntimeError(f"unsupported history schema version: {version}")
@@ -215,7 +229,7 @@ class HistoryStore:
 
     def start_session(self, started_at: float | None = None) -> int:
         started_at = time.time() if started_at is None else float(started_at)
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             connection.execute(
                 "UPDATE sessions SET ended_at=?, ended_reason=? WHERE ended_at IS NULL",
                 (started_at, "recovered"),
@@ -232,7 +246,7 @@ class HistoryStore:
             session_id = self._current_session_id
             if session_id is None:
                 return
-            with self._connect() as connection:
+            with self._connection() as connection:
                 connection.execute(
                     "UPDATE sessions SET ended_at=?, ended_reason=? "
                     "WHERE id=? AND ended_at IS NULL",
@@ -264,7 +278,7 @@ class HistoryStore:
                 json.dumps(metadata, ensure_ascii=False, separators=(",", ":"))
                 if metadata else None
             )
-            with self._connect() as connection:
+            with self._connection() as connection:
                 cursor = connection.execute(
                     "INSERT OR IGNORE INTO matches("
                     "event_id,session_id,created_at,result,source,streak_after,"
@@ -356,7 +370,7 @@ class HistoryStore:
         if ended_at is None:
             ended_at = detected_at
         now = time.time()
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             match = connection.execute(
                 "SELECT session_id,result FROM matches WHERE event_id=?", (event_id,)
             ).fetchone()
@@ -383,7 +397,7 @@ class HistoryStore:
         assignments = ",".join(f"{field}=?" for field in cleaned)
         values = list(cleaned.values())
         values.extend((time.time(), str(context_id)))
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             cursor = connection.execute(
                 f"UPDATE match_contexts SET {assignments},updated_at=? WHERE context_id=?",
                 values,
@@ -391,7 +405,7 @@ class HistoryStore:
             return cursor.rowcount == 1
 
     def match_context(self, context_id: str) -> dict[str, Any] | None:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 "SELECT * FROM match_contexts WHERE context_id=?", (str(context_id),)
             ).fetchone()
@@ -402,7 +416,7 @@ class HistoryStore:
             session_id = self._current_session_id
             if session_id is None:
                 return None
-            with self._connect() as connection:
+            with self._connection() as connection:
                 row = connection.execute(
                     "SELECT event_id FROM matches WHERE session_id=? ORDER BY id DESC LIMIT 1",
                     (session_id,),
@@ -415,7 +429,7 @@ class HistoryStore:
             session_id = self._current_session_id
             if session_id is None:
                 return None
-            with self._connect() as connection:
+            with self._connection() as connection:
                 row = connection.execute(
                     "SELECT id,event_id,result FROM matches "
                     "WHERE session_id=? AND event_id=?",
@@ -443,7 +457,7 @@ class HistoryStore:
                 }
 
     def lifetime_summary(self) -> dict[str, Any]:
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             row = connection.execute(
                 "SELECT COALESCE(SUM(wins),0) wins, COALESCE(SUM(losses),0) losses, "
                 "COALESCE(SUM(draws),0) draws, COALESCE(MAX(best_streak),0) best_streak "
@@ -459,7 +473,7 @@ class HistoryStore:
 
     def recent_matches(self, limit: int = 10) -> list[dict[str, Any]]:
         limit = max(1, min(int(limit), 100))
-        with self._lock, self._connect() as connection:
+        with self._lock, self._connection() as connection:
             rows = connection.execute(
                 "SELECT event_id,session_id,created_at,result,source,streak_after "
                 "FROM matches ORDER BY id DESC LIMIT ?", (limit,)
@@ -471,7 +485,7 @@ class HistoryStore:
             session_id = self._current_session_id
             if session_id is None:
                 return None
-            with self._connect() as connection:
+            with self._connection() as connection:
                 row = connection.execute(
                     "SELECT id,started_at,ended_at FROM sessions WHERE id=?", (session_id,)
                 ).fetchone()
