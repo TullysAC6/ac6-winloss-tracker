@@ -2,6 +2,8 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import textwrap
 import time
@@ -13,6 +15,28 @@ LOADER = importlib.machinery.SourceFileLoader("source_launcher", str(ROOT / "lau
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 launcher = importlib.util.module_from_spec(SPEC)
 LOADER.exec_module(launcher)
+
+
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.6)"])
+try:
+    deadline = time.monotonic() + 2.0
+    observed_running = False
+    while time.monotonic() < deadline and child.poll() is None:
+        if launcher.process_is_alive(child.pid):
+            observed_running = True
+            break
+        time.sleep(0.05)
+    assert child.poll() is None
+    assert observed_running
+    child.wait(timeout=3)
+    assert child.poll() == 0
+    assert launcher.process_is_alive(child.pid) is False
+finally:
+    if child.poll() is None:
+        child.terminate()
+        child.wait(timeout=3)
+
+print("Popen/process_is_alive running and exited states agree: OK")
 
 
 FAKE_SERVER = textwrap.dedent(

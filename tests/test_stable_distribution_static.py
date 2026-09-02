@@ -72,7 +72,8 @@ assert "%LOCALAPPDATA%\\AC6WinLossTracker\\" in readme
 workflow = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
 assert "windows-tests:" in workflow
 assert "runs-on: windows-latest" in workflow
-assert "python-version: '3.12'" in workflow
+assert "python-version: ['3.12', '3.13', '3.14']" in workflow
+assert "python-version: ${{ matrix.python-version }}" in workflow
 assert "python tests/run_all_tests.py" in workflow
 assert "release/**" in workflow and "workflow_dispatch:" in workflow
 assert "test/python-source-install" in workflow

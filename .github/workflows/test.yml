@@ -63,9 +63,6 @@ jobs:
             throw "install.ps1 has PowerShell syntax errors"
           }
 
-      - name: Probe launcher runtime lifecycle
-        run: python tests/test_launcher_runtime_probe.py
-
       - name: Run launcher tests
         run: python tests/test_launcher.py
 
