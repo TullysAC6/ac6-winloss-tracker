@@ -6,11 +6,22 @@ import sys
 import tempfile
 import threading
 import urllib.request
+from contextlib import contextmanager
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+
+@contextmanager
+def open_database(*args, **kwargs):
+    connection = sqlite3.connect(*args, **kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
 
 
 with tempfile.TemporaryDirectory() as temporary:
@@ -36,7 +47,7 @@ with tempfile.TemporaryDirectory() as temporary:
         assert summary["lifetime"]["wins"] == 3
         assert summary["lifetime"]["losses"] == 2
         assert len(summary["recent_matches"]) == 5
-        with sqlite3.connect(server.history.path) as connection:
+        with open_database(server.history.path) as connection:
             assert connection.execute("SELECT COUNT(*) FROM match_contexts").fetchone()[0] == 5
 
         # MatchContext is a post-result enrichment transaction. Its failure
@@ -49,7 +60,7 @@ with tempfile.TemporaryDirectory() as temporary:
         assert server.record_result("loss", "context-failure-test") is True
         assert server.stats.snapshot()["losses"] == 3
         assert len(server.history.recent_matches(100)) == 6
-        with sqlite3.connect(server.history.path) as connection:
+        with open_database(server.history.path) as connection:
             assert connection.execute("SELECT COUNT(*) FROM match_contexts").fetchone()[0] == 5
         server.history.create_match_context = original_create_context
         server.undo_result()

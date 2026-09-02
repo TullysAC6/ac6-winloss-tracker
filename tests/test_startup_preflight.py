@@ -6,6 +6,7 @@ import socket
 import sqlite3
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -13,12 +14,22 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
+@contextmanager
+def open_database(*args, **kwargs):
+    connection = sqlite3.connect(*args, **kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def make_db(path, version):
-    with sqlite3.connect(path) as connection:
+    with open_database(path) as connection:
         connection.execute(f"PRAGMA user_version={int(version)}")
         connection.execute("CREATE TABLE sentinel(value TEXT)")
         connection.execute("INSERT INTO sentinel VALUES ('preserve-me')")
@@ -69,7 +80,7 @@ with tempfile.TemporaryDirectory() as temporary:
         make_db(db, schema)
         before = (digest(db), db.stat().st_size, db.stat().st_mtime_ns, sorted(p.name for p in case.iterdir()))
         assert read_history_schema_version(case) == schema
-        with sqlite3.connect(f"file:{db.resolve()}?mode=ro", uri=True) as connection:
+        with open_database(f"file:{db.resolve()}?mode=ro", uri=True) as connection:
             assert connection.execute("PRAGMA user_version").fetchone()[0] == schema
             assert connection.execute("SELECT value FROM sentinel").fetchone()[0] == "preserve-me"
         after = (digest(db), db.stat().st_size, db.stat().st_mtime_ns, sorted(p.name for p in case.iterdir()))
@@ -112,7 +123,7 @@ with tempfile.TemporaryDirectory() as temporary:
             server.RUNTIME_PATH = case / ".runtime.json"
             config = dict(server.DEFAULT_CONFIG, port=18760 + schema)
             server.CONFIG_PATH.write_text(json.dumps(config), encoding="utf-8")
-            with sqlite3.connect(f"file:{db.resolve()}?mode=ro", uri=True) as connection:
+            with open_database(f"file:{db.resolve()}?mode=ro", uri=True) as connection:
                 before_rows = connection.execute("SELECT value FROM sentinel").fetchall()
                 before_schema = connection.execute("PRAGMA user_version").fetchone()[0]
             before = (
@@ -124,7 +135,7 @@ with tempfile.TemporaryDirectory() as temporary:
                 raise AssertionError("future schema must fail")
             except server.StartupEnvironmentError as error:
                 assert error.code == "ENV-HISTORY-FUTURE-SCHEMA"
-            with sqlite3.connect(f"file:{db.resolve()}?mode=ro", uri=True) as connection:
+            with open_database(f"file:{db.resolve()}?mode=ro", uri=True) as connection:
                 after_rows = connection.execute("SELECT value FROM sentinel").fetchall()
                 after_schema = connection.execute("PRAGMA user_version").fetchone()[0]
             after = (

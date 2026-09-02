@@ -1,6 +1,7 @@
 import sqlite3
 import sys
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -9,12 +10,22 @@ sys.path.insert(0, str(ROOT))
 from history_store import HistoryStore
 
 
+@contextmanager
+def open_database(*args, **kwargs):
+    connection = sqlite3.connect(*args, **kwargs)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
     store = HistoryStore(root)
     assert store.path == root / "history.db"
     assert store.path.exists()
-    with sqlite3.connect(store.path) as connection:
+    with open_database(store.path) as connection:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
 
     first_session = store.start_session(started_at=1000)
@@ -76,7 +87,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert reopened.lifetime_summary() == lifetime
     third_session = reopened.start_session(started_at=2000)
     assert third_session != second_session
-    with sqlite3.connect(store.path) as connection:
+    with open_database(store.path) as connection:
         open_sessions = connection.execute(
             "SELECT COUNT(*) FROM sessions WHERE ended_at IS NULL"
         ).fetchone()[0]
@@ -114,7 +125,7 @@ with tempfile.TemporaryDirectory() as temporary:
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
     path = root / "history.db"
-    with sqlite3.connect(path) as connection:
+    with open_database(path) as connection:
         connection.executescript(
             """
             CREATE TABLE sessions (
@@ -139,7 +150,7 @@ with tempfile.TemporaryDirectory() as temporary:
             """
         )
     migrated = HistoryStore(root)
-    with sqlite3.connect(path) as connection:
+    with open_database(path) as connection:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
         assert connection.execute("SELECT result FROM matches").fetchone()[0] == "win"
     legacy = migrated.match_context("legacy-event")
@@ -157,7 +168,7 @@ with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
     path = root / "history.db"
     expected_ids = {}
-    with sqlite3.connect(path) as connection:
+    with open_database(path) as connection:
         connection.executescript(
             """
             CREATE TABLE sessions (
@@ -218,7 +229,7 @@ with tempfile.TemporaryDirectory() as temporary:
             )
 
     migrated = HistoryStore(root)
-    with sqlite3.connect(path) as connection:
+    with open_database(path) as connection:
         assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
         columns = [row[1] for row in connection.execute("PRAGMA table_info(match_contexts)")]
         assert "context_id" in columns and "match_id" not in columns
