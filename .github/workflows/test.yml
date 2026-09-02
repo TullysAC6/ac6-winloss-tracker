@@ -19,20 +19,33 @@ env:
 
 jobs:
   windows-tests:
-    name: Windows tests
+    name: Windows tests (Python ${{ matrix.python-version }})
     runs-on: windows-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@v6
 
-      - name: Set up Python 3.12
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
           cache: pip
+
+      - name: Record runtime details
+        shell: pwsh
+        run: |
+          python --version
+          python -c "import platform, sqlite3, struct; print('architecture=' + platform.architecture()[0]); print('pointer_bits=' + str(struct.calcsize('P') * 8)); print('sqlite=' + sqlite3.sqlite_version)"
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+
+      - name: Check installed dependencies
+        run: python -m pip check
 
       - name: Compile Python sources
         run: python -m compileall -q .
@@ -50,5 +63,11 @@ jobs:
             throw "install.ps1 has PowerShell syntax errors"
           }
 
-      - name: Run full regression suite
+      - name: Probe launcher runtime lifecycle
+        run: python tests/test_launcher_runtime_probe.py
+
+      - name: Run launcher tests
+        run: python tests/test_launcher.py
+
+      - name: Run full regression suite after launcher passes
         run: python tests/run_all_tests.py
