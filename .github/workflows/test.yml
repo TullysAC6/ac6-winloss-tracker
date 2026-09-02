@@ -54,25 +54,28 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q .
 
-      - name: Validate PowerShell installer syntax
+      - name: Validate PowerShell syntax
         shell: pwsh
         run: |
-          $tokens = $null
-          $errors = $null
-          [void][System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path ./install.ps1), [ref]$tokens, [ref]$errors
-          )
-          if ($errors.Count -gt 0) {
-            $errors | Format-List -Force
-            throw "install.ps1 has PowerShell syntax errors"
+          foreach ($path in @('./install.ps1', './uninstall.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $path), [ref]$tokens, [ref]$errors
+            )
+            if ($errors.Count -gt 0) {
+              $errors | Format-List -Force
+              throw "$path has PowerShell syntax errors"
+            }
           }
 
-      - name: Validate Runtime Policy
-        run: python tests/test_runtime_policy.py && python tests/test_runtime_guard.py
-
-      - name: Validate installer Runtime Policy
+      - name: Validate installer Python selection
         shell: pwsh
         run: ./tests/test_runtime_policy_installer.ps1
+
+      - name: Validate uninstaller safety and reinstall preservation
+        shell: pwsh
+        run: ./tests/test_uninstaller.ps1
 
       - name: Run launcher tests
         if: matrix.python-version != '3.12'

@@ -6,7 +6,6 @@ import time
 import traceback
 
 from app_paths import DISPLAY_NAME
-from runtime_policy import UnsupportedRuntimeError, require_supported_runtime
 
 
 def _launch_overlay():
@@ -52,12 +51,6 @@ def _show_error(message: str):
 
 
 def main():
-    try:
-        require_supported_runtime()
-    except UnsupportedRuntimeError as error:
-        _show_error(str(error))
-        print(error, file=sys.stderr)
-        return 2
     if "--overlay" in sys.argv:
         import game_overlay
         overlay_args = [arg for arg in sys.argv[1:] if arg != "--overlay"]
@@ -100,4 +93,4 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main() or 0)
+    main()

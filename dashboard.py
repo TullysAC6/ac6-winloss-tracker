@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from app_paths import DISPLAY_NAME, data_dir
-from runtime_policy import require_supported_runtime
 
 
 DATA_ROOT = data_dir()
@@ -336,7 +335,6 @@ class DashboardApp:
 
 
 def main() -> int:
-    require_supported_runtime()
     runtime = read_server_runtime()
     if runtime is None or not process_is_alive(runtime["pid"]):
         return 2

@@ -15,7 +15,6 @@ from collections import deque
 from pathlib import Path
 
 from app_paths import VERSION, data_dir, diagnostics_dir
-from runtime_policy import current_runtime_status
 from history_store import read_history_schema_version
 
 try:
@@ -181,7 +180,6 @@ class DiagnosticRecorder:
         except Exception as error:
             history_schema = f"unreadable:{type(error).__name__}"
 
-        runtime_status = current_runtime_status()
         manifest = {
             "app_version": VERSION,
             "created_at": time.time(),
@@ -189,10 +187,6 @@ class DiagnosticRecorder:
             "python_version": platform.python_version(),
             "python_architecture": f"{struct.calcsize('P') * 8}-bit",
             "python_source": "source-distribution" if not getattr(sys, "frozen", False) else "frozen",
-            "python_policy_status": "supported" if runtime_status.supported else "unsupported",
-            "python_free_threaded": runtime_status.free_threaded,
-            "python_runtime_role": runtime_status.role,
-            "python_policy_version": runtime_status.policy_version,
             "dependency_status": dependencies,
             "sqlite_runtime_version": sqlite3.sqlite_version,
             "history_schema_version": history_schema,

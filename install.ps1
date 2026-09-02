@@ -18,7 +18,9 @@ $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
 $installParent = Split-Path -Parent $installPath
 $tempRoot = $null
 $python = $null
-$script:runtimePolicy = $null
+$preferredPythonMinor = 14
+$fallbackPythonMinor = 13
+$pythonWingetPackage = 'Python.Python.3.14'
 $exitCode = 0
 $script:currentStage = 'startup'
 $script:sourceSwapped = $false
@@ -119,7 +121,7 @@ function Write-InstalledMetadata {
         resolved_commit = $Commit
         installed_at = [DateTimeOffset]::UtcNow.ToString('o')
         python_version = [string]$Python.Version
-        python_policy_version = [int]$script:runtimePolicy.policy_version
+        python_role = [string]$Python.Role
     } | ConvertTo-Json
     [System.IO.File]::WriteAllText(
         $temporaryPath, $metadata, (New-Object System.Text.UTF8Encoding($false))
@@ -127,51 +129,17 @@ function Write-InstalledMetadata {
     Move-Item -LiteralPath $temporaryPath -Destination $metadataPath -Force
 }
 
-function Read-RuntimePolicy {
-    param([Parameter(Mandatory = $true)][string]$SourcePath)
-
-    $policyPath = Join-Path $SourcePath 'runtime-policy.json'
-    if (-not (Test-Path -LiteralPath $policyPath -PathType Leaf)) {
-        throw '取得したソースにruntime-policy.jsonがありません。現在のTrackerは変更していません。'
-    }
-    try {
-        $policy = Get-Content -LiteralPath $policyPath -Raw -ErrorAction Stop | ConvertFrom-Json
-        if ([int]$policy.policy_version -lt 1 -or
-            [bool]$policy.allow_prerelease -ne $false -or
-            [bool]$policy.allow_free_threaded -ne $false) {
-            throw 'Stable policy flags are invalid'
-        }
-        foreach ($role in @('preferred', 'fallback')) {
-            $entry = $policy.$role
-            if (-not $entry -or [int]$entry.major -lt 3 -or [int]$entry.minor -lt 0 -or [int]$entry.minimum_patch -lt 0) {
-                throw "Runtime policy $role entry is invalid"
-            }
-        }
-        if ([string]::IsNullOrWhiteSpace([string]$policy.preferred.winget_package_id)) {
-            throw 'Preferred winget package ID is missing'
-        }
-        return $policy
-    } catch {
-        throw "Runtime Policyを安全に読み込めませんでした。現在のTrackerは変更していません。$($_.Exception.Message)"
-    }
-}
-
-function Get-RuntimePolicyRole {
+function Get-SupportedPythonRole {
     param(
         [int]$Major,
         [int]$Minor,
-        [int]$Patch,
         [string]$ReleaseLevel,
         [string]$GilDisabled
     )
 
     if ($ReleaseLevel -ne 'final' -or $GilDisabled -ne '0') { return $null }
-    foreach ($role in @('preferred', 'fallback')) {
-        $entry = $script:runtimePolicy.$role
-        if ($Major -eq [int]$entry.major -and $Minor -eq [int]$entry.minor -and $Patch -ge [int]$entry.minimum_patch) {
-            return $role
-        }
-    }
+    if ($Major -eq 3 -and $Minor -eq $preferredPythonMinor) { return 'preferred' }
+    if ($Major -eq 3 -and $Minor -eq $fallbackPythonMinor) { return 'fallback' }
     return $null
 }
 
@@ -542,9 +510,9 @@ function Find-SupportedPython {
             }
             $releaseLevel = $versionLines[3].Trim()
             $gilDisabled = $versionLines[4].Trim()
-            $role = Get-RuntimePolicyRole -Major $major -Minor $minor -Patch $micro -ReleaseLevel $releaseLevel -GilDisabled $gilDisabled
+            $role = Get-SupportedPythonRole -Major $major -Minor $minor -ReleaseLevel $releaseLevel -GilDisabled $gilDisabled
             if (-not $role) {
-                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("unsupported runtime policy: {0}.{1}.{2}, releaselevel={3}, Py_GIL_DISABLED={4}" -f $major, $minor, $micro, $releaseLevel, $gilDisabled)
+                Write-CandidateSkipped -Kind 'Python' -Path $signedPython.Path -Reason ("unsupported Python series/build: {0}.{1}.{2}, releaselevel={3}, Py_GIL_DISABLED={4}" -f $major, $minor, $micro, $releaseLevel, $gilDisabled)
                 continue
             }
 
@@ -644,8 +612,8 @@ function Install-PythonWithWinget {
         throw '安全性を確認できるwingetが見つかりませんでした。Windows Updateを実行してから、もう一度お試しください。'
     }
 
-    $packageId = [string]$script:runtimePolicy.preferred.winget_package_id
-    Write-Step '検証済みPreferred RuntimeのPython 3.14を現在のユーザー用に自動インストールしています。'
+    $packageId = $pythonWingetPackage
+    Write-Step '公式Python 3.14を現在のユーザー用に自動インストールしています。'
     $wingetResult = Invoke-NativeCommand -FilePath $signedWinget.Path -ArgumentList @(
         'install', '--exact', '--id', $packageId, '--source', 'winget', '--scope', 'user', '--silent',
         '--accept-package-agreements', '--accept-source-agreements'
@@ -1090,7 +1058,7 @@ try {
         throw '取得したZIPの内容を確認できませんでした。現在のTrackerは変更していません。'
     }
     $sourceRoot = Get-Item -LiteralPath $expectedSourceRoot
-    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.txt', 'runtime-policy.json', 'runtime_policy.py')) {
+    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.txt', 'uninstall.ps1')) {
         if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot.FullName $requiredFile) -PathType Leaf)) {
             throw "取得したZIPに必要なファイル $requiredFile がありません。現在のTrackerは変更していません。"
         }
@@ -1107,11 +1075,7 @@ try {
         throw '取得したソースに、配布対象外の実行バイナリまたは証明書ファイルが含まれていました。現在のTrackerは変更していません。'
     }
     Write-InstallLog "archive validation: success; immutable revision $resolvedCommit"
-    $script:runtimePolicy = Read-RuntimePolicy -SourcePath $sourceRoot.FullName
-    Write-InstallLog ("runtime policy: version={0}; preferred={1}.{2}.{3}+; fallback={4}.{5}.{6}+" -f `
-        $script:runtimePolicy.policy_version,
-        $script:runtimePolicy.preferred.major, $script:runtimePolicy.preferred.minor, $script:runtimePolicy.preferred.minimum_patch,
-        $script:runtimePolicy.fallback.major, $script:runtimePolicy.fallback.minor, $script:runtimePolicy.fallback.minimum_patch)
+    Write-InstallLog "Python selection: preferred=3.$preferredPythonMinor; fallback=3.$fallbackPythonMinor; new install=$pythonWingetPackage"
 
     Set-InstallStage -Name 'python-discovery'
     Write-Step 'Stableで検証済みのPSF署名Python Runtimeを探しています。'
@@ -1126,9 +1090,7 @@ try {
         Set-InstallStage -Name 'python-verification'
     }
     if (-not $python) {
-        throw ('[ENV-PYTHON-UNSUPPORTED] Python {0}.{1}.{2}+または{3}.{4}.{5}+の署名済みstandard-GIL Runtimeを確認できませんでした。install.ps1を再実行してください。' -f `
-            $script:runtimePolicy.preferred.major, $script:runtimePolicy.preferred.minor, $script:runtimePolicy.preferred.minimum_patch,
-            $script:runtimePolicy.fallback.major, $script:runtimePolicy.fallback.minor, $script:runtimePolicy.fallback.minimum_patch)
+        throw '[ENV-PYTHON-UNSUPPORTED] PSF署名済みのPython 3.14または3.13（final・通常GIL）を確認できませんでした。install.ps1を再実行してください。'
     }
 
     Write-Host "Python $($python.Version) ($($python.Role)): $($python.PythonPath)"
@@ -1137,7 +1099,7 @@ try {
     Write-InstallLog "selected Pythonw path: $($python.PythonwPath)"
     Write-InstallLog "selected Python Authenticode Status: $($python.SignatureStatus)"
     Write-InstallLog "selected Python signer: $($python.SignerSubject)"
-    Write-InstallLog "selected Python policy role: $($python.Role)"
+    Write-InstallLog "selected Python role: $($python.Role)"
     Write-InstallLog "selected Python free-threaded: $($python.FreeThreaded)"
     Write-InstallLog "selected Python architecture: $($python.Architecture)"
 

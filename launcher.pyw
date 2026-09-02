@@ -12,8 +12,6 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from runtime_policy import UnsupportedRuntimeError, require_supported_runtime
-
 
 DISPLAY_NAME = "AC6 Win/Loss Tracker"
 APP_DIR = Path(__file__).resolve().parent
@@ -383,16 +381,6 @@ def shutdown_tracker(log_path: Path = STARTUP_LOG) -> bool:
 
 def main() -> None:
     import tkinter as tk
-    from tkinter import messagebox
-
-    try:
-        require_supported_runtime()
-    except UnsupportedRuntimeError as error:
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror(DISPLAY_NAME, str(error), parent=root)
-        root.destroy()
-        return
 
     root = tk.Tk()
     root.title(DISPLAY_NAME)

@@ -32,9 +32,11 @@ assert "Write-InstalledMetadata -Commit $resolvedCommit" in installer
 assert "Restore-PreviousSource" in installer
 assert "Complete-SourceInstall" in installer
 assert "Python Software Foundation" in installer
-assert "runtime-policy.json" in installer
+assert "Get-SupportedPythonRole" in installer
+assert "$preferredPythonMinor = 14" in installer
+assert "$fallbackPythonMinor = 13" in installer
+assert "$pythonWingetPackage = 'Python.Python.3.14'" in installer
 assert "Python.Python.3.12" not in installer
-assert "python_policy_version" in installer
 assert "python_version" in installer
 assert "Backup-AppShortcut" in installer and "Restore-AppShortcut" in installer
 assert r"\\Microsoft\\WindowsApps\\" in installer
@@ -73,13 +75,13 @@ assert one_line in readme
 assert "6b8dcdd818ec9c5b6e81450fb955d1451a5dc540" in readme
 assert "YouTubeコメント機能はありません" in readme
 assert "%LOCALAPPDATA%\\AC6WinLossTracker\\" in readme
-policy = __import__("json").loads((ROOT / "runtime-policy.json").read_text(encoding="utf-8"))
-preferred = policy["preferred"]
-fallback = policy["fallback"]
-assert f"Python {preferred['major']}.{preferred['minor']}.{preferred['minimum_patch']}以上" in readme
-assert f"Python {fallback['major']}.{fallback['minor']}.{fallback['minimum_patch']}以上" in readme
+assert "Python 3.14を優先" in readme
+assert "Python 3.13" in readme
 assert "free-threaded build" in readme
-assert "Python 3.12.x以下" in readme and "Python 3.15.x以上" in readme
+assert "3.12以下しかない場合" in readme
+assert "Pythonを自動削除しません" in readme
+assert "-RemoveUserData" in readme
+assert (ROOT / "uninstall.ps1").is_file()
 
 workflow = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
 assert "windows-tests:" in workflow
@@ -87,7 +89,8 @@ assert "runs-on: windows-latest" in workflow
 assert "python-version: ['3.12', '3.13', '3.14']" in workflow
 assert "python-version: ${{ matrix.python-version }}" in workflow
 assert "python tests/run_all_tests.py" in workflow
-assert "python tests/test_runtime_policy.py" in workflow
+assert "tests/test_runtime_policy_installer.ps1" in workflow
+assert "tests/test_uninstaller.ps1" in workflow
 assert "matrix.python-version != '3.12'" in workflow
 assert "release/**" in workflow and "workflow_dispatch:" in workflow
 assert "test/python-source-install" in workflow
