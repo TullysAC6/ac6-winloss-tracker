@@ -6,15 +6,23 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $appName = 'AC6 WinLoss Tracker'
-$branchName = 'test/python-source-install'
-$archiveUrl = 'https://github.com/TullysAC6/ac6-winloss-tracker/archive/refs/heads/test/python-source-install.zip'
+$channel = 'stable'
+$version = '1.0.0'
+$repository = 'TullysAC6/ac6-winloss-tracker'
+$mainHeadUrl = "https://api.github.com/repos/$repository/commits/main"
+$resolvedCommit = $null
+$archiveUrl = $null
 $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
 $script:logPath = Join-Path $dataPath 'source-install.log'
 $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
 $installParent = Split-Path -Parent $installPath
 $tempRoot = $null
+$python = $null
 $exitCode = 0
 $script:currentStage = 'startup'
+$script:sourceSwapped = $false
+$script:hadPreviousInstall = $false
+$script:backupPath = "$installPath.previous"
 
 function Write-InstallLog {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -32,6 +40,80 @@ function Set-InstallStage {
     param([Parameter(Mandatory = $true)][string]$Name)
     $script:currentStage = $Name
     Write-InstallLog "stage: $Name"
+}
+
+function Get-InstalledRevision {
+    $metadataPath = Join-Path $dataPath 'installed-version.json'
+    try {
+        if (Test-Path -LiteralPath $metadataPath -PathType Leaf) {
+            $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+            if ([string]$metadata.resolved_commit -match '^[0-9a-fA-F]{40}$') {
+                return [string]$metadata.resolved_commit
+            }
+        }
+    } catch {
+        Write-InstallLog "installed metadata inspection failed: $($_.Exception.Message)"
+    }
+    return '(unknown)'
+}
+
+function Resolve-StableCommit {
+    Write-Step 'GitHub mainの固定リビジョンを確認しています。'
+    try {
+        # Exactly one unauthenticated API request is used per installer run.
+        $response = Invoke-WebRequest -Uri $mainHeadUrl -UseBasicParsing -TimeoutSec 15 `
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.0' } `
+            -ErrorAction Stop
+        $payload = $response.Content | ConvertFrom-Json
+        $sha = [string]$payload.sha
+        if ($sha -notmatch '^[0-9a-fA-F]{40}$') {
+            throw 'GitHubから受信したcommit SHAの形式が正しくありません。現在のTrackerは変更していません。'
+        }
+        return $sha.ToLowerInvariant()
+    } catch {
+        $resolveError = $_
+        $statusCode = 0
+        $retryAfter = $null
+        $rateRemaining = $null
+        $rateReset = $null
+        try {
+            $statusCode = [int]$resolveError.Exception.Response.StatusCode
+            $retryAfter = $resolveError.Exception.Response.Headers['Retry-After']
+            $rateRemaining = $resolveError.Exception.Response.Headers['X-RateLimit-Remaining']
+            $rateReset = $resolveError.Exception.Response.Headers['X-RateLimit-Reset']
+        } catch {
+            # Network exceptions do not always carry an HTTP response.
+        }
+        if ($statusCode -eq 403 -or $statusCode -eq 429) {
+            $installed = Get-InstalledRevision
+            $detail = "現在のinstalled revision: $installed"
+            if ($retryAfter) { $detail += "; Retry-After: $retryAfter seconds" }
+            if ($rateRemaining) { $detail += "; remaining: $rateRemaining" }
+            if ($rateReset -match '^\d+$') {
+                $resetLocal = [DateTimeOffset]::FromUnixTimeSeconds([int64]$rateReset).LocalDateTime
+                $detail += "; reset: $($resetLocal.ToString('yyyy-MM-dd HH:mm:ss'))"
+            }
+            Write-InstallLog "GitHub rate limit: HTTP $statusCode; $detail"
+            throw "GitHubの更新確認リクエスト制限に達しています。現在のTrackerは変更していません。しばらく待ってから同じコマンドを再実行してください。`n$detail"
+        }
+        throw 'GitHub mainの更新確認に失敗しました。現在のTrackerは変更していません。インターネット接続とGitHubの状態を確認してください。'
+    }
+}
+
+function Write-InstalledMetadata {
+    param([Parameter(Mandatory = $true)][string]$Commit)
+    $metadataPath = Join-Path $dataPath 'installed-version.json'
+    $temporaryPath = Join-Path $dataPath 'installed-version.json.tmp'
+    $metadata = [ordered]@{
+        channel = $channel
+        version = $version
+        resolved_commit = $Commit
+        installed_at = [DateTimeOffset]::UtcNow.ToString('o')
+    } | ConvertTo-Json
+    [System.IO.File]::WriteAllText(
+        $temporaryPath, $metadata, (New-Object System.Text.UTF8Encoding($false))
+    )
+    Move-Item -LiteralPath $temporaryPath -Destination $metadataPath -Force
 }
 
 function Write-CandidateSkipped {
@@ -504,7 +586,7 @@ function Invoke-PipInstall {
         }
         if ($ensureResult.ExitCode -ne 0) {
             Write-InstallLog "pip install result: failed (ensurepip exit code $($ensureResult.ExitCode))"
-            throw 'pipの準備に失敗しました。Pythonを再インストールしてから、もう一度お試しください。'
+            throw '[ENV-DEPENDENCY-MISSING] pipの準備に失敗しました。Pythonを再インストールしてから、もう一度お試しください。'
         }
     }
 
@@ -520,7 +602,7 @@ function Invoke-PipInstall {
     }
     if ($pipResult.ExitCode -ne 0) {
         Write-InstallLog "pip install result: failed (exit code $($pipResult.ExitCode))"
-        throw '必要なPythonライブラリのインストールに失敗しました。インターネット接続を確認してください。'
+        throw '[ENV-DEPENDENCY-MISSING] 必要なPythonライブラリのインストールに失敗しました。インターネット接続を確認してください。'
     }
     Write-InstallLog 'pip install result: success'
 
@@ -531,7 +613,7 @@ function Invoke-PipInstall {
     Write-InstallLog "dependency verification stdout:`n$($dependencyResult.StdOut)"
     Write-InstallLog "dependency verification stderr:`n$($dependencyResult.StdErr)"
     if ($dependencyResult.ExitCode -ne 0) {
-        throw 'インストールしたPythonライブラリを読み込めませんでした。source-install.logを添えて報告してください。'
+        throw '[ENV-DEPENDENCY-IMPORT] インストールしたPythonライブラリを読み込めませんでした。source-install.logを添えて報告してください。'
     }
     Write-InstallLog "dependency verification result: success ($($dependencyResult.StdOut.Trim()))"
 }
@@ -721,28 +803,46 @@ function Install-SourceTree {
     param([Parameter(Mandatory = $true)][string]$SourcePath)
 
     New-Item -ItemType Directory -Path $installParent -Force | Out-Null
-    $backupPath = "$installPath.previous"
-    if (Test-Path -LiteralPath $backupPath) {
-        Remove-Item -LiteralPath $backupPath -Recurse -Force
+    if (Test-Path -LiteralPath $script:backupPath) {
+        Remove-Item -LiteralPath $script:backupPath -Recurse -Force
     }
 
-    $hadPreviousInstall = Test-Path -LiteralPath $installPath
-    if ($hadPreviousInstall) {
-        Move-Item -LiteralPath $installPath -Destination $backupPath
+    $script:hadPreviousInstall = Test-Path -LiteralPath $installPath
+    if ($script:hadPreviousInstall) {
+        Move-Item -LiteralPath $installPath -Destination $script:backupPath
     }
 
     try {
         Move-Item -LiteralPath $SourcePath -Destination $installPath
+        $script:sourceSwapped = $true
     } catch {
-        if ($hadPreviousInstall -and -not (Test-Path -LiteralPath $installPath) -and (Test-Path -LiteralPath $backupPath)) {
-            Move-Item -LiteralPath $backupPath -Destination $installPath
+        if ($script:hadPreviousInstall -and -not (Test-Path -LiteralPath $installPath) -and (Test-Path -LiteralPath $script:backupPath)) {
+            Move-Item -LiteralPath $script:backupPath -Destination $installPath
         }
         throw
     }
+}
 
-    if (Test-Path -LiteralPath $backupPath) {
-        Remove-Item -LiteralPath $backupPath -Recurse -Force
+function Complete-SourceInstall {
+    if (Test-Path -LiteralPath $script:backupPath) {
+        Remove-Item -LiteralPath $script:backupPath -Recurse -Force
     }
+    $script:sourceSwapped = $false
+}
+
+function Restore-PreviousSource {
+    if (-not $script:sourceSwapped) { return }
+    Write-InstallLog 'transaction rollback started'
+    if (Test-Path -LiteralPath $installPath) {
+        Remove-Item -LiteralPath $installPath -Recurse -Force
+    }
+    if ($script:hadPreviousInstall -and (Test-Path -LiteralPath $script:backupPath)) {
+        Move-Item -LiteralPath $script:backupPath -Destination $installPath
+        Write-InstallLog 'transaction rollback restored previous source'
+    } else {
+        Write-InstallLog 'transaction rollback removed incomplete first install'
+    }
+    $script:sourceSwapped = $false
 }
 
 function Wait-AppRuntimeReady {
@@ -799,7 +899,7 @@ function New-AppShortcut {
         $shortcut.TargetPath = $PythonwPath
         $shortcut.Arguments = '"{0}"' -f $LauncherPath
         $shortcut.WorkingDirectory = $installPath
-        $shortcut.Description = 'AC6 Win/Loss Tracker (Python source test)'
+        $shortcut.Description = 'AC6 Win/Loss Tracker Stable'
         $shortcut.Save()
     } finally {
         if ($shortcut) {
@@ -820,9 +920,57 @@ try {
 
     New-Item -ItemType Directory -Path $dataPath -Force | Out-Null
     Write-InstallLog '------------------------------------------------------------'
-    Write-InstallLog "Installer branch: $branchName"
+    Write-InstallLog "Installer channel: $channel"
+    Write-InstallLog "Installer version: $version"
     Write-InstallLog "Windows version: $([Environment]::OSVersion.VersionString)"
     Set-InstallStage -Name 'startup'
+
+    Set-InstallStage -Name 'revision-resolve'
+    $resolvedCommit = Resolve-StableCommit
+    $archiveUrl = "https://github.com/$repository/archive/$resolvedCommit.zip"
+    Write-InstallLog "resolved main revision: $resolvedCommit"
+
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('AC6WinLossTrackerSource-' + [Guid]::NewGuid().ToString('N'))
+    $zipPath = Join-Path $tempRoot 'source.zip'
+    $extractPath = Join-Path $tempRoot 'extracted'
+    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
+
+    Set-InstallStage -Name 'source-download'
+    Write-Step 'GitHubからStableソースをHTTPSで取得し、内容を確認しています。'
+    try {
+        Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 60 `
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.0' }
+        if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf) -or (Get-Item -LiteralPath $zipPath).Length -le 0) {
+            throw 'downloaded archive is empty'
+        }
+        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
+    } catch {
+        throw 'ソースコードの取得または展開に失敗しました。現在のTrackerは変更していません。インターネット接続とGitHubの状態を確認してください。'
+    }
+
+    $repositoryName = ($repository -split '/')[-1]
+    $expectedSourceRoot = Join-Path $extractPath ("{0}-{1}" -f $repositoryName, $resolvedCommit)
+    if (-not (Test-Path -LiteralPath $expectedSourceRoot -PathType Container)) {
+        throw '取得したZIPの内容を確認できませんでした。現在のTrackerは変更していません。'
+    }
+    $sourceRoot = Get-Item -LiteralPath $expectedSourceRoot
+    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.txt')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot.FullName $requiredFile) -PathType Leaf)) {
+            throw "取得したZIPに必要なファイル $requiredFile がありません。現在のTrackerは変更していません。"
+        }
+    }
+
+    $versionSource = Get-Content -LiteralPath (Join-Path $sourceRoot.FullName 'app_paths.py') -Raw
+    if ($versionSource -notmatch ('(?m)^VERSION\s*=\s*["'']{0}["'']\s*$' -f [Regex]::Escape($version))) {
+        throw "取得したソースのバージョンがStable $version と一致しません。現在のTrackerは変更していません。"
+    }
+
+    $forbiddenFiles = @(Get-ChildItem -LiteralPath $sourceRoot.FullName -Recurse -File |
+        Where-Object { $_.Extension -match '(?i)^\.(exe|com|scr|msi|msix|pfx|p12)$' })
+    if ($forbiddenFiles.Count -gt 0) {
+        throw '取得したソースに、配布対象外の実行バイナリまたは証明書ファイルが含まれていました。現在のTrackerは変更していません。'
+    }
+    Write-InstallLog "archive validation: success; immutable revision $resolvedCommit"
 
     Set-InstallStage -Name 'python-discovery'
     Write-Step '署名済みのPython 3.10以上を探しています。'
@@ -837,7 +985,7 @@ try {
         Set-InstallStage -Name 'python-verification'
     }
     if (-not $python) {
-        throw 'Python 3.10以上の実体を確認できませんでした。Pythonの自動インストールに失敗した可能性があります。'
+        throw '[ENV-PYTHON-NOT-FOUND] Python 3.10以上の署名済み実体を確認できませんでした。install.ps1を再実行してください。'
     }
 
     Write-Host "Python $($python.Version): $($python.PythonPath)"
@@ -846,38 +994,6 @@ try {
     Write-InstallLog "selected Pythonw path: $($python.PythonwPath)"
     Write-InstallLog "selected Python Authenticode Status: $($python.SignatureStatus)"
     Write-InstallLog "selected Python signer: $($python.SignerSubject)"
-
-    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('AC6WinLossTrackerSource-' + [Guid]::NewGuid().ToString('N'))
-    $zipPath = Join-Path $tempRoot 'source.zip'
-    $extractPath = Join-Path $tempRoot 'extracted'
-    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
-
-    Set-InstallStage -Name 'source-download'
-    Write-Step 'GitHubからテスト用ソースをHTTPSで取得しています。'
-    try {
-        Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath -UseBasicParsing
-        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractPath -Force
-    } catch {
-        throw 'ソースコードの取得に失敗しました。インターネット接続とGitHubの状態を確認してください。'
-    }
-
-    $sourceRoot = Get-ChildItem -LiteralPath $extractPath -Directory |
-        Where-Object {
-            (Test-Path -LiteralPath (Join-Path $_.FullName 'app.py')) -and
-            (Test-Path -LiteralPath (Join-Path $_.FullName 'launcher.pyw')) -and
-            (Test-Path -LiteralPath (Join-Path $_.FullName 'dashboard.py')) -and
-            (Test-Path -LiteralPath (Join-Path $_.FullName 'requirements.txt'))
-        } |
-        Select-Object -First 1
-    if (-not $sourceRoot) {
-        throw '取得したZIPの内容を確認できませんでした。配布ブランチの構成を確認してください。'
-    }
-
-    $forbiddenFiles = @(Get-ChildItem -LiteralPath $sourceRoot.FullName -Recurse -File |
-        Where-Object { $_.Extension -match '(?i)^\.(exe|com|scr|msi|msix|pfx|p12)$' })
-    if ($forbiddenFiles.Count -gt 0) {
-        throw '取得したソースに、このテストでは実行しないバイナリまたは証明書ファイルが含まれていました。'
-    }
 
     Set-InstallStage -Name 'pip-install'
     Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.txt')
@@ -920,12 +1036,32 @@ try {
     }
 
     Write-InstallLog 'application launch result: success'
+    Write-InstalledMetadata -Commit $resolvedCommit
+    Write-InstallLog "installed revision: $resolvedCommit"
+    Complete-SourceInstall
     Write-Host "`nセットアップが完了しました。" -ForegroundColor Green
     Write-Host "デスクトップの「AC6 WinLoss Tracker」から次回以降も起動できます。"
     Write-Host "ログ: $script:logPath"
 } catch {
     $exitCode = 1
     $errorRecord = $_
+    if ($script:sourceSwapped) {
+        try {
+            Stop-RunningTracker
+        } catch {
+            try { Write-InstallLog "rollback shutdown warning: $($_.Exception.Message)" } catch {}
+        }
+        try {
+            Restore-PreviousSource
+            if ($script:hadPreviousInstall -and $python -and (Test-Path -LiteralPath (Join-Path $installPath 'launcher.pyw'))) {
+                $previousLauncher = Join-Path $installPath 'launcher.pyw'
+                Start-Process -FilePath $python.PythonwPath -ArgumentList ('"{0}"' -f $previousLauncher) -WorkingDirectory $installPath | Out-Null
+                Write-InstallLog 'transaction rollback restarted previous source'
+            }
+        } catch {
+            try { Write-InstallLog "transaction rollback failed: $($_.Exception.Message)" } catch {}
+        }
+    }
     $friendlyMessage = [string]$errorRecord.Exception.Message
     if ([string]::IsNullOrWhiteSpace($friendlyMessage)) {
         $friendlyMessage = 'セットアップ中に問題が発生しました。インターネット接続を確認して、もう一度お試しください。'

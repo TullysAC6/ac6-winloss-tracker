@@ -173,7 +173,7 @@ with tempfile.TemporaryDirectory() as temporary:
 
 print("launcher startup / duplicate / stale runtime / failure logging: OK")
 
-installer = (ROOT / "install-source-test.ps1").read_text(encoding="utf-8")
+installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
 assert "$shortcut.TargetPath = $PythonwPath" in installer
 assert "$shortcut.Arguments = '\"{0}\"' -f $LauncherPath" in installer
 assert "New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcherPath" in installer

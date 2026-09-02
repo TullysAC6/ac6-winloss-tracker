@@ -67,14 +67,23 @@ def main():
 
     overlay = None
     try:
-        overlay = _launch_overlay()
-        time.sleep(0.25)
-        if overlay.poll() is not None:
-            print(f"[lifecycle] overlay exited during startup: PID {overlay.pid}, exit {overlay.returncode}")
         import server
-        server.main()
+
+        def launch_overlay_after_ownership():
+            nonlocal overlay
+            overlay = _launch_overlay()
+            time.sleep(0.25)
+            if overlay.poll() is not None:
+                print(f"[lifecycle] overlay exited during startup: PID {overlay.pid}, exit {overlay.returncode}")
+
+        server.main(on_ready=launch_overlay_after_ownership)
     except Exception as e:
-        _show_error(f"起動に失敗しました。\n\n{type(e).__name__}: {e}\n\n診断ZIPを作成して報告してください。")
+        _show_error(
+            "起動に失敗しました。\n\n"
+            f"{type(e).__name__}: {e}\n\n"
+            "推奨操作: install.ps1を再実行してください。\n"
+            "診断先: %LOCALAPPDATA%\\AC6WinLossTracker\\diagnostics\\"
+        )
         traceback.print_exc()
     finally:
         try:

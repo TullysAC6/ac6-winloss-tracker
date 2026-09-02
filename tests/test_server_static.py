@@ -15,7 +15,7 @@ assert 'RUNTIME_PATH = DATA_ROOT / ".runtime.json"' in s
 assert 'write_runtime_file(server.server_address[1])' in s
 assert 'if path == "/api/system/shutdown":' in s
 assert 'threading.Thread(target=self.server.shutdown, daemon=True).start()' in s
-assert 'self.headers.get("X-Control-Token", "") != CONTROL_TOKEN' in s
+assert 'secrets.compare_digest(str(supplied_token), CONTROL_TOKEN)' in s
 assert 'if path == "/health":' in s
 assert 'def lifecycle_health(' in s
 assert 'OVERLAY_HEARTBEAT_MAX_AGE = 5.0' in s
@@ -28,12 +28,18 @@ assert 'for n in range(5, 51, 5):' in s
 assert 'event_id = secrets.token_urlsafe(18)' in s
 assert '"effect_id": event_id' in s
 assert '"tier": min(10, milestone // 5)' in s
-bind_pos = s.index('server = QuietThreadingHTTPServer')
-reset_pos = s.index('stats.reset()', bind_pos)
+environment_pos = s.index('inspect_startup_environment()', s.index('def main('))
+bind_pos = s.index('server = QuietThreadingHTTPServer', environment_pos)
+preflight_pos = s.index('preflight_history_schema()', bind_pos)
+filesystem_pos = s.index('validate_owned_filesystem()', preflight_pos)
+reset_pos = s.index('stats.reset()', filesystem_pos)
 detector_pos = s.index('threading.Thread(target=detector_supervisor', reset_pos)
 history_pos = s.index('store = HistoryStore(DATA_ROOT)', reset_pos)
 session_pos = s.index('store.start_session()', history_pos)
-assert bind_pos < reset_pos < history_pos < session_pos < detector_pos
+runtime_pos = s.index('write_runtime_file(server.server_address[1])', detector_pos)
+ready_pos = s.index('on_ready()', runtime_pos)
+assert environment_pos < bind_pos < preflight_pos < filesystem_pos < reset_pos
+assert reset_pos < history_pos < session_pos < detector_pos < runtime_pos < ready_pos
 print("session reset ordering and 5..50 milestone source: OK")
 
 assert 'store.record_result(event_id, result, source, s)' in s

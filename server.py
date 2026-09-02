@@ -1,4 +1,6 @@
 import json
+import importlib
+import importlib.util
 import os
 import queue
 import secrets
@@ -12,10 +14,12 @@ from urllib.parse import urlparse
 
 
 from app_paths import data_dir, resource_dir, resource_path
-from config_utils import DEFAULT_CONFIG, CONFIG_PATH, get_config_health, load_config
+from config_utils import (
+    DEFAULT_CONFIG, CONFIG_PATH, get_config_health, load_config, validate_config,
+)
 from diagnostics import RECORDER
 from event_bus import EventBus
-from history_store import HistoryStore
+from history_store import HistoryStore, read_history_schema_version
 from result_detector import ResultDetector
 from result_gate import ResultGate
 from stats_manager import StatsCorruptError, StatsManager
@@ -74,6 +78,14 @@ def create_control_token():
 
 
 CONTROL_TOKEN = create_control_token()
+
+
+class StartupEnvironmentError(RuntimeError):
+    def __init__(self, code, description, action):
+        self.code = str(code)
+        self.description = str(description)
+        self.action = str(action)
+        super().__init__(f"[{self.code}] {self.description} {self.action}")
 
 
 def write_runtime_file(port):
@@ -662,7 +674,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
-        if self.headers.get("X-Control-Token", "") != CONTROL_TOKEN:
+        supplied_token = self.headers.get("X-Control-Token", "")
+        if not secrets.compare_digest(str(supplied_token), CONTROL_TOKEN):
             self.json_response({"error": "unauthorized"}, 403)
             return
 
@@ -712,25 +725,112 @@ def ensure_first_run_config():
     RECORDER.record("first_run_initialized")
 
 
-def main():
-    global history
-    ensure_first_run_config()
+def inspect_startup_config():
+    """Read and validate config without migrating or creating it."""
+    if not CONFIG_PATH.exists():
+        return dict(DEFAULT_CONFIG)
     try:
-        c = load_config(use_last_good=False)
-    except Exception as e:
-        print(f"[startup] config error: {e}")
-        input("Enterキーで終了...")
-        return
+        with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
+            return validate_config(json.load(config_file))
+    except Exception as error:
+        raise StartupEnvironmentError(
+            "ENV-CONFIG-INVALID",
+            "設定ファイルを安全に読み込めません。",
+            "config.jsonを確認するか、診断ZIPを作成して報告してください。",
+        ) from error
 
-    server = QuietThreadingHTTPServer(("127.0.0.1", c["port"]), Handler)
+
+def inspect_startup_environment():
+    """Perform non-mutating runtime/dependency checks before ownership."""
+    if sys.version_info < (3, 10):
+        raise StartupEnvironmentError(
+            "ENV-PYTHON-VERSION",
+            "Python 3.10以上が必要です。",
+            "公式Pythonを更新してからinstall.ps1を再実行してください。",
+        )
+    for module_name in ("mss", "ttkbootstrap", "tkinter"):
+        if importlib.util.find_spec(module_name) is None:
+            raise StartupEnvironmentError(
+                "ENV-DEPENDENCY-MISSING",
+                f"必要なPythonモジュール {module_name} がありません。",
+                "install.ps1を再実行して依存関係を修復してください。",
+            )
+        try:
+            importlib.import_module(module_name)
+        except Exception as error:
+            raise StartupEnvironmentError(
+                "ENV-DEPENDENCY-IMPORT",
+                f"Pythonモジュール {module_name} を読み込めません。",
+                "install.ps1を再実行し、改善しない場合は診断ZIPを添えて報告してください。",
+            ) from error
+
+
+def preflight_history_schema():
+    """Reject newer history formats before any authoritative mutation."""
+    try:
+        version = read_history_schema_version(DATA_ROOT)
+    except Exception as error:
+        raise StartupEnvironmentError(
+            "ENV-HISTORY-UNREADABLE",
+            "戦績履歴を読み取り専用で確認できません。",
+            "history.dbを変更せず、診断ZIPを作成して報告してください。",
+        ) from error
+    if version > HistoryStore.SCHEMA_VERSION:
+        raise StartupEnvironmentError(
+            "ENV-HISTORY-FUTURE-SCHEMA",
+            f"このアプリより新しい履歴形式（schema {version}）です。",
+            "新しいバージョンのAC6 Win/Loss Trackerを使用してください。",
+        )
+    return version
+
+
+def validate_owned_filesystem():
+    """Verify the owned data directory before resetting session state."""
+    probe = DATA_ROOT / ".startup-write-test.tmp"
+    try:
+        DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        with probe.open("xb") as output:
+            output.write(b"ok")
+            output.flush()
+            os.fsync(output.fileno())
+        probe.unlink()
+    except Exception as error:
+        try:
+            probe.unlink()
+        except OSError:
+            pass
+        raise StartupEnvironmentError(
+            "ENV-WRITE-PERMISSION",
+            "ユーザーデータ保存先へ安全に書き込めません。",
+            "フォルダーの権限と空き容量を確認してください。",
+        ) from error
+
+
+def main(on_ready=None):
+    global history
+    c = inspect_startup_config()
+    inspect_startup_environment()
+
+    try:
+        server = QuietThreadingHTTPServer(("127.0.0.1", c["port"]), Handler)
+    except OSError as error:
+        raise StartupEnvironmentError(
+            "ENV-PORT-IN-USE",
+            f"ローカルポート {c['port']} を使用できません。",
+            "すでにTrackerが起動していないか確認してください。",
+        ) from error
 
     # Binding the configured port is the ownership boundary: never reset
     # another running instance's stats before this succeeds.
     try:
+        preflight_history_schema()
+        validate_owned_filesystem()
+        ensure_first_run_config()
+        c = load_config(use_last_good=False)
         stats.reset()
         stats.snapshot()
     except Exception as e:
-        print(f"[startup] stats reset failed: {type(e).__name__}: {e}")
+        print(f"[startup] owned initialization failed: {type(e).__name__}: {e}")
         server.server_close()
         raise
 
@@ -747,16 +847,17 @@ def main():
     except Exception as e:
         history_failure("startup", e)
 
-    threading.Thread(target=detector_supervisor, daemon=True).start()
-    write_runtime_file(server.server_address[1])
-
-    print("=" * 68)
-    print(" AC6 Win/Loss Tracker")
-    print(f" OBS URL : http://127.0.0.1:{c['port']}/")
-    print(" AC6 Auto Win/Loss + Win Rate + Streak UI")
-    print("=" * 68)
-
     try:
+        threading.Thread(target=detector_supervisor, daemon=True).start()
+        write_runtime_file(server.server_address[1])
+        if on_ready is not None:
+            on_ready()
+
+        print("=" * 68)
+        print(" AC6 Win/Loss Tracker")
+        print(f" OBS URL : http://127.0.0.1:{c['port']}/")
+        print(" AC6 Auto Win/Loss + Win Rate + Streak UI")
+        print("=" * 68)
         server.serve_forever()
     except KeyboardInterrupt:
         pass

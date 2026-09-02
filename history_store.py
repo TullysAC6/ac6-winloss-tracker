@@ -8,6 +8,17 @@ from pathlib import Path
 from typing import Any
 
 
+def read_history_schema_version(root: str | Path) -> int:
+    """Inspect history.db without creating a database, journal, or WAL file."""
+    path = Path(root) / "history.db"
+    if not path.exists():
+        return 0
+    uri = path.resolve().as_uri() + "?mode=ro"
+    with sqlite3.connect(uri, uri=True, timeout=1.0) as connection:
+        row = connection.execute("PRAGMA user_version").fetchone()
+        return int(row[0])
+
+
 class HistoryStore:
     """Transactional lifetime history owned exclusively by server.py.
 

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+import importlib.metadata
+import importlib.util
 import os
 import platform
-import shutil
+import sqlite3
+import struct
+import sys
 import threading
 import time
 import zipfile
@@ -11,6 +15,7 @@ from collections import deque
 from pathlib import Path
 
 from app_paths import VERSION, data_dir, diagnostics_dir
+from history_store import read_history_schema_version
 
 try:
     from mss.tools import to_png
@@ -140,11 +145,63 @@ class DiagnosticRecorder:
         stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         out = export_dir / f"AC6-Tracker-Diagnostics-{stamp}.zip"
 
+        dependencies = {}
+        for dependency in ("mss", "ttkbootstrap"):
+            try:
+                dependencies[dependency] = {
+                    "available": importlib.util.find_spec(dependency) is not None,
+                    "version": importlib.metadata.version(dependency),
+                }
+            except Exception as error:
+                dependencies[dependency] = {
+                    "available": False,
+                    "version": None,
+                    "error_type": type(error).__name__,
+                }
+
+        display = {"available": False}
+        if os.name == "nt":
+            try:
+                import ctypes
+                user32 = ctypes.windll.user32
+                display = {
+                    "available": True,
+                    "primary_width": int(user32.GetSystemMetrics(0)),
+                    "primary_height": int(user32.GetSystemMetrics(1)),
+                    "monitor_count": int(user32.GetSystemMetrics(80)),
+                    "dpi": int(user32.GetDpiForSystem()) if hasattr(user32, "GetDpiForSystem") else None,
+                    "hdr": "not queried",
+                }
+            except Exception as error:
+                display = {"available": False, "error_type": type(error).__name__}
+
+        try:
+            history_schema = read_history_schema_version(root)
+        except Exception as error:
+            history_schema = f"unreadable:{type(error).__name__}"
+
         manifest = {
             "app_version": VERSION,
             "created_at": time.time(),
             "platform": platform.platform(),
-            "python": platform.python_version(),
+            "python_version": platform.python_version(),
+            "python_architecture": f"{struct.calcsize('P') * 8}-bit",
+            "python_source": "source-distribution" if not getattr(sys, "frozen", False) else "frozen",
+            "dependency_status": dependencies,
+            "sqlite_runtime_version": sqlite3.sqlite_version,
+            "history_schema_version": history_schema,
+            "python": {
+                "version": platform.python_version(),
+                "implementation": platform.python_implementation(),
+                "architecture_bits": struct.calcsize("P") * 8,
+                "source": "python-source-distribution" if not getattr(sys, "frozen", False) else "frozen",
+                "dependencies": dependencies,
+            },
+            "sqlite": {
+                "runtime_version": sqlite3.sqlite_version,
+                "history_schema": history_schema,
+            },
+            "display": display,
             "privacy": "Contains detector telemetry and result-detection ROI images only; no full-screen capture.",
         }
         tmp_manifest = self.root / "manifest.json"

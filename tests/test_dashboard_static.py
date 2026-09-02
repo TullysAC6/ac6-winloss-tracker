@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 dashboard = (ROOT / "dashboard.py").read_text(encoding="utf-8")
 launcher = (ROOT / "launcher.pyw").read_text(encoding="utf-8")
-installer = (ROOT / "install-source-test.ps1").read_text(encoding="utf-8")
+installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
 requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
 server = (ROOT / "server.py").read_text(encoding="utf-8")
 
