@@ -1,4 +1,4 @@
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+[CmdletBinding()]
 param([switch]$RemoveUserData)
 
 Set-StrictMode -Version Latest
@@ -10,7 +10,14 @@ $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
 $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
 $runtimePath = Join-Path $dataPath '.runtime.json'
 $logPath = Join-Path $dataPath 'source-uninstall.log'
-$runtimeFileNames = @('.runtime.json', '.runtime.json.tmp', '.overlay-runtime.json', '.dashboard-runtime.json')
+$runtimeFileNames = @(
+    '.runtime.json',
+    '.runtime.json.tmp',
+    '.overlay-runtime.json',
+    '.overlay-runtime.json.tmp',
+    '.dashboard-runtime.json',
+    '.dashboard-runtime.json.tmp'
+)
 
 function Write-UninstallLog {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -117,6 +124,34 @@ function Remove-TrackerRuntimeFiles {
         $path = Join-Path $dataPath $name
         if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
     }
+    # game_overlay.py writes this exact PID-qualified temporary naming form.
+    foreach ($temporary in @(Get-ChildItem -LiteralPath $dataPath -Filter '.overlay-runtime.json.*.tmp' -File -Force -ErrorAction SilentlyContinue)) {
+        Remove-Item -LiteralPath $temporary.FullName -Force
+    }
+}
+
+function Confirm-UserDataRemoval {
+    Write-Host ''
+    Write-Host '警告: history.db、config.json、stats.json、diagnosticsを含む全ユーザーデータを完全削除します。' -ForegroundColor Red
+    Write-Host '通常アンインストールでは、これらの戦績・設定データは保持されます。' -ForegroundColor Yellow
+    try {
+        $answer = Read-Host '完全削除する場合だけ YES と入力してください'
+        return [string]$answer -ceq 'YES'
+    } catch {
+        Write-UninstallLog "user data confirmation unavailable: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Remove-TrackerUserData {
+    if (-not (Confirm-UserDataRemoval)) {
+        Write-UninstallLog 'user data removal declined or confirmation unavailable'
+        return $false
+    }
+    if (Test-Path -LiteralPath $dataPath -PathType Container) {
+        Remove-Item -LiteralPath $dataPath -Recurse -Force
+    }
+    return $true
 }
 
 function Remove-TrackerShortcut {
@@ -143,8 +178,7 @@ try {
     Remove-TrackerSource
 
     if ($RemoveUserData) {
-        if ($PSCmdlet.ShouldProcess($dataPath, '戦績・設定・診断を含む全ユーザーデータを完全削除')) {
-            Remove-Item -LiteralPath $dataPath -Recurse -Force
+        if (Remove-TrackerUserData) {
             Write-Host 'アプリ本体とユーザーデータを削除しました。' -ForegroundColor Green
         } else {
             Write-Host 'ユーザーデータの削除はキャンセルされました。アプリ本体のみ削除しました。' -ForegroundColor Yellow

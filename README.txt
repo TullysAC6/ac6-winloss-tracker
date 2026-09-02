@@ -49,7 +49,7 @@ uninstall.ps1はrelease候補に含まれています。main昇格前のため�
 
 通常アンインストールではアプリ本体とデスクトップショートカットだけを削除し、戦績・設定・診断は
 残します。完全削除はuninstall.ps1をローカル保存して -RemoveUserData を明示した場合だけ選べ、
-実行前にPowerShellの確認が表示されます。
+実行前に完全削除の内容が表示され、YESの完全一致を入力した場合だけ削除されます。
 
 【戦績は消えますか？】
 通常アンインストールではhistory.db、config.json、stats.json、diagnostics\を保持します。
