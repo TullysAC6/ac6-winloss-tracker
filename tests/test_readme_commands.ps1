@@ -46,6 +46,13 @@ function Assert-ReadmeCommand {
         $errors | Format-List -Force
         throw 'README command has PowerShell syntax errors'
     }
+    $exitStatements = @($ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.ExitStatementAst]
+    }, $true))
+    if ($exitStatements.Count -ne 0) {
+        throw 'README command must not terminate the current PowerShell session'
+    }
     foreach ($name in @('u', 'p')) {
         $variables = @($ast.FindAll({
             param($node)
@@ -58,9 +65,70 @@ function Assert-ReadmeCommand {
     }
 }
 
+function Invoke-ReadmeCommandContinuationTest {
+    param([Parameter(Mandatory = $true)][string]$Command)
+    $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('ac6-readme-command-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
+    $harnessPath = Join-Path $testRoot 'harness.ps1'
+    $descendantPidPath = Join-Path $testRoot 'descendant.pid'
+    $hostExecutable = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    $escapedHost = $hostExecutable.Replace("'", "''")
+    $escapedPidPath = $descendantPidPath.Replace("'", "''")
+    $escapedOutputPath = (Join-Path $testRoot 'descendant.out').Replace("'", "''")
+    $escapedErrorPath = (Join-Path $testRoot 'descendant.err').Replace("'", "''")
+    $harness = @"
+`$ErrorActionPreference = 'Stop'
+function Invoke-WebRequest {
+    param(`$Uri, `$OutFile, [switch]`$UseBasicParsing)
+    [IO.File]::WriteAllText(`$OutFile, 'fixture')
+}
+function Get-FileHash {
+    param(`$Path, `$Algorithm)
+    return [pscustomobject]@{ Hash = '$expectedHash' }
+}
+function powershell.exe {
+    param([Parameter(ValueFromRemainingArguments=`$true)][object[]]`$Remaining)
+    `$child = Start-Process -FilePath '$escapedHost' -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -PassThru -RedirectStandardOutput '$escapedOutputPath' -RedirectStandardError '$escapedErrorPath'
+    [IO.File]::WriteAllText('$escapedPidPath', [string]`$child.Id)
+    `$global:LASTEXITCODE = 0
+}
+$Command
+Write-Output 'AFTER_AC6_COMMAND'
+"@
+    [IO.File]::WriteAllText($harnessPath, $harness, (New-Object Text.UTF8Encoding($true)))
+    $descendant = $null
+    try {
+        $output = @(& $hostExecutable -NoProfile -ExecutionPolicy Bypass -File $harnessPath 2>&1)
+        $childExitCode = $LASTEXITCODE
+        if ($childExitCode -ne 0) {
+            throw "README command harness failed with exit code $childExitCode`: $($output -join ' ')"
+        }
+        if ($output -notcontains 'AFTER_AC6_COMMAND') {
+            throw 'control did not return after the README command'
+        }
+        if (-not (Test-Path -LiteralPath $descendantPidPath -PathType Leaf)) {
+            throw 'README command harness did not start its long-lived descendant'
+        }
+        $descendantPid = [int]([IO.File]::ReadAllText($descendantPidPath))
+        $descendant = Get-Process -Id $descendantPid -ErrorAction Stop
+        if ($descendant.HasExited) {
+            throw 'long-lived descendant did not remain alive after the README command returned'
+        }
+    } finally {
+        if ($null -ne $descendant -and -not $descendant.HasExited) {
+            Stop-Process -Id $descendant.Id -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path -LiteralPath $testRoot) {
+            Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 $installCommand = Get-ReadmeCommand -Heading 'インストール / 更新'
 $uninstallCommand = Get-ReadmeCommand -Heading 'アンインストール'
 Assert-ReadmeCommand -Command $installCommand -IsUninstall $false
 Assert-ReadmeCommand -Command $uninstallCommand -IsUninstall $true
+Invoke-ReadmeCommandContinuationTest -Command $installCommand
+Invoke-ReadmeCommandContinuationTest -Command $uninstallCommand
 
 Write-Host 'README PowerShell commands: OK'
