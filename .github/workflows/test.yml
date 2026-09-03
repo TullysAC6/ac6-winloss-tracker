@@ -27,13 +27,14 @@ jobs:
       matrix:
         python-version: ['3.12', '3.13', '3.14']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: requirements.lock
 
       - name: Record runtime details
         shell: pwsh
@@ -42,14 +43,18 @@ jobs:
           python -c "import platform, sqlite3, struct; print('architecture=' + platform.architecture()[0]); print('pointer_bits=' + str(struct.calcsize('P') * 8)); print('sqlite=' + sqlite3.sqlite_version)"
 
       - name: Install dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt
+        if: matrix.python-version != '3.12'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --only-binary=:all: --require-hashes -r requirements.lock
 
       - name: Check installed dependencies
+        if: matrix.python-version != '3.12'
         run: python -m pip check
 
       - name: Audit dependencies
         if: matrix.python-version != '3.12'
-        run: python -m pip install pip-audit && python -m pip_audit -r requirements.txt
+        run: python -m pip install pip-audit==2.10.1 && python -m pip_audit -r requirements.lock
 
       - name: Compile Python sources
         run: python -m compileall -q .
@@ -57,7 +62,7 @@ jobs:
       - name: Validate PowerShell syntax
         shell: pwsh
         run: |
-          foreach ($path in @('./install.ps1', './uninstall.ps1')) {
+          foreach ($path in @('./bootstrap.ps1', './install.ps1', './uninstall.ps1')) {
             $tokens = $null
             $errors = $null
             [void][System.Management.Automation.Language.Parser]::ParseFile(
@@ -73,6 +78,20 @@ jobs:
         shell: pwsh
         run: ./tests/test_runtime_policy_installer.ps1
 
+      - name: Validate verified bootstrap with PowerShell 7
+        shell: pwsh
+        run: ./tests/test_bootstrap.ps1
+
+      - name: Validate release script asset preparation
+        shell: pwsh
+        run: |
+          ./scripts/prepare-release-assets.ps1 -OutputDirectory "$env:RUNNER_TEMP/release-assets"
+          foreach ($name in @('install.ps1', 'install.ps1.sha256', 'uninstall.ps1', 'uninstall.ps1.sha256')) {
+            if (-not (Test-Path -LiteralPath "$env:RUNNER_TEMP/release-assets/$name" -PathType Leaf)) {
+              throw "Missing release asset: $name"
+            }
+          }
+
       - name: Validate installer selection with Windows PowerShell 5.1
         shell: pwsh
         run: |
@@ -80,9 +99,21 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1
           if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 installer test failed with exit code $LASTEXITCODE" }
 
+      - name: Validate verified bootstrap with Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_bootstrap.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 bootstrap test failed with exit code $LASTEXITCODE" }
+
       - name: Validate uninstaller safety and reinstall preservation
         shell: pwsh
         run: ./tests/test_uninstaller.ps1
+
+      - name: Validate uninstaller with Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_uninstaller.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 uninstaller test failed with exit code $LASTEXITCODE" }
 
       - name: Run launcher tests
         if: matrix.python-version != '3.12'
@@ -91,3 +122,16 @@ jobs:
       - name: Run full regression suite after launcher passes
         if: matrix.python-version != '3.12'
         run: python tests/run_all_tests.py
+
+  required-windows-tests:
+    name: Windows tests
+    if: always()
+    needs: windows-tests
+    runs-on: windows-latest
+    steps:
+      - name: Require every Windows matrix job
+        shell: pwsh
+        run: |
+          if ('${{ needs.windows-tests.result }}' -ne 'success') {
+            throw 'One or more Windows test matrix jobs failed.'
+          }
