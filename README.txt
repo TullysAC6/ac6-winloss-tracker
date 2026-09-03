@@ -8,15 +8,17 @@ Windows 11向けローカルツールです。テレメトリやYouTubeコメン
 Windows PowerShellへ次の1行をそのまま貼り付けて実行してください。管理者権限、Git、GitHub CLI、
 独自バイナリの実行は不要です。
 
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-Expression (Invoke-RestMethod 'https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/heads/main/install.ps1')"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}"
 
 【何がインストールされますか？】
 - AC6 Win/Loss Tracker本体
 - デスクトップショートカット
 - 必要な対応Pythonがない場合は、公式Python 3.14
 
-インストーラーはGitHub APIでmainのHEADを1回だけ解決し、40桁SHAを検証して、その変更不能な
-リビジョンのZIPを取得します。Python Software Foundationの有効なAuthenticode署名を確認し、
+1行コマンドは不変なv1.0.0 tagのbootstrapを固定SHA-256で検証してから実行します。bootstrapは
+最新のnon-prerelease Stable Releaseからinstallerを取得し、GitHubのasset digestと同梱checksumの
+両方を照合します。HTTP失敗、不完全なdownload、hash不一致、metadataやscriptの異常時は実行せず、
+一時ファイルを削除して終了します。インストーラーはPython Software Foundationの有効なAuthenticode署名を確認し、
 Python 3.14を優先します。3.14がなく、検証可能なPython 3.13がある場合はそれを使用できます。
 同じ系列に複数候補がある場合は新しいversionを選択します。3.12以下しかない場合は既存Pythonを
 消さず、wingetから公式Python 3.14をユーザー領域へ追加します。python.exeとpythonw.exeの署名が
@@ -41,11 +43,12 @@ Trackerは既存Pythonを削除しません。インストーラーがPython 3.1
 利用する可能性があるため、Trackerのアンインストール時にPythonを自動削除しません。
 
 【アップデート方法】
-初回と同じ「推奨インストール / 更新」のPowerShell 1行をもう一度実行してください。
+初回と同じ「推奨インストール / 更新」の検証付きPowerShell 1行をもう一度実行してください。
 
 【アンインストール】
-uninstall.ps1はrelease候補に含まれています。main昇格前のため、正式なPowerShell 1行コマンドは
-まだ公開していません。main昇格後に正式導線として案内します。
+通常アンインストールも次の検証付き1行で実行できます。
+
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -Mode Uninstall;exit $LASTEXITCODE}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}"
 
 通常アンインストールではアプリ本体とデスクトップショートカットだけを削除し、戦績・設定・診断は
 残します。完全削除はuninstall.ps1をローカル保存して -RemoveUserData を明示した場合だけ選べ、
@@ -80,7 +83,7 @@ AC6-Tracker-Diagnostics-YYYYMMDD-HHMMSS.zip が作られます。検出ログ、
 【リリース方針】
 Stable v1.0.0は、検証済みbaseline
 6b8dcdd818ec9c5b6e81450fb955d1451a5dc540を基礎にしたPythonソース配布です。
-正式な導入・更新経路は、このREADME冒頭のPowerShell 1行へ一本化しています。
+正式な導入・更新経路は、このREADME冒頭の検証付きPowerShell 1行へ一本化しています。
 
 開発者向けテスト:
   python tests/run_all_tests.py

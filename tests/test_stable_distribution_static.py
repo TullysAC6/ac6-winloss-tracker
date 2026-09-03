@@ -19,13 +19,13 @@ for removed in (
 assert re.search(r'^VERSION\s*=\s*["\']1\.0\.0["\']$', version_source, re.MULTILINE)
 assert "$channel = 'stable'" in installer
 assert "$version = '1.0.0'" in installer
-assert 'https://api.github.com/repos/$repository/commits/main' in installer
+assert 'https://api.github.com/repos/$repository/commits/$SourceTag' in installer
 assert '^[0-9a-fA-F]{40}$' in installer
 assert 'archive/$resolvedCommit.zip' in installer
 assert "archive/refs/heads/main.zip" not in installer
 assert "test/python-source-install" not in installer
 assert "install-source-test.ps1" not in installer
-assert installer.count('Invoke-WebRequest -Uri $mainHeadUrl') == 1
+assert installer.count('Invoke-WebRequest -Uri $releaseCommitUrl') == 1
 assert "$statusCode -eq 403 -or $statusCode -eq 429" in installer
 assert "Get-InstalledRevision" in installer and "currently installed" not in installer
 assert "Write-InstalledMetadata -Commit $resolvedCommit" in installer
@@ -42,6 +42,9 @@ assert "Backup-AppShortcut" in installer and "Restore-AppShortcut" in installer
 assert r"\\Microsoft\\WindowsApps\\" in installer
 assert "Get-AuthenticodeSignature" in installer
 assert "pip', 'install', '--user'" in installer
+assert "'--require-hashes'" in installer
+assert "'--only-binary=:all:'" in installer
+assert "requirements.lock" in installer
 assert "Remove-Item -LiteralPath $dataPath" not in installer
 assert "Remove-Item -LiteralPath $installPath" in installer
 assert "venv" not in installer.lower()
@@ -66,12 +69,13 @@ for status in (403, 429):
     assert f"$statusCode -eq {status}" in installer
 assert "現在のTrackerは変更していません" in installer
 
-one_line = (
-    'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command '
-    '"Invoke-Expression (Invoke-RestMethod '
-    "'https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/heads/main/install.ps1')\""
-)
-assert one_line in readme
+assert "Invoke-Expression" not in readme
+assert "refs/tags/v1.0.0/bootstrap.ps1" in readme
+assert "Get-FileHash $p -Algorithm SHA256" in readme
+assert "99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF" in readme
+assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
+assert (ROOT / "install.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
+assert (ROOT / "uninstall.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert "6b8dcdd818ec9c5b6e81450fb955d1451a5dc540" in readme
 assert "YouTubeコメント機能はありません" in readme
 assert "%LOCALAPPDATA%\\AC6WinLossTracker\\" in readme
@@ -91,9 +95,28 @@ assert "python-version: ${{ matrix.python-version }}" in workflow
 assert "python tests/run_all_tests.py" in workflow
 assert "tests/test_runtime_policy_installer.ps1" in workflow
 assert "tests/test_uninstaller.ps1" in workflow
+assert "tests/test_bootstrap.ps1" in workflow
 assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1" in workflow
+assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_bootstrap.ps1" in workflow
+assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_uninstaller.ps1" in workflow
 assert "matrix.python-version != '3.12'" in workflow
 assert "release/**" in workflow and "workflow_dispatch:" in workflow
 assert "test/python-source-install" in workflow
+assert "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6" in workflow
+assert "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7" in workflow
+assert "pip-audit==2.10.1" in workflow
+assert "name: Windows tests" in workflow
+
+bootstrap = (ROOT / "bootstrap.ps1").read_text(encoding="utf-8")
+assert "Invoke-Expression" not in bootstrap
+assert "releases/latest" in bootstrap
+assert "prerelease" in bootstrap and "draft" in bootstrap
+assert "Get-FileHash" in bootstrap and "sha256:" in bootstrap
+assert "powershell.exe" in bootstrap
+
+lock = (ROOT / "requirements.lock").read_text(encoding="utf-8")
+for package in ("mss==10.2.0", "pillow==12.3.0", "ttkbootstrap==2.2.2"):
+    assert package in lock
+assert lock.count("--hash=sha256:") == 4
 
 print("Stable source distribution / immutable revision / installer static checks: OK")

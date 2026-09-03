@@ -1,0 +1,7 @@
+mss==10.2.0 \
+    --hash=sha256:e79f428899280e7e64e38365b5bfed683851ebea807eeaeadaf06eb8e0d67197
+pillow==12.3.0 \
+    --hash=sha256:1cca606cd25738df4ed873d5ad46bbdb3d83b5cbca291f6b4ff13a4df6b0bbe8 \
+    --hash=sha256:fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d
+ttkbootstrap==2.2.2 \
+    --hash=sha256:b268daf53e73fb3d50482ec743a675e325ec644afe7fb706b6bbee35fda489f8

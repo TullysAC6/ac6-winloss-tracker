@@ -1,5 +1,7 @@
-[CmdletBinding()]
-param()
+﻿[CmdletBinding()]
+param(
+    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.0.0'
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -9,7 +11,7 @@ $appName = 'AC6 WinLoss Tracker'
 $channel = 'stable'
 $version = '1.0.0'
 $repository = 'TullysAC6/ac6-winloss-tracker'
-$mainHeadUrl = "https://api.github.com/repos/$repository/commits/main"
+$releaseCommitUrl = "https://api.github.com/repos/$repository/commits/$SourceTag"
 $resolvedCommit = $null
 $archiveUrl = $null
 $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
@@ -66,10 +68,10 @@ function Get-InstalledRevision {
 }
 
 function Resolve-StableCommit {
-    Write-Step 'GitHub mainの固定リビジョンを確認しています。'
+    Write-Step "GitHub Stable $SourceTag の固定リビジョンを確認しています。"
     try {
         # Exactly one unauthenticated API request is used per installer run.
-        $response = Invoke-WebRequest -Uri $mainHeadUrl -UseBasicParsing -TimeoutSec 15 `
+        $response = Invoke-WebRequest -Uri $releaseCommitUrl -UseBasicParsing -TimeoutSec 15 `
             -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.0' } `
             -ErrorAction Stop
         $payload = $response.Content | ConvertFrom-Json
@@ -104,7 +106,7 @@ function Resolve-StableCommit {
             Write-InstallLog "GitHub rate limit: HTTP $statusCode; $detail"
             throw "GitHubの更新確認リクエスト制限に達しています。現在のTrackerは変更していません。しばらく待ってから同じコマンドを再実行してください。`n$detail"
         }
-        throw 'GitHub mainの更新確認に失敗しました。現在のTrackerは変更していません。インターネット接続とGitHubの状態を確認してください。'
+        throw "GitHub Stable $SourceTag の確認に失敗しました。現在のTrackerは変更していません。インターネット接続とGitHubの状態を確認してください。"
     }
 }
 
@@ -659,7 +661,8 @@ function Invoke-PipInstall {
     }
 
     $pipResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @(
-        '-m', 'pip', 'install', '--user', '--no-warn-script-location', '-r', $RequirementsPath
+        '-m', 'pip', 'install', '--user', '--no-warn-script-location', '--require-hashes',
+        '--only-binary=:all:', '-r', $RequirementsPath
     )
     Write-InstallLog "pip command: $($pipResult.Command)"
     Write-InstallLog "pip exit code: $($pipResult.ExitCode)"
@@ -1032,7 +1035,8 @@ try {
     Set-InstallStage -Name 'revision-resolve'
     $resolvedCommit = Resolve-StableCommit
     $archiveUrl = "https://github.com/$repository/archive/$resolvedCommit.zip"
-    Write-InstallLog "resolved main revision: $resolvedCommit"
+    Write-InstallLog "resolved Stable tag: $SourceTag"
+    Write-InstallLog "resolved Stable revision: $resolvedCommit"
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('AC6WinLossTrackerSource-' + [Guid]::NewGuid().ToString('N'))
     $zipPath = Join-Path $tempRoot 'source.zip'
@@ -1058,7 +1062,7 @@ try {
         throw '取得したZIPの内容を確認できませんでした。現在のTrackerは変更していません。'
     }
     $sourceRoot = Get-Item -LiteralPath $expectedSourceRoot
-    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.txt', 'uninstall.ps1')) {
+    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.lock', 'uninstall.ps1')) {
         if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot.FullName $requiredFile) -PathType Leaf)) {
             throw "取得したZIPに必要なファイル $requiredFile がありません。現在のTrackerは変更していません。"
         }
@@ -1104,7 +1108,7 @@ try {
     Write-InstallLog "selected Python architecture: $($python.Architecture)"
 
     Set-InstallStage -Name 'pip-install'
-    Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.txt')
+    Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.lock')
     Set-InstallStage -Name 'python-verification'
     $confirmedPython = Find-SupportedPython
     if (-not $confirmedPython -or
