@@ -175,7 +175,7 @@ if (-not $LibraryOnly) {
     $webRequest = {
         param($Uri, $OutFile)
         Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -TimeoutSec 60 `
-            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Bootstrap/1.0.0' } -ErrorAction Stop
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Bootstrap/1.0.1' } -ErrorAction Stop
     }
     $childProcess = {
         param($Path, $SelectedMode, $VerifiedReleaseTag)
