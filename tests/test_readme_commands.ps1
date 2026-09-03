@@ -71,11 +71,11 @@ function Invoke-ReadmeCommandContinuationTest {
     New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
     $harnessPath = Join-Path $testRoot 'harness.ps1'
     $descendantPidPath = Join-Path $testRoot 'descendant.pid'
+    $afterMarkerPath = Join-Path $testRoot 'after.marker'
     $hostExecutable = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
     $escapedHost = $hostExecutable.Replace("'", "''")
     $escapedPidPath = $descendantPidPath.Replace("'", "''")
-    $escapedOutputPath = (Join-Path $testRoot 'descendant.out').Replace("'", "''")
-    $escapedErrorPath = (Join-Path $testRoot 'descendant.err').Replace("'", "''")
+    $escapedAfterPath = $afterMarkerPath.Replace("'", "''")
     $harness = @"
 `$ErrorActionPreference = 'Stop'
 function Invoke-WebRequest {
@@ -88,22 +88,30 @@ function Get-FileHash {
 }
 function powershell.exe {
     param([Parameter(ValueFromRemainingArguments=`$true)][object[]]`$Remaining)
-    `$child = Start-Process -FilePath '$escapedHost' -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -PassThru -RedirectStandardOutput '$escapedOutputPath' -RedirectStandardError '$escapedErrorPath'
+    `$child = Start-Process -FilePath '$escapedHost' -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -PassThru
     [IO.File]::WriteAllText('$escapedPidPath', [string]`$child.Id)
     `$global:LASTEXITCODE = 0
 }
 $Command
 Write-Output 'AFTER_AC6_COMMAND'
+[IO.File]::WriteAllText('$escapedAfterPath', 'AFTER_AC6_COMMAND')
 "@
     [IO.File]::WriteAllText($harnessPath, $harness, (New-Object Text.UTF8Encoding($true)))
     $descendant = $null
     try {
-        $output = @(& $hostExecutable -NoProfile -ExecutionPolicy Bypass -File $harnessPath 2>&1)
-        $childExitCode = $LASTEXITCODE
+        $startInfo = New-Object Diagnostics.ProcessStartInfo
+        $startInfo.FileName = $hostExecutable
+        $startInfo.Arguments = '-NoProfile -ExecutionPolicy Bypass -File "' + $harnessPath + '"'
+        $startInfo.UseShellExecute = $false
+        $harnessProcess = [Diagnostics.Process]::Start($startInfo)
+        $harnessProcess.WaitForExit()
+        $childExitCode = [int]$harnessProcess.ExitCode
+        $harnessProcess.Dispose()
         if ($childExitCode -ne 0) {
-            throw "README command harness failed with exit code $childExitCode`: $($output -join ' ')"
+            throw "README command harness failed with exit code $childExitCode"
         }
-        if ($output -notcontains 'AFTER_AC6_COMMAND') {
+        if (-not (Test-Path -LiteralPath $afterMarkerPath -PathType Leaf) -or
+            [IO.File]::ReadAllText($afterMarkerPath) -cne 'AFTER_AC6_COMMAND') {
             throw 'control did not return after the README command'
         }
         if (-not (Test-Path -LiteralPath $descendantPidPath -PathType Leaf)) {
