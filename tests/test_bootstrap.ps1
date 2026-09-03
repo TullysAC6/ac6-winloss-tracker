@@ -60,6 +60,42 @@ try {
     if ($result -ne 0) { throw 'successful verified download failed' }
     if ($script:childTag -cne 'v1.0.0') { throw 'verified release tag was not passed to installer' }
 
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
+        $descendantPidPath = Join-Path $testRoot 'descendant.pid'
+        $escapedPidPath = $descendantPidPath.Replace("'", "''")
+        $fakeInstallerPath = Join-Path $testRoot 'fake-installer.ps1'
+        $fakeInstaller = @"
+param([string]`$SourceTag)
+`$child = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 30') -PassThru
+[System.IO.File]::WriteAllText('$escapedPidPath', [string]`$child.Id)
+exit 0
+"@
+        [System.IO.File]::WriteAllText(
+            $fakeInstallerPath, $fakeInstaller, (New-Object System.Text.UTF8Encoding($false))
+        )
+        $descendant = $null
+        try {
+            $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+            $processResult = Invoke-InstallerChildProcess -Path $fakeInstallerPath -Mode Install `
+                -VerifiedReleaseTag 'v1.0.1'
+            $stopwatch.Stop()
+            if ($processResult -ne 0) { throw 'fake installer exit code was not propagated' }
+            if (-not (Test-Path -LiteralPath $descendantPidPath -PathType Leaf)) {
+                throw 'fake installer did not record its long-lived child'
+            }
+            $descendantPid = [int](Get-Content -LiteralPath $descendantPidPath -Raw)
+            $descendant = Get-Process -Id $descendantPid -ErrorAction Stop
+            if ($descendant.HasExited) { throw 'bootstrap waited for the installer descendant to exit' }
+            if ($stopwatch.Elapsed.TotalSeconds -ge 15) {
+                throw "bootstrap did not return promptly after its direct child exited: $($stopwatch.Elapsed)"
+            }
+        } finally {
+            if ($null -ne $descendant -and -not $descendant.HasExited) {
+                Stop-Process -Id $descendant.Id -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     $script:childExitCode = 23
     $result = Invoke-VerifiedReleaseScript -Mode Install -Repository owner/repo -ReleaseTag v1.0.0 -WebRequestInvoker $web -ChildInvoker $child
     if ($result -ne 23) { throw 'child installer exit code was not propagated' }

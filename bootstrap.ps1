@@ -90,6 +90,23 @@ function Assert-PowerShellScript {
     }
 }
 
+function Invoke-InstallerChildProcess {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [ValidateSet('Install', 'Uninstall')][string]$Mode,
+        [Parameter(Mandatory = $true)][string]$VerifiedReleaseTag
+    )
+    $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Path)
+    if ($Mode -eq 'Install') { $arguments += @('-SourceTag', $VerifiedReleaseTag) }
+    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -PassThru
+    try {
+        $process.WaitForExit()
+        return [int]$process.ExitCode
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Invoke-VerifiedReleaseScript {
     param(
         [ValidateSet('Install', 'Uninstall')][string]$Mode,
@@ -162,10 +179,8 @@ if (-not $LibraryOnly) {
     }
     $childProcess = {
         param($Path, $SelectedMode, $VerifiedReleaseTag)
-        $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $Path)
-        if ($SelectedMode -eq 'Install') { $arguments += @('-SourceTag', $VerifiedReleaseTag) }
-        $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -Wait -PassThru
-        return [int]$process.ExitCode
+        return Invoke-InstallerChildProcess -Path $Path -Mode $SelectedMode `
+            -VerifiedReleaseTag $VerifiedReleaseTag
     }
     try {
         $result = Invoke-VerifiedReleaseScript -Mode $Mode -Repository $Repository -ReleaseTag $ReleaseTag `
