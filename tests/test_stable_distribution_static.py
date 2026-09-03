@@ -72,7 +72,8 @@ assert "現在のTrackerは変更していません" in installer
 assert "Invoke-Expression" not in readme
 assert "refs/tags/v1.0.0/bootstrap.ps1" in readme
 assert "Get-FileHash $p -Algorithm SHA256" in readme
-assert "8849B716D4E9268F39D024463116EEDEEA835A07C3386F14F46C8C28187CF55D" in readme
+assert "99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF" in readme
+assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert "6b8dcdd818ec9c5b6e81450fb955d1451a5dc540" in readme
 assert "YouTubeコメント機能はありません" in readme
 assert "%LOCALAPPDATA%\\AC6WinLossTracker\\" in readme

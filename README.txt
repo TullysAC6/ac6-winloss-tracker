@@ -8,7 +8,7 @@ Windows 11向けローカルツールです。テレメトリやYouTubeコメン
 Windows PowerShellへ次の1行をそのまま貼り付けて実行してください。管理者権限、Git、GitHub CLI、
 独自バイナリの実行は不要です。
 
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '8849B716D4E9268F39D024463116EEDEEA835A07C3386F14F46C8C28187CF55D'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p;exit $LASTEXITCODE}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}"
 
 【何がインストールされますか？】
 - AC6 Win/Loss Tracker本体
@@ -48,7 +48,7 @@ Trackerは既存Pythonを削除しません。インストーラーがPython 3.1
 【アンインストール】
 通常アンインストールも次の検証付き1行で実行できます。
 
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '8849B716D4E9268F39D024463116EEDEEA835A07C3386F14F46C8C28187CF55D'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -Mode Uninstall;exit $LASTEXITCODE}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}"
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -Mode Uninstall;exit $LASTEXITCODE}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}"
 
 通常アンインストールではアプリ本体とデスクトップショートカットだけを削除し、戦績・設定・診断は
 残します。完全削除はuninstall.ps1をローカル保存して -RemoveUserData を明示した場合だけ選べ、

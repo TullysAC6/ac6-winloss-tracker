@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Install', 'Uninstall')][string]$Mode = 'Install',
     [Parameter(DontShow = $true)][string]$Repository = 'TullysAC6/ac6-winloss-tracker',
