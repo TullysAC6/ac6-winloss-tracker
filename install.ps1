@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.0.0'
 )

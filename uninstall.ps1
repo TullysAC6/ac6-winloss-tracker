@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([switch]$RemoveUserData)
 
 Set-StrictMode -Version Latest
