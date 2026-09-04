@@ -8,6 +8,7 @@ $ProgressPreference = 'SilentlyContinue'
 $appName = 'AC6 WinLoss Tracker'
 $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
 $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
+$runtimeRoot = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerRuntime'
 $runtimePath = Join-Path $dataPath '.runtime.json'
 $logPath = Join-Path $dataPath 'source-uninstall.log'
 $runtimeFileNames = @(
@@ -169,6 +170,16 @@ function Remove-TrackerSource {
     if (Test-Path -LiteralPath $previous -PathType Container) { Remove-Item -LiteralPath $previous -Recurse -Force }
 }
 
+function Remove-TrackerDedicatedRuntime {
+    $expected = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerRuntime'))
+    $actual = [System.IO.Path]::GetFullPath($runtimeRoot)
+    if ($actual -ne $expected) { throw 'Tracker専用Python環境の場所を安全に確認できないため、削除を中止しました。' }
+    if (Test-Path -LiteralPath $actual -PathType Container) {
+        Remove-Item -LiteralPath $actual -Recurse -Force
+        Write-UninstallLog 'dedicated Tracker Python environment removed'
+    }
+}
+
 try {
     Write-Host "[$appName] アンインストールを開始します。" -ForegroundColor Cyan
     Write-UninstallLog "uninstall started; remove user data=$RemoveUserData"
@@ -176,6 +187,7 @@ try {
     Remove-TrackerRuntimeFiles
     Remove-TrackerShortcut
     Remove-TrackerSource
+    Remove-TrackerDedicatedRuntime
 
     if ($RemoveUserData) {
         if (Remove-TrackerUserData) {

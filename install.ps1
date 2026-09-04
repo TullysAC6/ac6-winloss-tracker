@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.0.1'
+    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.1.0'
 )
 
 Set-StrictMode -Version Latest
@@ -9,7 +9,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 $appName = 'AC6 WinLoss Tracker'
 $channel = 'stable'
-$version = '1.0.1'
+$version = '1.1.0'
 $repository = 'TullysAC6/ac6-winloss-tracker'
 $releaseCommitUrl = "https://api.github.com/repos/$repository/commits/$SourceTag"
 $resolvedCommit = $null
@@ -18,6 +18,10 @@ $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
 $script:logPath = Join-Path $dataPath 'source-install.log'
 $installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
 $installParent = Split-Path -Parent $installPath
+$runtimeRoot = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerRuntime'
+$venvPath = Join-Path $runtimeRoot 'venv'
+$script:venvBackupPath = Join-Path $runtimeRoot 'venv.previous'
+$script:venvCandidatePath = $null
 $tempRoot = $null
 $python = $null
 $preferredPythonMinor = 14
@@ -33,6 +37,12 @@ $script:shortcutBackupPath = $null
 $script:shortcutExisted = $false
 $script:shortcutChanged = $false
 $script:previousPythonwPath = $null
+$script:previousShortcutArguments = $null
+$script:previousShortcutWorkingDirectory = $null
+$script:runtimeSwapped = $false
+$script:hadPreviousRuntime = $false
+$script:installerMutex = $null
+$script:installerMutexOwned = $false
 
 function Write-InstallLog {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -50,6 +60,31 @@ function Set-InstallStage {
     param([Parameter(Mandatory = $true)][string]$Name)
     $script:currentStage = $Name
     Write-InstallLog "stage: $Name"
+}
+
+function Enter-InstallerMutex {
+    $createdNew = $false
+    $script:installerMutex = New-Object System.Threading.Mutex($false, 'Local\AC6WinLossTrackerInstaller', [ref]$createdNew)
+    try {
+        $script:installerMutexOwned = $script:installerMutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+        $script:installerMutexOwned = $true
+    }
+    if (-not $script:installerMutexOwned) {
+        throw '別のAC6 Win/Loss Trackerセットアップが実行中です。完了後にもう一度お試しください。'
+    }
+    Write-InstallLog 'installer mutex acquired'
+}
+
+function Exit-InstallerMutex {
+    if ($script:installerMutex) {
+        if ($script:installerMutexOwned) {
+            try { $script:installerMutex.ReleaseMutex() } catch {}
+        }
+        $script:installerMutex.Dispose()
+        $script:installerMutex = $null
+        $script:installerMutexOwned = $false
+    }
 }
 
 function Get-InstalledRevision {
@@ -72,7 +107,7 @@ function Resolve-StableCommit {
     try {
         # Exactly one unauthenticated API request is used per installer run.
         $response = Invoke-WebRequest -Uri $releaseCommitUrl -UseBasicParsing -TimeoutSec 15 `
-            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.1' } `
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.1.0' } `
             -ErrorAction Stop
         $payload = $response.Content | ConvertFrom-Json
         $sha = [string]$payload.sha
@@ -124,6 +159,11 @@ function Write-InstalledMetadata {
         installed_at = [DateTimeOffset]::UtcNow.ToString('o')
         python_version = [string]$Python.Version
         python_role = [string]$Python.Role
+        python_base_runtime = [string]$Python.PythonPath
+        python_venv_runtime = [string]$Python.VenvPythonPath
+        venv_active = $true
+        requirements_lock_sha256 = [string]$Python.RequirementsHash
+        dependency_versions = [string]$Python.DependencyVersions
     } | ConvertTo-Json
     [System.IO.File]::WriteAllText(
         $temporaryPath, $metadata, (New-Object System.Text.UTF8Encoding($false))
@@ -205,7 +245,8 @@ function ConvertTo-NativeArgument {
 function Invoke-NativeCommand {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
-        [string[]]$ArgumentList = @()
+        [string[]]$ArgumentList = @(),
+        [hashtable]$Environment = @{}
     )
 
     $nativeArguments = @($ArgumentList | ForEach-Object { ConvertTo-NativeArgument -Argument ([string]$_) })
@@ -224,6 +265,9 @@ function Invoke-NativeCommand {
         $startInfo.CreateNoWindow = $true
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
+        foreach ($name in $Environment.Keys) {
+            $startInfo.EnvironmentVariables[[string]$name] = [string]$Environment[$name]
+        }
 
         $process = New-Object System.Diagnostics.Process
         $process.StartInfo = $startInfo
@@ -632,36 +676,50 @@ function Install-PythonWithWinget {
     }
 }
 
-function Invoke-PipInstall {
+function Get-IsolatedPythonEnvironment {
+    return @{
+        PYTHONNOUSERSITE = '1'
+        PYTHONUTF8 = '1'
+        PYTHONIOENCODING = 'utf-8'
+        PIP_USER = '0'
+        PIP_REQUIRE_VIRTUALENV = '1'
+    }
+}
+
+function New-TrackerVenv {
     param(
-        [Parameter(Mandatory = $true)][string]$PythonPath,
-        [Parameter(Mandatory = $true)][string]$RequirementsPath
+        [Parameter(Mandatory = $true)]$BasePython,
+        [Parameter(Mandatory = $true)][string]$RequirementsPath,
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
     )
 
-    Write-Step 'Python依存ライブラリを確認しています。'
-    $pipCheck = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-m', 'pip', '--version')
-    Write-InstallLog "pip version command: $($pipCheck.Command)"
-    Write-InstallLog "pip version exit code: $($pipCheck.ExitCode)"
-    Write-InstallLog "pip version stdout:`n$($pipCheck.StdOut)"
-    Write-InstallLog "pip version stderr:`n$($pipCheck.StdErr)"
-    if ($pipCheck.ExitCode -ne 0) {
-        Write-Host 'pipが見つからないため、Python標準のensurepipを実行します。'
-        $ensureResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-m', 'ensurepip', '--upgrade')
-        Write-InstallLog "ensurepip command: $($ensureResult.Command)"
-        Write-InstallLog "ensurepip exit code: $($ensureResult.ExitCode)"
-        Write-InstallLog "ensurepip stdout:`n$($ensureResult.StdOut)"
-        Write-InstallLog "ensurepip stderr:`n$($ensureResult.StdErr)"
-        if (-not [string]::IsNullOrWhiteSpace($ensureResult.StdOut)) {
-            Write-Host $ensureResult.StdOut
-        }
-        if ($ensureResult.ExitCode -ne 0) {
-            Write-InstallLog "pip install result: failed (ensurepip exit code $($ensureResult.ExitCode))"
-            throw '[ENV-DEPENDENCY-MISSING] pipの準備に失敗しました。Pythonを再インストールしてから、もう一度お試しください。'
+    Write-Step 'Tracker専用のPython環境を準備しています。'
+    if (Test-Path -LiteralPath $DestinationPath) {
+        Remove-Item -LiteralPath $DestinationPath -Recurse -Force
+    }
+    $createResult = Invoke-NativeCommand -FilePath $BasePython.PythonPath -ArgumentList @(
+        '-m', 'venv', $DestinationPath
+    )
+    Write-InstallLog "venv creation command: $($createResult.Command)"
+    Write-InstallLog "venv creation exit code: $($createResult.ExitCode)"
+    Write-InstallLog "venv creation stdout:`n$($createResult.StdOut)"
+    Write-InstallLog "venv creation stderr:`n$($createResult.StdErr)"
+    if ($createResult.ExitCode -ne 0) {
+        throw '[ENV-VENV-CREATE] Tracker専用Python環境の作成に失敗しました。現在のTrackerは変更していません。'
+    }
+
+    $venvPython = Join-Path $DestinationPath 'Scripts\python.exe'
+    $venvPythonw = Join-Path $DestinationPath 'Scripts\pythonw.exe'
+    foreach ($requiredRuntime in @($venvPython, $venvPythonw)) {
+        if (-not (Test-Path -LiteralPath $requiredRuntime -PathType Leaf)) {
+            throw "[ENV-VENV-INCOMPLETE] Tracker専用Python環境に $requiredRuntime がありません。"
         }
     }
 
-    $pipResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @(
-        '-m', 'pip', 'install', '--user', '--no-warn-script-location', '--require-hashes',
+    $isolatedEnvironment = Get-IsolatedPythonEnvironment
+    $pipResult = Invoke-NativeCommand -FilePath $venvPython -Environment $isolatedEnvironment -ArgumentList @(
+        '-m', 'pip', 'install', '--require-hashes',
         '--only-binary=:all:', '-r', $RequirementsPath
     )
     Write-InstallLog "pip command: $($pipResult.Command)"
@@ -675,10 +733,18 @@ function Invoke-PipInstall {
         Write-InstallLog "pip install result: failed (exit code $($pipResult.ExitCode))"
         throw '[ENV-DEPENDENCY-MISSING] 必要なPythonライブラリのインストールに失敗しました。インターネット接続を確認してください。'
     }
-    Write-InstallLog 'pip install result: success'
+    Write-InstallLog 'dedicated venv pip install result: success'
 
-    $dependencyCode = 'from importlib.metadata import version; import mss, ttkbootstrap, PIL, tkinter, sqlite3; print("mss=" + mss.__version__ + "; ttkbootstrap=" + version("ttkbootstrap") + "; pillow=" + version("Pillow") + "; sqlite=" + sqlite3.sqlite_version)'
-    $dependencyResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $dependencyCode)
+    $pipCheckResult = Invoke-NativeCommand -FilePath $venvPython -Environment $isolatedEnvironment -ArgumentList @('-m', 'pip', 'check')
+    Write-InstallLog "pip check exit code: $($pipCheckResult.ExitCode)"
+    Write-InstallLog "pip check stdout:`n$($pipCheckResult.StdOut)"
+    Write-InstallLog "pip check stderr:`n$($pipCheckResult.StdErr)"
+    if ($pipCheckResult.ExitCode -ne 0) {
+        throw '[ENV-DEPENDENCY-CHECK] Tracker専用Python環境の依存関係確認に失敗しました。'
+    }
+
+    $dependencyCode = 'import importlib.metadata as md,json,platform,site,struct,sys,sysconfig; import mss, ttkbootstrap, PIL, tkinter, sqlite3; print(json.dumps({"major":sys.version_info.major,"minor":sys.version_info.minor,"micro":sys.version_info.micro,"releaselevel":sys.version_info.releaselevel,"gil_disabled":bool(sysconfig.get_config_var("Py_GIL_DISABLED")),"bits":struct.calcsize("P")*8,"machine":platform.machine(),"executable":sys.executable,"prefix":sys.prefix,"base_prefix":sys.base_prefix,"user_site_enabled":site.ENABLE_USER_SITE,"mss_version":md.version("mss"),"ttkbootstrap_version":md.version("ttkbootstrap"),"pillow_version":md.version("Pillow"),"mss_path":mss.__file__,"ttkbootstrap_path":ttkbootstrap.__file__,"pillow_path":PIL.__file__},separators=(",",":")))'
+    $dependencyResult = Invoke-NativeCommand -FilePath $venvPython -Environment $isolatedEnvironment -ArgumentList @('-c', $dependencyCode)
     Write-InstallLog "dependency verification command: $($dependencyResult.Command)"
     Write-InstallLog "dependency verification exit code: $($dependencyResult.ExitCode)"
     Write-InstallLog "dependency verification stdout:`n$($dependencyResult.StdOut)"
@@ -686,7 +752,66 @@ function Invoke-PipInstall {
     if ($dependencyResult.ExitCode -ne 0) {
         throw '[ENV-DEPENDENCY-IMPORT] インストールしたPythonライブラリを読み込めませんでした。source-install.logを添えて報告してください。'
     }
+    try {
+        $runtimeInfo = $dependencyResult.StdOut.Trim() | ConvertFrom-Json
+    } catch {
+        throw '[ENV-VENV-VERIFY] Tracker専用Python環境の検証結果を確認できませんでした。'
+    }
+
+    $expectedBasePrefix = (Split-Path -Parent $BasePython.PythonPath).TrimEnd('\')
+    $actualBasePrefix = ([string]$runtimeInfo.base_prefix).TrimEnd('\')
+    $resolvedVenvPython = (Resolve-Path -LiteralPath $venvPython).Path
+    if ([int]$runtimeInfo.major -ne [int]$BasePython.Major -or
+        [int]$runtimeInfo.minor -ne [int]$BasePython.Minor -or
+        [string]$runtimeInfo.releaselevel -ne 'final' -or
+        [bool]$runtimeInfo.gil_disabled -or
+        [int]$runtimeInfo.bits -ne 64 -or
+        [string]$runtimeInfo.executable -ne $resolvedVenvPython -or
+        [string]$runtimeInfo.prefix -eq [string]$runtimeInfo.base_prefix -or
+        $actualBasePrefix -ne $expectedBasePrefix -or
+        [bool]$runtimeInfo.user_site_enabled) {
+        throw '[ENV-VENV-POLICY] Tracker専用Python環境が必要なRuntimeポリシーを満たしていません。'
+    }
+    $expectedVersions = @{
+        mss_version = '10.2.0'
+        ttkbootstrap_version = '2.2.2'
+        pillow_version = '12.3.0'
+    }
+    foreach ($propertyName in $expectedVersions.Keys) {
+        if ([string]$runtimeInfo.$propertyName -ne [string]$expectedVersions[$propertyName]) {
+            throw "[ENV-DEPENDENCY-VERSION] $propertyName がrequirements.lockと一致しません。"
+        }
+    }
+    $venvPrefix = ([string]$runtimeInfo.prefix).TrimEnd('\') + '\'
+    foreach ($propertyName in @('mss_path', 'ttkbootstrap_path', 'pillow_path')) {
+        if (-not ([string]$runtimeInfo.$propertyName).StartsWith($venvPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "[ENV-DEPENDENCY-ISOLATION] $propertyName がTracker専用Python環境の外から読み込まれました。"
+        }
+    }
+
+    $compileResult = Invoke-NativeCommand -FilePath $venvPython -Environment $isolatedEnvironment -ArgumentList @('-m', 'compileall', '-q', $SourcePath)
+    if ($compileResult.ExitCode -ne 0) {
+        throw '[ENV-RUNTIME-SMOKE] TrackerソースのRuntime確認に失敗しました。'
+    }
+    $smokeCode = 'import sys; sys.path.insert(0,sys.argv[1]); import app_paths,config,detector,result_gate,history_store; print("tracker-runtime-smoke-ok")'
+    $smokeResult = Invoke-NativeCommand -FilePath $venvPython -Environment $isolatedEnvironment -ArgumentList @('-c', $smokeCode, $SourcePath)
+    Write-InstallLog "runtime smoke exit code: $($smokeResult.ExitCode)"
+    Write-InstallLog "runtime smoke stdout:`n$($smokeResult.StdOut)"
+    Write-InstallLog "runtime smoke stderr:`n$($smokeResult.StdErr)"
+    if ($smokeResult.ExitCode -ne 0 -or $smokeResult.StdOut.Trim() -ne 'tracker-runtime-smoke-ok') {
+        throw '[ENV-RUNTIME-SMOKE] TrackerモジュールのRuntime確認に失敗しました。'
+    }
+
+    $requirementsHash = (Get-FileHash -LiteralPath $RequirementsPath -Algorithm SHA256).Hash.ToUpperInvariant()
     Write-InstallLog "dependency verification result: success ($($dependencyResult.StdOut.Trim()))"
+    Write-InstallLog "requirements.lock SHA-256: $requirementsHash"
+    Write-InstallLog 'PYTHONNOUSERSITE isolation: enabled; user site disabled'
+    return [PSCustomObject]@{
+        VenvPythonPath = $venvPython
+        VenvPythonwPath = $venvPythonw
+        RequirementsHash = $requirementsHash
+        DependencyVersions = 'mss=10.2.0; ttkbootstrap=2.2.2; Pillow=12.3.0'
+    }
 }
 
 function Get-TrackerRuntime {
@@ -895,8 +1020,12 @@ function Install-SourceTree {
 }
 
 function Complete-SourceInstall {
-    if (Test-Path -LiteralPath $script:backupPath) {
-        Remove-Item -LiteralPath $script:backupPath -Recurse -Force
+    try {
+        if (Test-Path -LiteralPath $script:backupPath) {
+            Remove-Item -LiteralPath $script:backupPath -Recurse -Force
+        }
+    } catch {
+        Write-InstallLog "previous source cleanup warning: $($_.Exception.Message)"
     }
     $script:sourceSwapped = $false
 }
@@ -914,6 +1043,53 @@ function Restore-PreviousSource {
         Write-InstallLog 'transaction rollback removed incomplete first install'
     }
     $script:sourceSwapped = $false
+}
+
+function Install-TrackerRuntime {
+    param([Parameter(Mandatory = $true)][string]$CandidatePath)
+
+    New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
+    if (Test-Path -LiteralPath $script:venvBackupPath) {
+        Remove-Item -LiteralPath $script:venvBackupPath -Recurse -Force
+    }
+    $script:hadPreviousRuntime = Test-Path -LiteralPath $venvPath -PathType Container
+    if ($script:hadPreviousRuntime) {
+        Move-Item -LiteralPath $venvPath -Destination $script:venvBackupPath
+    }
+    try {
+        Move-Item -LiteralPath $CandidatePath -Destination $venvPath
+        $script:runtimeSwapped = $true
+    } catch {
+        if ($script:hadPreviousRuntime -and -not (Test-Path -LiteralPath $venvPath) -and (Test-Path -LiteralPath $script:venvBackupPath)) {
+            Move-Item -LiteralPath $script:venvBackupPath -Destination $venvPath
+        }
+        throw
+    }
+}
+
+function Complete-TrackerRuntimeInstall {
+    try {
+        if (Test-Path -LiteralPath $script:venvBackupPath) {
+            Remove-Item -LiteralPath $script:venvBackupPath -Recurse -Force
+        }
+    } catch {
+        Write-InstallLog "previous dedicated runtime cleanup warning: $($_.Exception.Message)"
+    }
+    $script:runtimeSwapped = $false
+}
+
+function Restore-PreviousTrackerRuntime {
+    if (-not $script:runtimeSwapped) { return }
+    if (Test-Path -LiteralPath $venvPath) {
+        Remove-Item -LiteralPath $venvPath -Recurse -Force
+    }
+    if ($script:hadPreviousRuntime -and (Test-Path -LiteralPath $script:venvBackupPath)) {
+        Move-Item -LiteralPath $script:venvBackupPath -Destination $venvPath
+        Write-InstallLog 'transaction rollback restored previous dedicated runtime'
+    } else {
+        Write-InstallLog 'transaction rollback removed incomplete first dedicated runtime'
+    }
+    $script:runtimeSwapped = $false
 }
 
 function Wait-AppRuntimeReady {
@@ -966,6 +1142,8 @@ function Backup-AppShortcut {
         try {
             $oldShortcut = $shell.CreateShortcut($script:shortcutPath)
             $script:previousPythonwPath = [string]$oldShortcut.TargetPath
+            $script:previousShortcutArguments = [string]$oldShortcut.Arguments
+            $script:previousShortcutWorkingDirectory = [string]$oldShortcut.WorkingDirectory
         } finally {
             if ($oldShortcut) { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($oldShortcut) }
             [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
@@ -1003,7 +1181,7 @@ function New-AppShortcut {
     try {
         $shortcut = $shell.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $PythonwPath
-        $shortcut.Arguments = '"{0}"' -f $LauncherPath
+        $shortcut.Arguments = '-s "{0}"' -f $LauncherPath
         $shortcut.WorkingDirectory = $installPath
         $shortcut.Description = 'AC6 Win/Loss Tracker Stable'
         $shortcut.Save()
@@ -1031,6 +1209,8 @@ try {
     Write-InstallLog "Installer version: $version"
     Write-InstallLog "Windows version: $([Environment]::OSVersion.VersionString)"
     Set-InstallStage -Name 'startup'
+    Set-InstallStage -Name 'installer-lock'
+    Enter-InstallerMutex
 
     Set-InstallStage -Name 'revision-resolve'
     $resolvedCommit = Resolve-StableCommit
@@ -1047,7 +1227,7 @@ try {
     Write-Step 'GitHubからStableソースをHTTPSで取得し、内容を確認しています。'
     try {
         Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 60 `
-            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.1' }
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.1.0' }
         if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf) -or (Get-Item -LiteralPath $zipPath).Length -le 0) {
             throw 'downloaded archive is empty'
         }
@@ -1107,8 +1287,11 @@ try {
     Write-InstallLog "selected Python free-threaded: $($python.FreeThreaded)"
     Write-InstallLog "selected Python architecture: $($python.Architecture)"
 
-    Set-InstallStage -Name 'pip-install'
-    Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.lock')
+    Set-InstallStage -Name 'venv-prepare'
+    $script:venvCandidatePath = Join-Path $tempRoot 'venv.candidate'
+    $preparedRuntime = New-TrackerVenv -BasePython $python `
+        -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.lock') `
+        -SourcePath $sourceRoot.FullName -DestinationPath $script:venvCandidatePath
     Set-InstallStage -Name 'python-verification'
     $confirmedPython = Find-SupportedPython
     if (-not $confirmedPython -or
@@ -1119,13 +1302,20 @@ try {
         throw '[ENV-PYTHON-UNSUPPORTED] 依存確認後にselected Python Runtimeの完全性を再確認できませんでした。現在のTrackerは変更していません。'
     }
     $python = $confirmedPython
-    Write-InstallLog 'selected Python post-dependency validation: success'
+    Write-InstallLog 'selected base Python post-venv validation: success'
     Backup-AppShortcut
 
     if (Test-Path -LiteralPath $installPath -PathType Container) {
         Set-InstallStage -Name 'stop-running-app'
         Stop-RunningTracker
     }
+
+    Set-InstallStage -Name 'runtime-install'
+    Install-TrackerRuntime -CandidatePath $script:venvCandidatePath
+    $python | Add-Member -NotePropertyName VenvPythonPath -NotePropertyValue (Join-Path $venvPath 'Scripts\python.exe') -Force
+    $python | Add-Member -NotePropertyName VenvPythonwPath -NotePropertyValue (Join-Path $venvPath 'Scripts\pythonw.exe') -Force
+    $python | Add-Member -NotePropertyName RequirementsHash -NotePropertyValue $preparedRuntime.RequirementsHash -Force
+    $python | Add-Member -NotePropertyName DependencyVersions -NotePropertyValue $preparedRuntime.DependencyVersions -Force
 
     Set-InstallStage -Name 'source-install'
     Write-Step 'アプリのソースをユーザー領域へインストールしています。'
@@ -1146,15 +1336,15 @@ try {
 
     Set-InstallStage -Name 'shortcut'
     Write-Step 'デスクトップショートカットを作成しています。'
-    $shortcutPath = New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcherPath
+    $shortcutPath = New-AppShortcut -PythonwPath $python.VenvPythonwPath -LauncherPath $launcherPath
     Write-InstallLog "shortcut path: $shortcutPath"
-    Write-InstallLog "shortcut TargetPath: $($python.PythonwPath)"
-    Write-InstallLog "shortcut Arguments: `"$launcherPath`""
+    Write-InstallLog "shortcut TargetPath: $($python.VenvPythonwPath)"
+    Write-InstallLog "shortcut Arguments: -s `"$launcherPath`""
 
     Set-InstallStage -Name 'launch'
     Write-Step 'ショートカットと同じ方法でアプリを起動しています。'
-    $launcherArguments = '"{0}"' -f $launcherPath
-    Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments -WorkingDirectory $installPath | Out-Null
+    $launcherArguments = '-s "{0}"' -f $launcherPath
+    Start-Process -FilePath $python.VenvPythonwPath -ArgumentList $launcherArguments -WorkingDirectory $installPath | Out-Null
     if (-not (Wait-AppRuntimeReady -TimeoutSeconds 15)) {
         throw 'アプリの起動を確認できませんでした。startup.logを確認してください。'
     }
@@ -1163,13 +1353,14 @@ try {
     Write-InstalledMetadata -Commit $resolvedCommit -Python $python
     Write-InstallLog "installed revision: $resolvedCommit"
     Complete-SourceInstall
+    Complete-TrackerRuntimeInstall
     Write-Host "`nセットアップが完了しました。" -ForegroundColor Green
     Write-Host "デスクトップの「AC6 WinLoss Tracker」から次回以降も起動できます。"
     Write-Host "ログ: $script:logPath"
 } catch {
     $exitCode = 1
     $errorRecord = $_
-    if ($script:sourceSwapped) {
+    if ($script:runtimeSwapped -or $script:sourceSwapped -or $script:shortcutChanged) {
         try {
             Stop-RunningTracker
         } catch {
@@ -1181,6 +1372,11 @@ try {
             try { Write-InstallLog "source rollback failed: $($_.Exception.Message)" } catch {}
         }
         try {
+            Restore-PreviousTrackerRuntime
+        } catch {
+            try { Write-InstallLog "runtime rollback failed: $($_.Exception.Message)" } catch {}
+        }
+        try {
             Restore-AppShortcut
         } catch {
             try { Write-InstallLog "shortcut rollback failed: $($_.Exception.Message)" } catch {}
@@ -1189,7 +1385,9 @@ try {
             if ($script:hadPreviousInstall -and $python -and (Test-Path -LiteralPath (Join-Path $installPath 'launcher.pyw'))) {
                 $previousLauncher = Join-Path $installPath 'launcher.pyw'
                 $rollbackPythonw = if ($script:previousPythonwPath -and (Test-Path -LiteralPath $script:previousPythonwPath -PathType Leaf)) { $script:previousPythonwPath } else { $python.PythonwPath }
-                Start-Process -FilePath $rollbackPythonw -ArgumentList ('"{0}"' -f $previousLauncher) -WorkingDirectory $installPath | Out-Null
+                $rollbackArguments = if ($script:previousShortcutArguments) { $script:previousShortcutArguments } else { '"{0}"' -f $previousLauncher }
+                $rollbackWorkingDirectory = if ($script:previousShortcutWorkingDirectory) { $script:previousShortcutWorkingDirectory } else { $installPath }
+                Start-Process -FilePath $rollbackPythonw -ArgumentList $rollbackArguments -WorkingDirectory $rollbackWorkingDirectory | Out-Null
                 Write-InstallLog 'transaction rollback restarted previous source'
             }
         } catch {
@@ -1222,6 +1420,7 @@ try {
     if ($tempRoot -and (Test-Path -LiteralPath $tempRoot)) {
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
+    Exit-InstallerMutex
 }
 
 if ($exitCode -ne 0) {

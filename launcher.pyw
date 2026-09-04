@@ -29,6 +29,7 @@ STARTUP_TIMEOUT_SECONDS = 10.0
 
 def utf8_python_environment() -> dict[str, str]:
     environment = os.environ.copy()
+    environment["PYTHONNOUSERSITE"] = "1"
     environment["PYTHONUTF8"] = "1"
     environment["PYTHONIOENCODING"] = "utf-8"
     return environment
