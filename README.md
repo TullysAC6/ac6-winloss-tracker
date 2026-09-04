@@ -2,6 +2,11 @@
 
 ARMORED CORE VIの対戦結果を画面から自動認識し、勝敗・勝率・連勝・累計履歴を記録するWindows 11向けツールです。ゲーム中の手動入力は必要ありません。
 
+> [!IMPORTANT]
+> **対応モードは RANK MATCH: SINGLE（ランクマッチ・シングル）のみです。**
+>
+> CUSTOM MATCH（カスタムマッチ）およびRANK MATCH: TEAM（ランクマッチ・チーム）は現在サポート対象外です。これらのモードでは、WIN / LOSE検出、戦績カウント、Overlay更新、History記録の動作を検証しておらず、動作保証していません。
+
 <img src="docs/images/dashboard-overview.png" alt="AC6 Win/Loss Tracker Dashboard Overview" width="900">
 
 ## 主な機能
@@ -26,6 +31,9 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 - GitやGitHub CLIは不要です。
 - 必要な対応Pythonは自動で準備されます。
 - 更新も同じ1行を実行します。
+
+> [!NOTE]
+> 現在のv1.0.1では専用のPython仮想環境（venv）を使用していません。必要なPythonパッケージはユーザーのPython環境へインストールされるため、他のPythonアプリやスクリプトと依存関係が競合する可能性があります。既存のPython本体はインストール時もアンインストール時も削除しません。専用venvによる完全な環境分離は今後のバージョンで対応予定です。
 
 ## 使い方
 
@@ -85,15 +93,24 @@ Tracker起動中に「AC6 WinLoss Tracker」ショートカットをもう一度
 
 ARMORED CORE VIが前面にあるとき、現在の戦績をゲーム内Overlayに表示します。試合結果は画面から自動認識されるため、ゲームプレイ中の手動操作は不要です。
 
-## OBS（任意）
+## OBSで配信画面に表示する（任意）
 
-OBSで戦績を配信画面に表示したい場合は、ブラウザソースに次のURLを指定できます。通常の利用では設定不要です。
+OBSは任意です。OBSを使用しなくてもTrackerは動作し、自動WIN / LOSE検出とゲーム内OverlayにOBSは必要ありません。
 
-OBSブラウザソース:
+1. AC6 Win/Loss Trackerを起動します。
+2. OBSを開きます。
+3. 「Sources / ソース」の「+」を押します。
+4. 「Browser / ブラウザ」を追加します。
+5. URLに次を入力します。
 
 ```text
 http://127.0.0.1:8765/
 ```
+
+6. 幅と高さをOBSのキャンバスや配信レイアウトに合わせます。
+7. OBS上で必要な位置とサイズに配置します。
+
+ゲーム内OverlayはAC6の画面上に戦績を表示する機能です。OBS Browser SourceはOBSの配信画面に戦績を表示する別の機能で、互いに独立しています。
 
 ## アンインストール
 
