@@ -793,7 +793,7 @@ function New-TrackerVenv {
     if ($compileResult.ExitCode -ne 0) {
         throw '[ENV-RUNTIME-SMOKE] TrackerソースのRuntime確認に失敗しました。'
     }
-    $smokeCode = 'import sys; sys.path.insert(0,sys.argv[1]); import app_paths,config,detector,result_gate,history_store; print("tracker-runtime-smoke-ok")'
+    $smokeCode = 'import sys; sys.path.insert(0,sys.argv[1]); import app_paths,config_utils,result_detector,result_gate,history_store; print("tracker-runtime-smoke-ok")'
     $smokeResult = Invoke-NativeCommand -FilePath $venvPython -Environment $isolatedEnvironment -ArgumentList @('-c', $smokeCode, $SourcePath)
     Write-InstallLog "runtime smoke exit code: $($smokeResult.ExitCode)"
     Write-InstallLog "runtime smoke stdout:`n$($smokeResult.StdOut)"
