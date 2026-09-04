@@ -71,7 +71,11 @@ foreach ($removed in @('runtime-policy.json', 'runtime_policy.py', 'minimum_patc
 }
 $signatureCheck = $installer.IndexOf('Get-SignedExecutableInfo -Path $fullPath')
 $runtimeCheck = $installer.IndexOf('Get-SupportedPythonRole -Major')
-$pip = $installer.IndexOf('Invoke-PipInstall', $runtimeCheck)
-$shutdown = $installer.IndexOf('Stop-RunningTracker', $pip)
-if ($signatureCheck -lt 0 -or $runtimeCheck -le $signatureCheck -or $pip -le $runtimeCheck -or $shutdown -le $pip) { throw 'Installer validation/shutdown ordering is unsafe' }
+$venv = $installer.IndexOf('New-TrackerVenv -BasePython $python', $runtimeCheck)
+$shutdown = $installer.IndexOf('Stop-RunningTracker', $venv)
+if ($signatureCheck -lt 0 -or $runtimeCheck -le $signatureCheck -or $venv -le $runtimeCheck -or $shutdown -le $venv) { throw 'Installer validation/shutdown ordering is unsafe' }
+foreach ($required in @('PYTHONNOUSERSITE', 'PIP_REQUIRE_VIRTUALENV', "'-m', 'venv'", "'-m', 'pip', 'check'", 'Install-TrackerRuntime', 'Restore-PreviousTrackerRuntime', 'Local\AC6WinLossTrackerInstaller')) {
+    if (-not $installer.Contains($required)) { throw "Dedicated venv invariant missing: $required" }
+}
+if ($installer.Contains("'--user'")) { throw 'Installer must not install packages into user site' }
 Write-Host 'Simple Python selection and installer safety ordering: OK'

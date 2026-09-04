@@ -16,9 +16,9 @@ for removed in (
 ):
     assert not (ROOT / removed).exists(), removed
 
-assert re.search(r'^VERSION\s*=\s*["\']1\.0\.1["\']$', version_source, re.MULTILINE)
+assert re.search(r'^VERSION\s*=\s*["\']1\.1\.0["\']$', version_source, re.MULTILINE)
 assert "$channel = 'stable'" in installer
-assert "$version = '1.0.1'" in installer
+assert "$version = '1.1.0'" in installer
 assert 'https://api.github.com/repos/$repository/commits/$SourceTag' in installer
 assert '^[0-9a-fA-F]{40}$' in installer
 assert 'archive/$resolvedCommit.zip' in installer
@@ -41,23 +41,28 @@ assert "python_version" in installer
 assert "Backup-AppShortcut" in installer and "Restore-AppShortcut" in installer
 assert r"\\Microsoft\\WindowsApps\\" in installer
 assert "Get-AuthenticodeSignature" in installer
-assert "pip', 'install', '--user'" in installer
+assert "pip', 'install', '--require-hashes'" in installer
 assert "'--require-hashes'" in installer
 assert "'--only-binary=:all:'" in installer
 assert "requirements.lock" in installer
 assert "Remove-Item -LiteralPath $dataPath" not in installer
 assert "Remove-Item -LiteralPath $installPath" in installer
-assert "venv" not in installer.lower()
+assert "'--user'" not in installer
+assert "'-m', 'venv'" in installer
+assert "PYTHONNOUSERSITE" in installer
+assert "PIP_REQUIRE_VIRTUALENV" in installer
+assert "AC6WinLossTrackerRuntime" in installer
+assert "Restore-PreviousTrackerRuntime" in installer
 assert not re.search(r"(?i)pyinstaller|makeappx|new-selfsignedcertificate|\.pfx|\.msix", installer)
 
 download = installer.index("Set-InstallStage -Name 'source-download'")
 archive_check = installer.index("archive validation: success", download)
-pip = installer.index("Set-InstallStage -Name 'pip-install'", archive_check)
-stop = installer.index("Stop-RunningTracker", pip)
+venv = installer.index("Set-InstallStage -Name 'venv-prepare'", archive_check)
+stop = installer.index("Stop-RunningTracker", venv)
 swap = installer.index("Install-SourceTree -SourcePath", stop)
 health = installer.index("Wait-AppRuntimeReady", swap)
 metadata = installer.index("Write-InstalledMetadata -Commit", health)
-assert download < archive_check < pip < stop < swap < health < metadata
+assert download < archive_check < venv < stop < swap < health < metadata
 
 # The installer uses a strict parser and fail-closed handling for the required
 # mocked API response classes: 200/valid SHA, invalid SHA, 403 and 429.
@@ -89,6 +94,8 @@ assert "python-version: ${{ matrix.python-version }}" in workflow
 assert "python tests/run_all_tests.py" in workflow
 assert "tests/test_runtime_policy_installer.ps1" in workflow
 assert "tests/test_uninstaller.ps1" in workflow
+assert "tests/test_venv_transaction.ps1" in workflow
+assert "tests/test_venv_integration.ps1" in workflow
 assert "tests/test_bootstrap.ps1" in workflow
 assert "tests/test_readme_commands.ps1" in workflow
 assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1" in workflow

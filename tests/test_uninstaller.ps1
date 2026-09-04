@@ -6,7 +6,7 @@ $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($uninstallerPath, [ref]$tokens, [ref]$errors)
 if ($errors.Count -gt 0) { throw 'uninstall.ps1 syntax is invalid' }
 
-foreach ($name in @('Test-TrackerCommandLine', 'Remove-TrackerRuntimeFiles', 'Remove-TrackerSource', 'Stop-TrackerSafely', 'Confirm-UserDataRemoval', 'Remove-TrackerUserData')) {
+foreach ($name in @('Test-TrackerCommandLine', 'Remove-TrackerRuntimeFiles', 'Remove-TrackerSource', 'Remove-TrackerDedicatedRuntime', 'Stop-TrackerSafely', 'Confirm-UserDataRemoval', 'Remove-TrackerUserData')) {
     $functionAst = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if (-not $functionAst) { throw "Uninstaller function missing: $name" }
     Invoke-Expression $functionAst.Extent.Text
@@ -24,8 +24,14 @@ try {
     $env:LOCALAPPDATA = $testRoot
     $dataPath = Join-Path $testRoot 'AC6WinLossTracker'
     $installPath = Join-Path $testRoot 'Programs\AC6WinLossTrackerSource'
+    $runtimeRoot = Join-Path $testRoot 'Programs\AC6WinLossTrackerRuntime'
+    $unrelatedPython = Join-Path $testRoot 'PythonUserSite\site-packages\unrelated-package.txt'
     $runtimeFileNames = @('.runtime.json', '.runtime.json.tmp', '.overlay-runtime.json', '.overlay-runtime.json.tmp', '.dashboard-runtime.json', '.dashboard-runtime.json.tmp')
     New-Item -ItemType Directory -Path $installPath -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $runtimeRoot 'venv\Scripts') -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $runtimeRoot 'venv\Scripts\python.exe') -Value 'fixture'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $unrelatedPython) -Force | Out-Null
+    Set-Content -LiteralPath $unrelatedPython -Value 'must remain'
     New-Item -ItemType Directory -Path (Join-Path $dataPath 'diagnostics') -Force | Out-Null
     foreach ($name in @('history.db', 'config.json', 'stats.json')) { Set-Content -LiteralPath (Join-Path $dataPath $name) -Value 'fixture' }
     foreach ($name in $runtimeFileNames) { Set-Content -LiteralPath (Join-Path $dataPath $name) -Value '{}' }
@@ -43,8 +49,11 @@ try {
     foreach ($name in $runtimeFileNames) { if (Test-Path -LiteralPath (Join-Path $dataPath $name)) { throw "runtime file remains: $name" } }
     if (Test-Path -LiteralPath (Join-Path $dataPath '.overlay-runtime.json.4242.tmp')) { throw 'PID-qualified overlay runtime tmp remains' }
     Remove-TrackerSource
+    Remove-TrackerDedicatedRuntime
     if (Test-Path -LiteralPath $installPath) { throw 'application source remains' }
     if (Test-Path -LiteralPath "$installPath.previous") { throw 'previous application source remains' }
+    if (Test-Path -LiteralPath $runtimeRoot) { throw 'dedicated Tracker runtime remains' }
+    if (-not (Test-Path -LiteralPath $unrelatedPython -PathType Leaf)) { throw 'unrelated user Python package was removed' }
     foreach ($name in @('history.db', 'config.json', 'stats.json', 'diagnostics')) { if (-not (Test-Path -LiteralPath (Join-Path $dataPath $name))) { throw "user data removed: $name" } }
 
     New-Item -ItemType Directory -Path $installPath -Force | Out-Null

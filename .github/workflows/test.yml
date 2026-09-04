@@ -76,7 +76,14 @@ jobs:
 
       - name: Validate installer Python selection
         shell: pwsh
-        run: ./tests/test_runtime_policy_installer.ps1
+        run: |
+          ./tests/test_runtime_policy_installer.ps1
+          ./tests/test_venv_transaction.ps1
+
+      - name: Build and verify dedicated venv with PowerShell 7
+        if: matrix.python-version != '3.12'
+        shell: pwsh
+        run: ./tests/test_venv_integration.ps1 -BasePythonPath (Get-Command python.exe).Source
 
       - name: Validate verified bootstrap with PowerShell 7
         shell: pwsh
@@ -102,6 +109,16 @@ jobs:
           powershell.exe -NoProfile -Command '$PSVersionTable.PSVersion'
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1
           if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 installer test failed with exit code $LASTEXITCODE" }
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_venv_transaction.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 venv transaction test failed with exit code $LASTEXITCODE" }
+
+      - name: Build and verify dedicated venv with Windows PowerShell 5.1
+        if: matrix.python-version != '3.12'
+        shell: pwsh
+        run: |
+          $pythonPath = (Get-Command python.exe).Source
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_venv_integration.ps1 -BasePythonPath "$pythonPath"
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 venv integration test failed with exit code $LASTEXITCODE" }
 
       - name: Validate verified bootstrap with Windows PowerShell 5.1
         shell: pwsh

@@ -211,12 +211,13 @@ assert "GetExitCodeProcess" in launcher_source
 assert "exit_code.value == 259" in launcher_source
 assert 'environment["PYTHONUTF8"] = "1"' in launcher_source
 assert 'environment["PYTHONIOENCODING"] = "utf-8"' in launcher_source
+assert 'environment["PYTHONNOUSERSITE"] = "1"' in launcher_source
 
 installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
 assert "$shortcut.TargetPath = $PythonwPath" in installer
-assert "$shortcut.Arguments = '\"{0}\"' -f $LauncherPath" in installer
-assert "New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcherPath" in installer
-assert "Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments" in installer
+assert "$shortcut.Arguments = '-s \"{0}\"' -f $LauncherPath" in installer
+assert "New-AppShortcut -PythonwPath $python.VenvPythonwPath -LauncherPath $launcherPath" in installer
+assert "Start-Process -FilePath $python.VenvPythonwPath -ArgumentList $launcherArguments" in installer
 assert "Wait-AppRuntimeReady -TimeoutSeconds 15" in installer
 assert '"http://127.0.0.1:{0}/health"' in installer
 print("launcher shortcut and installer readiness checks: OK")
