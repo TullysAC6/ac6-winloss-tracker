@@ -16,9 +16,9 @@ foreach ($name in @('ConvertTo-NativeArgument', 'Invoke-NativeCommand', 'Get-Iso
 function Write-InstallLog { param($Message) }
 function Write-Step { param($Message) }
 
-$versionResult = & $BasePythonPath -c 'import json,sys; print(json.dumps({"major":sys.version_info.major,"minor":sys.version_info.minor,"version":".".join(map(str,sys.version_info[:3]))}))'
-if ($LASTEXITCODE -ne 0) { throw 'base Python version query failed' }
-$version = $versionResult | ConvertFrom-Json
+$versionInvocation = Invoke-NativeCommand -FilePath $BasePythonPath -ArgumentList @('-c', 'import json,sys; print(json.dumps({"major":sys.version_info.major,"minor":sys.version_info.minor,"version":".".join(map(str,sys.version_info[:3]))}))')
+if ($versionInvocation.ExitCode -ne 0) { throw "base Python version query failed: $($versionInvocation.StdErr)" }
+$version = $versionInvocation.StdOut | ConvertFrom-Json
 if ([int]$version.major -ne 3 -or [int]$version.minor -notin @(13, 14)) { throw 'integration test requires Python 3.13 or 3.14' }
 $base = [PSCustomObject]@{
     PythonPath = (Resolve-Path -LiteralPath $BasePythonPath).Path
