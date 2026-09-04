@@ -30,12 +30,10 @@ $base = [PSCustomObject]@{
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('ac6-venv-integration-' + [Guid]::NewGuid().ToString('N'))
 $oldPythonUserBase = $env:PYTHONUSERBASE
 try {
-    $sourcePath = Join-Path $testRoot 'source'
+    $sourcePath = $root
     $destinationPath = Join-Path $testRoot 'venv'
     $userBase = Join-Path $testRoot 'existing-user-python'
-    New-Item -ItemType Directory -Path $sourcePath -Force | Out-Null
     New-Item -ItemType Directory -Path $userBase -Force | Out-Null
-    Set-Content -LiteralPath (Join-Path $sourcePath 'smoke.py') -Value 'import mss, ttkbootstrap, PIL'
     $userSentinel = Join-Path $userBase 'existing-package.txt'
     Set-Content -LiteralPath $userSentinel -Value 'must remain unchanged'
     $env:PYTHONUSERBASE = $userBase
