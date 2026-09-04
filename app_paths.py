@@ -6,7 +6,7 @@ from pathlib import Path
 
 APP_NAME = "AC6WinLossTracker"
 DISPLAY_NAME = "AC6 Win/Loss Tracker"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 
 def resource_dir() -> Path:

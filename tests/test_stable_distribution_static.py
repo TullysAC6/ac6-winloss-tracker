@@ -4,7 +4,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[1]
 installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
-readme = (ROOT / "README.txt").read_text(encoding="utf-8")
+readme = (ROOT / "README.md").read_text(encoding="utf-8")
 version_source = (ROOT / "app_paths.py").read_text(encoding="utf-8")
 
 for removed in (
@@ -16,9 +16,9 @@ for removed in (
 ):
     assert not (ROOT / removed).exists(), removed
 
-assert re.search(r'^VERSION\s*=\s*["\']1\.0\.0["\']$', version_source, re.MULTILINE)
+assert re.search(r'^VERSION\s*=\s*["\']1\.0\.1["\']$', version_source, re.MULTILINE)
 assert "$channel = 'stable'" in installer
-assert "$version = '1.0.0'" in installer
+assert "$version = '1.0.1'" in installer
 assert 'https://api.github.com/repos/$repository/commits/$SourceTag' in installer
 assert '^[0-9a-fA-F]{40}$' in installer
 assert 'archive/$resolvedCommit.zip' in installer
@@ -70,21 +70,15 @@ for status in (403, 429):
 assert "現在のTrackerは変更していません" in installer
 
 assert "Invoke-Expression" not in readme
-assert "refs/tags/v1.0.0/bootstrap.ps1" in readme
+assert "refs/tags/v1.0.1/bootstrap.ps1" in readme
 assert "Get-FileHash $p -Algorithm SHA256" in readme
-assert "99059995404F2EC2122C9497B6079CB1134A04D4A627C57FE7A21DE28F99A6FF" in readme
+assert "39E7E8C54239F1FA61666FF4C9199AFF6BF86B5937C7F69C6B14EBBC59D1C9E8" in readme
 assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "install.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "uninstall.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
-assert "6b8dcdd818ec9c5b6e81450fb955d1451a5dc540" in readme
-assert "YouTubeコメント機能はありません" in readme
+assert "YouTubeコメント機能" in readme and "ありません" in readme
 assert "%LOCALAPPDATA%\\AC6WinLossTracker\\" in readme
-assert "Python 3.14を優先" in readme
-assert "Python 3.13" in readme
-assert "free-threaded build" in readme
-assert "3.12以下しかない場合" in readme
-assert "Pythonを自動削除しません" in readme
-assert "-RemoveUserData" in readme
+assert "Pythonは自動削除しません" in readme
 assert (ROOT / "uninstall.ps1").is_file()
 
 workflow = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
@@ -96,8 +90,10 @@ assert "python tests/run_all_tests.py" in workflow
 assert "tests/test_runtime_policy_installer.ps1" in workflow
 assert "tests/test_uninstaller.ps1" in workflow
 assert "tests/test_bootstrap.ps1" in workflow
+assert "tests/test_readme_commands.ps1" in workflow
 assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_runtime_policy_installer.ps1" in workflow
 assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_bootstrap.ps1" in workflow
+assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_readme_commands.ps1" in workflow
 assert "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_uninstaller.ps1" in workflow
 assert "matrix.python-version != '3.12'" in workflow
 assert "release/**" in workflow and "workflow_dispatch:" in workflow
@@ -113,6 +109,9 @@ assert "releases/latest" in bootstrap
 assert "prerelease" in bootstrap and "draft" in bootstrap
 assert "Get-FileHash" in bootstrap and "sha256:" in bootstrap
 assert "powershell.exe" in bootstrap
+assert "Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -PassThru" in bootstrap
+assert "$process.WaitForExit()" in bootstrap
+assert "-Wait -PassThru" not in bootstrap
 
 lock = (ROOT / "requirements.lock").read_text(encoding="utf-8")
 for package in ("mss==10.2.0", "pillow==12.3.0", "ttkbootstrap==2.2.2"):

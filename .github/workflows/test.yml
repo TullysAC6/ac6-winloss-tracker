@@ -82,6 +82,10 @@ jobs:
         shell: pwsh
         run: ./tests/test_bootstrap.ps1
 
+      - name: Validate README commands with PowerShell 7
+        shell: pwsh
+        run: ./tests/test_readme_commands.ps1
+
       - name: Validate release script asset preparation
         shell: pwsh
         run: |
@@ -104,6 +108,12 @@ jobs:
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_bootstrap.ps1
           if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 bootstrap test failed with exit code $LASTEXITCODE" }
+
+      - name: Validate README commands with Windows PowerShell 5.1
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_readme_commands.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 README command test failed with exit code $LASTEXITCODE" }
 
       - name: Validate uninstaller safety and reinstall preservation
         shell: pwsh

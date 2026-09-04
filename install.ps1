@@ -1,6 +1,6 @@
 ﻿[CmdletBinding()]
 param(
-    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.0.0'
+    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.0.1'
 )
 
 Set-StrictMode -Version Latest
@@ -9,7 +9,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 $appName = 'AC6 WinLoss Tracker'
 $channel = 'stable'
-$version = '1.0.0'
+$version = '1.0.1'
 $repository = 'TullysAC6/ac6-winloss-tracker'
 $releaseCommitUrl = "https://api.github.com/repos/$repository/commits/$SourceTag"
 $resolvedCommit = $null
@@ -72,7 +72,7 @@ function Resolve-StableCommit {
     try {
         # Exactly one unauthenticated API request is used per installer run.
         $response = Invoke-WebRequest -Uri $releaseCommitUrl -UseBasicParsing -TimeoutSec 15 `
-            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.0' } `
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.1' } `
             -ErrorAction Stop
         $payload = $response.Content | ConvertFrom-Json
         $sha = [string]$payload.sha
@@ -1047,7 +1047,7 @@ try {
     Write-Step 'GitHubからStableソースをHTTPSで取得し、内容を確認しています。'
     try {
         Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 60 `
-            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.0' }
+            -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.0.1' }
         if (-not (Test-Path -LiteralPath $zipPath -PathType Leaf) -or (Get-Item -LiteralPath $zipPath).Length -le 0) {
             throw 'downloaded archive is empty'
         }

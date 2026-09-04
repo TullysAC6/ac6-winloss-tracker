@@ -1,6 +1,6 @@
 # Distribution security
 
-Stable installation and updates use the one-line command in `README.txt`.
+Stable installation and updates use the one-line command in `README.md`.
 Downloaded text is never passed to `Invoke-Expression`.
 
 The command downloads `bootstrap.ps1` from the immutable Stable tag and checks
@@ -31,3 +31,14 @@ releases when that repository setting is available.
 Production dependencies are installed from `requirements.lock` using both
 `--require-hashes` and `--only-binary=:all:`. See
 `docs/dependency-lock.md` for the Windows x64 Python 3.13/3.14 update process.
+
+The installer accepts only supported, non-prerelease, non-free-threaded Python
+runtimes whose `python.exe` and `pythonw.exe` Authenticode signatures match and
+are issued to the Python Software Foundation. WindowsApps execution aliases are
+not treated as Python runtimes. If a supported runtime is unavailable, the
+installer prepares official Python 3.14 without removing unrelated Python
+installations.
+
+PowerShell execution, Python installation, and application launch remain subject
+to local WDAC, AppLocker, Group Policy, and other administrator policies. The
+installer does not bypass those policies or permanently change ExecutionPolicy.
