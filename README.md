@@ -109,7 +109,7 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 - デスクトップショートカットを削除
 - 戦績を保持
 - 設定を保持
-- Pythonを保持
+- Pythonを保持（Pythonは自動削除しません）
 
 保存されたユーザーデータは`%LOCALAPPDATA%\AC6WinLossTracker\`にあり、再インストール後も利用できます。
 
