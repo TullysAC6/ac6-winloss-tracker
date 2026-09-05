@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -25,6 +26,7 @@ STARTUP_LOG = DATA_DIR / "startup.log"
 DASHBOARD_LOG = DATA_DIR / "dashboard.log"
 MAX_LOG_BYTES = 1024 * 1024
 STARTUP_TIMEOUT_SECONDS = 10.0
+LAUNCH_ID_ENV = "AC6_TRACKER_LAUNCH_ID"
 
 
 def utf8_python_environment() -> dict[str, str]:
@@ -33,6 +35,25 @@ def utf8_python_environment() -> dict[str, str]:
     environment["PYTHONUTF8"] = "1"
     environment["PYTHONIOENCODING"] = "utf-8"
     return environment
+
+
+def new_launch_id() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def read_requested_launch_id(arguments: list[str] | None = None) -> str | None:
+    arguments = sys.argv[1:] if arguments is None else arguments
+    try:
+        index = arguments.index("--launch-id")
+        value = arguments[index + 1]
+    except (ValueError, IndexError):
+        return None
+    if not 16 <= len(value) <= 128 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in value
+    ):
+        return None
+    return value
 
 
 def read_runtime(path: Path = RUNTIME_PATH) -> dict | None:
@@ -47,7 +68,13 @@ def read_runtime(path: Path = RUNTIME_PATH) -> dict | None:
     if type(port) is not int or not 1 <= port <= 65535:
         return None
     token = raw.get("token")
-    return {"pid": pid, "port": port, "token": token if isinstance(token, str) else ""}
+    launch_id = raw.get("launch_id")
+    return {
+        "pid": pid,
+        "port": port,
+        "token": token if isinstance(token, str) else "",
+        "launch_id": launch_id if isinstance(launch_id, str) else "",
+    }
 
 
 def process_is_alive(pid: int) -> bool:
@@ -127,6 +154,7 @@ def start_application(
     app_path: Path = APP_PATH,
     app_dir: Path = APP_DIR,
     log_path: Path = STARTUP_LOG,
+    launch_id: str | None = None,
 ) -> subprocess.Popen:
     rotate_startup_log(log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -137,6 +165,9 @@ def start_application(
             f"launch: {sys.executable} {app_path}\n"
         )
         startup_log.flush()
+        environment = utf8_python_environment()
+        if launch_id:
+            environment[LAUNCH_ID_ENV] = launch_id
         return subprocess.Popen(
             [sys.executable, str(app_path)],
             cwd=str(app_dir),
@@ -145,7 +176,7 @@ def start_application(
             stderr=subprocess.STDOUT,
             shell=False,
             creationflags=creationflags,
-            env=utf8_python_environment(),
+            env=environment,
         )
 
 
@@ -228,15 +259,15 @@ def wait_for_application(
     process: subprocess.Popen,
     runtime_path: Path = RUNTIME_PATH,
     timeout: float = STARTUP_TIMEOUT_SECONDS,
+    expected_launch_id: str | None = None,
 ) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        if process.poll() is not None:
-            return False
         runtime = read_runtime(runtime_path)
         if (
             runtime is not None
-            and runtime["pid"] == process.pid
+            and expected_launch_id
+            and runtime["launch_id"] == expected_launch_id
             and process_is_alive(runtime["pid"])
             and tracker_health(runtime["port"]) is not None
         ):
@@ -264,15 +295,17 @@ def launch_once(
     app_dir: Path = APP_DIR,
     log_path: Path = STARTUP_LOG,
     timeout: float = STARTUP_TIMEOUT_SECONDS,
+    launch_id: str | None = None,
 ) -> str:
     if running_instance(runtime_path) is not None:
         return "already_running"
+    launch_id = launch_id or new_launch_id()
     try:
-        process = start_application(app_path, app_dir, log_path)
+        process = start_application(app_path, app_dir, log_path, launch_id)
     except Exception:
         log_launcher_error(log_path)
         return "failed"
-    if wait_for_application(process, runtime_path, timeout):
+    if wait_for_application(process, runtime_path, timeout, launch_id):
         try:
             runtime = read_runtime(runtime_path)
             health = tracker_health(runtime["port"]) if runtime else None
@@ -287,7 +320,10 @@ def launch_once(
         except (OSError, KeyError, TypeError):
             pass
         return "started"
-    if process.poll() is None:
+    runtime = read_runtime(runtime_path)
+    if runtime is not None and runtime.get("launch_id") == launch_id:
+        cleanup_failed_launch(runtime, launch_id, runtime_path)
+    elif process.poll() is None:
         try:
             process.terminate()
         except OSError:
@@ -301,6 +337,65 @@ def launch_once(
     except OSError:
         pass
     return "failed"
+
+
+def request_shutdown_for_runtime(runtime: dict) -> bool:
+    if not runtime.get("token"):
+        return False
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{runtime['port']}/api/system/shutdown",
+        data=b"", method="POST",
+        headers={"X-Control-Token": runtime["token"]},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=3) as response:
+            return response.status == 200
+    except (OSError, urllib.error.URLError):
+        return False
+
+
+def terminate_process_by_pid(pid: int) -> bool:
+    if not process_is_alive(pid):
+        return True
+    if os.name == "nt":
+        process_terminate = 0x0001
+        handle = ctypes.windll.kernel32.OpenProcess(process_terminate, False, pid)
+        if not handle:
+            return False
+        try:
+            return bool(ctypes.windll.kernel32.TerminateProcess(handle, 1))
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 15)
+        return True
+    except OSError:
+        return False
+
+
+def cleanup_failed_launch(runtime: dict, expected_launch_id: str, runtime_path: Path) -> None:
+    """Stop only the runtime carrying this launch's unguessable identity."""
+    if runtime.get("launch_id") != expected_launch_id:
+        return
+    request_shutdown_for_runtime(runtime)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline and process_is_alive(runtime["pid"]):
+        time.sleep(0.1)
+    if process_is_alive(runtime["pid"]):
+        terminate_process_by_pid(runtime["pid"])
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and process_is_alive(runtime["pid"]):
+        time.sleep(0.05)
+    current = read_runtime(runtime_path)
+    if (
+        not process_is_alive(runtime["pid"])
+        and current is not None
+        and current.get("launch_id") == expected_launch_id
+    ):
+        try:
+            runtime_path.unlink()
+        except OSError:
+            pass
 
 
 def read_overlay_pid(path: Path = OVERLAY_RUNTIME_PATH) -> int:
@@ -325,16 +420,7 @@ def request_shutdown(runtime_path: Path = RUNTIME_PATH) -> tuple[dict | None, in
     dashboard_pid = read_dashboard_pid()
     if runtime is None or not runtime.get("token"):
         return None, overlay_pid
-    request = urllib.request.Request(
-        f"http://127.0.0.1:{runtime['port']}/api/system/shutdown",
-        data=b"", method="POST",
-        headers={"X-Control-Token": runtime["token"]},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=3) as response:
-            if response.status != 200:
-                return None, overlay_pid
-    except (OSError, urllib.error.URLError):
+    if not request_shutdown_for_runtime(runtime):
         return None, overlay_pid
     runtime["dashboard_pid"] = dashboard_pid
     return runtime, overlay_pid
@@ -455,7 +541,7 @@ def main() -> None:
             )
 
     def worker() -> None:
-        result = launch_once()
+        result = launch_once(launch_id=read_requested_launch_id())
         root.after(0, finish, result)
 
     root.after(100, lambda: threading.Thread(target=worker, daemon=True).start())

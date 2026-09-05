@@ -93,6 +93,19 @@ def create_control_token():
 CONTROL_TOKEN = create_control_token()
 
 
+def get_launch_id():
+    value = os.environ.get("AC6_TRACKER_LAUNCH_ID", "")
+    if 16 <= len(value) <= 128 and all(
+        character in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in value
+    ):
+        return value
+    return secrets.token_urlsafe(24)
+
+
+LAUNCH_ID = get_launch_id()
+
+
 class StartupEnvironmentError(RuntimeError):
     def __init__(self, code, description, action):
         self.code = str(code)
@@ -106,6 +119,7 @@ def write_runtime_file(port):
         "port": int(port),
         "token": CONTROL_TOKEN,
         "pid": os.getpid(),
+        "launch_id": LAUNCH_ID,
         "started_at": time.time(),
     }
     tmp = RUNTIME_PATH.with_name(".runtime.json.tmp")

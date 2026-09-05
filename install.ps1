@@ -62,6 +62,13 @@ function Set-InstallStage {
     Write-InstallLog "stage: $Name"
 }
 
+function New-LaunchId {
+    $bytes = New-Object byte[] 24
+    $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $generator.GetBytes($bytes) } finally { $generator.Dispose() }
+    return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
 function Enter-InstallerMutex {
     $createdNew = $false
     $script:installerMutex = New-Object System.Threading.Mutex($false, 'Local\AC6WinLossTrackerInstaller', [ref]$createdNew)
@@ -1093,7 +1100,10 @@ function Restore-PreviousTrackerRuntime {
 }
 
 function Wait-AppRuntimeReady {
-    param([int]$TimeoutSeconds = 15)
+    param(
+        [Parameter(Mandatory = $true)][string]$ExpectedLaunchId,
+        [int]$TimeoutSeconds = 15
+    )
 
     $runtimePath = Join-Path $dataPath '.runtime.json'
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
@@ -1103,7 +1113,8 @@ function Wait-AppRuntimeReady {
                 $runtime = Get-Content -LiteralPath $runtimePath -Raw -ErrorAction Stop | ConvertFrom-Json
                 $runtimePid = [int]$runtime.pid
                 $runtimePort = [int]$runtime.port
-                if ($runtimePid -gt 0 -and $runtimePort -ge 1 -and $runtimePort -le 65535) {
+                $runtimeLaunchId = [string]$runtime.launch_id
+                if ($runtimeLaunchId -ceq $ExpectedLaunchId -and $runtimePid -gt 0 -and $runtimePort -ge 1 -and $runtimePort -le 65535) {
                     $runtimeProcess = Get-Process -Id $runtimePid -ErrorAction Stop
                     if ($runtimeProcess -and -not $runtimeProcess.HasExited) {
                         $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/health" -f $runtimePort) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
@@ -1112,6 +1123,7 @@ function Wait-AppRuntimeReady {
                             Write-InstallLog "application runtime path: $runtimePath"
                             Write-InstallLog "application runtime PID: $runtimePid"
                             Write-InstallLog "application runtime port: $runtimePort"
+                            Write-InstallLog "application launch identity: verified"
                             Write-InstallLog 'application HTTP /health status: 200; overall health ready'
                             return $true
                         }
@@ -1343,9 +1355,10 @@ try {
 
     Set-InstallStage -Name 'launch'
     Write-Step 'ショートカットと同じ方法でアプリを起動しています。'
-    $launcherArguments = '-s "{0}"' -f $launcherPath
+    $launchId = New-LaunchId
+    $launcherArguments = '-s "{0}" --launch-id {1}' -f $launcherPath, $launchId
     Start-Process -FilePath $python.VenvPythonwPath -ArgumentList $launcherArguments -WorkingDirectory $installPath | Out-Null
-    if (-not (Wait-AppRuntimeReady -TimeoutSeconds 15)) {
+    if (-not (Wait-AppRuntimeReady -ExpectedLaunchId $launchId -TimeoutSeconds 15)) {
         throw 'アプリの起動を確認できませんでした。startup.logを確認してください。'
     }
 
