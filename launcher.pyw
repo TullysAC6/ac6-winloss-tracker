@@ -49,6 +49,8 @@ def read_runtime(path: Path = RUNTIME_PATH) -> dict | None:
     if type(port) is not int or not 1 <= port <= 65535:
         return None
     token = raw.get("token")
+    if isinstance(token, str) and any(not 33 <= ord(char) <= 126 for char in token):
+        return None
     return {"pid": pid, "port": port, "token": token if isinstance(token, str) else ""}
 
 

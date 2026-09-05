@@ -40,7 +40,9 @@ with tempfile.TemporaryDirectory(prefix="ac6-lifetime-") as temporary:
     )
     runtime = None
     try:
-        result = subprocess.run([sys.executable, "-c", code], cwd=ROOT,
+        # Match the installed Windows shortcut (venv pythonw, not console Python).
+        pythonw = str(Path(sys.executable).with_name("pythonw.exe"))
+        result = subprocess.run([pythonw, "-c", code], cwd=ROOT,
                                 env=env, capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, result.stdout + result.stderr
         runtime = json.loads((data / ".runtime.json").read_text())

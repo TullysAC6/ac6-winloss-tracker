@@ -106,6 +106,9 @@ with tempfile.TemporaryDirectory() as temporary:
             json.dumps({"pid": 2147483647, "port": 65534}), encoding="utf-8"
         )
         assert launcher.running_instance(runtime_path) is None
+        runtime_path.write_text(json.dumps({"pid": os.getpid(), "port": 65534,
+                                            "token": "invalid-\u2603"}), encoding="utf-8")
+        assert launcher.read_runtime(runtime_path) is None
 
         process = launcher.start_application(fake_server, root, startup_log)
         try:
