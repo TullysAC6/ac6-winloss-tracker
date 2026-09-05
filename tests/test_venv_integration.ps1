@@ -44,6 +44,9 @@ try {
     if (-not (Test-Path -LiteralPath $result.VenvPythonwPath -PathType Leaf)) { throw 'venv pythonw missing after integration build' }
     if ($result.DependencyVersions -ne 'mss=10.2.0; ttkbootstrap=2.2.2; Pillow=12.3.0') { throw 'locked dependency versions differ' }
     if ((Get-Content -LiteralPath $userSentinel -Raw).Trim() -ne 'must remain unchanged') { throw 'existing user Python package fixture changed' }
+    $lifetime = Invoke-NativeCommand -FilePath $result.VenvPythonPath -ArgumentList @((Join-Path $root 'tests/test_venv_lifetime.py'))
+    Write-Host $lifetime.StdOut
+    if ($lifetime.ExitCode -ne 0) { throw "venv launcher lifetime failed: $($lifetime.StdErr)" }
 } finally {
     $env:PYTHONUSERBASE = $oldPythonUserBase
     if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }

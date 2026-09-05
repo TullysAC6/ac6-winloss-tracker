@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import secrets
 import subprocess
 import sys
 import threading
@@ -11,6 +12,7 @@ import traceback
 import urllib.error
 import urllib.request
 from pathlib import Path
+from python_process import spawn_python
 
 
 DISPLAY_NAME = "AC6 Win/Loss Tracker"
@@ -103,7 +105,7 @@ def running_instance(path: Path = RUNTIME_PATH) -> dict[str, int] | None:
         return None
     if not process_is_alive(runtime["pid"]):
         return None
-    if tracker_health(runtime["port"]) is None:
+    if not authenticated_identity(runtime) or tracker_health(runtime["port"]) is None:
         return None
     return runtime
 
@@ -137,16 +139,21 @@ def start_application(
             f"launch: {sys.executable} {app_path}\n"
         )
         startup_log.flush()
-        return subprocess.Popen(
-            [sys.executable, str(app_path)],
+        environment = utf8_python_environment()
+        startup_token = secrets.token_urlsafe(32)
+        environment["AC6_STARTUP_TOKEN"] = startup_token
+        process = spawn_python(
+            [str(app_path)],
             cwd=str(app_dir),
             stdin=subprocess.DEVNULL,
             stdout=startup_log,
             stderr=subprocess.STDOUT,
             shell=False,
             creationflags=creationflags,
-            env=utf8_python_environment(),
+            env=environment,
         )
+        process.startup_token = startup_token
+        return process
 
 
 def open_dashboard(
@@ -165,8 +172,8 @@ def open_dashboard(
         rotate_startup_log(log_path)
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
         with log_path.open("a", encoding="utf-8", buffering=1) as startup_log:
-            process = subprocess.Popen(
-                [sys.executable, str(dashboard_path)], cwd=str(app_dir),
+            process = spawn_python(
+                [str(dashboard_path)], cwd=str(app_dir),
                 stdin=subprocess.DEVNULL, stdout=startup_log,
                 stderr=subprocess.STDOUT, shell=False, creationflags=creationflags,
                 env=utf8_python_environment(),
@@ -237,12 +244,28 @@ def wait_for_application(
         if (
             runtime is not None
             and runtime["pid"] == process.pid
+            and secrets.compare_digest(runtime["token"], process.startup_token)
+            and authenticated_identity(runtime)
             and process_is_alive(runtime["pid"])
             and tracker_health(runtime["port"]) is not None
         ):
             return True
         time.sleep(0.2)
     return False
+
+
+def authenticated_identity(runtime: dict) -> bool:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{runtime['port']}/api/system/identity",
+        data=b"", method="POST", headers={"X-Control-Token": runtime["token"]},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=0.75) as response:
+            payload = json.load(response)
+            return (response.status == 200 and isinstance(payload, dict)
+                    and payload.get("pid") == runtime["pid"])
+    except (OSError, ValueError, urllib.error.URLError):
+        return False
 
 
 def log_launcher_error(path: Path = STARTUP_LOG) -> None:
@@ -288,9 +311,26 @@ def launch_once(
             pass
         return "started"
     if process.poll() is None:
+        runtime = read_runtime(runtime_path)
+        if (runtime is not None and runtime["pid"] == process.pid
+                and secrets.compare_digest(runtime["token"], process.startup_token)
+                and authenticated_identity(runtime)):
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{runtime['port']}/api/system/shutdown",
+                data=b"", method="POST",
+                headers={"X-Control-Token": process.startup_token},
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=3):
+                    pass
+                process.wait(timeout=8)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
         try:
-            process.terminate()
-        except OSError:
+            if process.poll() is None:
+                process.terminate()
+            process.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
             pass
     try:
         with log_path.open("a", encoding="utf-8") as startup_log:

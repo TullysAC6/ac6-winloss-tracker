@@ -90,7 +90,11 @@ def create_control_token():
     return secrets.token_urlsafe(32)
 
 
-CONTROL_TOKEN = create_control_token()
+_startup_token = os.environ.pop("AC6_STARTUP_TOKEN", "")
+CONTROL_TOKEN = (_startup_token if len(_startup_token) == 43
+                 and all(c.isascii() and (c.isalnum() or c in "-_") for c in _startup_token)
+                 else create_control_token())
+del _startup_token
 
 
 class StartupEnvironmentError(RuntimeError):
@@ -700,6 +704,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
+            if path == "/api/system/identity":
+                self.json_response({"pid": os.getpid()})
+                return
             if path == "/api/system/shutdown":
                 self.json_response({"ok": True, "status": "shutting_down"})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()

@@ -74,6 +74,20 @@ with tempfile.TemporaryDirectory() as temporary:
             assert error.code == 403
         assert thread.is_alive()
 
+        identity_url = url.replace("shutdown", "identity")
+        for headers in ({}, {"X-Control-Token": "wrong-token"}):
+            try:
+                urllib.request.urlopen(urllib.request.Request(
+                    identity_url, data=b"", method="POST", headers=headers), timeout=2)
+                raise AssertionError("identity accepted without valid authentication")
+            except urllib.error.HTTPError as error:
+                assert error.code == 403
+        with urllib.request.urlopen(urllib.request.Request(
+            identity_url, data=b"", method="POST",
+            headers={"X-Control-Token": server.CONTROL_TOKEN}), timeout=2) as response:
+            assert json.load(response) == {"pid": os.getpid()}
+        assert thread.is_alive()
+
         authorized = urllib.request.Request(
             url,
             data=b"",

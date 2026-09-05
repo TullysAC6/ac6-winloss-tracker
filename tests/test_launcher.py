@@ -50,6 +50,7 @@ FAKE_SERVER = textwrap.dedent(
 
     data = Path(os.environ["LOCALAPPDATA"]) / "AC6WinLossTracker"
     data.mkdir(parents=True, exist_ok=True)
+    token = os.environ.pop("AC6_STARTUP_TOKEN")
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -67,7 +68,11 @@ FAKE_SERVER = textwrap.dedent(
         def log_message(self, *args):
             pass
         def do_POST(self):
-            if self.path == "/api/system/shutdown" and self.headers.get("X-Control-Token") == "test-token":
+            if self.path == "/api/system/identity" and self.headers.get("X-Control-Token") == token:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(json.dumps({"pid": os.getpid()}).encode())
+            elif self.path == "/api/system/shutdown" and self.headers.get("X-Control-Token") == token:
                 self.send_response(200)
                 self.end_headers()
                 threading.Thread(target=server.shutdown, daemon=True).start()
@@ -76,7 +81,7 @@ FAKE_SERVER = textwrap.dedent(
                 self.end_headers()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": "test-token"}
+    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": token}
     (data / ".runtime.json").write_text(json.dumps(runtime), encoding="utf-8")
     server.serve_forever()
     server.server_close()
@@ -110,12 +115,36 @@ with tempfile.TemporaryDirectory() as temporary:
             runtime = launcher.running_instance(runtime_path)
             assert runtime is not None
             assert runtime["pid"] == process.pid
+            original_token = process.startup_token
+            process.startup_token = "different-launch-token"
+            assert not launcher.wait_for_application(process, runtime_path, timeout=0.2)
+            process.startup_token = original_token
+            forged = dict(runtime, token="stale-token")
+            assert not launcher.authenticated_identity(forged)
+            forged = dict(runtime, pid=os.getpid())
+            assert not launcher.authenticated_identity(forged)
+            assert process.poll() is None
 
             second_result = launcher.launch_once(
                 runtime_path, fake_server, root, startup_log, timeout=1
             )
             assert second_result == "already_running"
             assert process.poll() is None
+
+            # Simulate a competing launch with another live instance's runtime.
+            # Failure may terminate only its retained child handle, never that server.
+            sleeper = root / "never_ready.py"
+            sleeper.write_text("import time; time.sleep(30)\n", encoding="utf-8")
+            old_running = launcher.running_instance
+            launcher.running_instance = lambda *args: None
+            try:
+                assert launcher.launch_once(runtime_path, sleeper, root, startup_log,
+                                            timeout=0.3) == "failed"
+            finally:
+                launcher.running_instance = old_running
+            assert process.poll() is None
+            assert launcher.authenticated_identity(runtime)
+            assert launcher.read_runtime(runtime_path) == runtime
 
             shutdown_runtime, overlay_pid = launcher.request_shutdown(runtime_path)
             assert shutdown_runtime is not None and overlay_pid == 0
@@ -132,6 +161,16 @@ with tempfile.TemporaryDirectory() as temporary:
                 process.wait(timeout=5)
 
         runtime_path.unlink(missing_ok=True)
+        # A live but never-ready owned instance must receive normal shutdown,
+        # remove its runtime file, and leave no child behind.
+        old_health = launcher.tracker_health
+        launcher.tracker_health = lambda *args, **kwargs: None
+        try:
+            assert launcher.launch_once(runtime_path, fake_server, root, startup_log,
+                                        timeout=0.5) == "failed"
+            assert not runtime_path.exists()
+        finally:
+            launcher.tracker_health = old_health
         dashboard_runtime = data / ".dashboard-runtime.json"
         dashboard_log = data / "dashboard.log"
         fake_dashboard = root / "fake_dashboard.py"

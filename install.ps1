@@ -1242,7 +1242,7 @@ try {
         throw '取得したZIPの内容を確認できませんでした。現在のTrackerは変更していません。'
     }
     $sourceRoot = Get-Item -LiteralPath $expectedSourceRoot
-    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.lock', 'uninstall.ps1')) {
+    foreach ($requiredFile in @('app.py', 'app_paths.py', 'python_process.py', 'launcher.pyw', 'dashboard.py', 'requirements.lock', 'uninstall.ps1')) {
         if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot.FullName $requiredFile) -PathType Leaf)) {
             throw "取得したZIPに必要なファイル $requiredFile がありません。現在のTrackerは変更していません。"
         }

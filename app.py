@@ -6,6 +6,7 @@ import time
 import traceback
 
 from app_paths import DISPLAY_NAME
+from python_process import spawn_python
 
 
 def _launch_overlay():
@@ -16,7 +17,7 @@ def _launch_overlay():
     flags = 0
     if sys.platform == "win32":
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    process = subprocess.Popen(cmd, creationflags=flags)
+    process = spawn_python(cmd[1:], creationflags=flags)
     print(f"[lifecycle] overlay command: {cmd!r}")
     print(f"[lifecycle] overlay PID: {process.pid}")
     return process
