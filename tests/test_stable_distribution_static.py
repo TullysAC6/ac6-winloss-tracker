@@ -53,6 +53,8 @@ assert "PYTHONNOUSERSITE" in installer
 assert "PIP_REQUIRE_VIRTUALENV" in installer
 assert "AC6WinLossTrackerRuntime" in installer
 assert "Restore-PreviousTrackerRuntime" in installer
+assert "Wait-AppRuntimeReady -ExpectedLaunchId $launchId" in installer
+assert "RandomNumberGenerator" in installer
 assert not re.search(r"(?i)pyinstaller|makeappx|new-selfsignedcertificate|\.pfx|\.msix", installer)
 
 download = installer.index("Set-InstallStage -Name 'source-download'")

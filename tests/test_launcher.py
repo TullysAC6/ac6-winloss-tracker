@@ -76,7 +76,7 @@ FAKE_SERVER = textwrap.dedent(
                 self.end_headers()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": "test-token"}
+    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": "test-token", "launch_id": os.environ.get("AC6_TRACKER_LAUNCH_ID", "")}
     (data / ".runtime.json").write_text(json.dumps(runtime), encoding="utf-8")
     server.serve_forever()
     server.server_close()
@@ -102,14 +102,25 @@ with tempfile.TemporaryDirectory() as temporary:
         )
         assert launcher.running_instance(runtime_path) is None
 
-        process = launcher.start_application(fake_server, root, startup_log)
+        launch_id = launcher.new_launch_id()
+        process = launcher.start_application(fake_server, root, startup_log, launch_id)
         try:
             assert launcher.wait_for_application(
-                process, runtime_path, timeout=5
+                process, runtime_path, timeout=5, expected_launch_id=launch_id
             ), startup_log.read_text(encoding="utf-8")
             runtime = launcher.running_instance(runtime_path)
             assert runtime is not None
             assert runtime["pid"] == process.pid
+            assert runtime["launch_id"] == launch_id
+
+            # A venv redirector/wrapper PID may differ from the actual runtime PID.
+            wrapper = type("Wrapper", (), {"pid": process.pid + 1000, "poll": process.poll})()
+            assert launcher.wait_for_application(
+                wrapper, runtime_path, timeout=1, expected_launch_id=launch_id
+            )
+            assert not launcher.wait_for_application(
+                wrapper, runtime_path, timeout=0.3, expected_launch_id=launcher.new_launch_id()
+            )
 
             second_result = launcher.launch_once(
                 runtime_path, fake_server, root, startup_log, timeout=1
@@ -132,6 +143,41 @@ with tempfile.TemporaryDirectory() as temporary:
                 process.wait(timeout=5)
 
         runtime_path.unlink(missing_ok=True)
+
+        # Missing/stale identity, dead runtime, and failed health never pass.
+        live_pid = os.getpid()
+        runtime_path.write_text(json.dumps({"pid": live_pid, "port": 65534, "token": "x"}), encoding="utf-8")
+        dummy = type("Dummy", (), {"pid": live_pid + 1, "poll": lambda self: None})()
+        assert not launcher.wait_for_application(dummy, runtime_path, timeout=0.2, expected_launch_id="A" * 24)
+        runtime_path.write_text(json.dumps({"pid": 2147483647, "port": 65534, "token": "x", "launch_id": "A" * 24}), encoding="utf-8")
+        assert not launcher.wait_for_application(dummy, runtime_path, timeout=0.2, expected_launch_id="A" * 24)
+        runtime_path.unlink(missing_ok=True)
+
+        # Failure cleanup is identity-scoped: a different Tracker is untouched.
+        cleanup_calls = []
+        original_shutdown = launcher.request_shutdown_for_runtime
+        original_alive = launcher.process_is_alive
+        original_terminate = launcher.terminate_process_by_pid
+        launcher.request_shutdown_for_runtime = lambda runtime: cleanup_calls.append(("shutdown", runtime["pid"])) or True
+        launcher.process_is_alive = lambda pid: False
+        launcher.terminate_process_by_pid = lambda pid: cleanup_calls.append(("terminate", pid)) or True
+        try:
+            foreign = {"pid": live_pid, "port": 65534, "token": "foreign", "launch_id": "B" * 24}
+            runtime_path.write_text(json.dumps(foreign), encoding="utf-8")
+            launcher.cleanup_failed_launch(foreign, "A" * 24, runtime_path)
+            assert cleanup_calls == []
+            assert runtime_path.exists()
+
+            owned = {"pid": live_pid, "port": 65534, "token": "owned", "launch_id": "A" * 24}
+            runtime_path.write_text(json.dumps(owned), encoding="utf-8")
+            launcher.cleanup_failed_launch(owned, "A" * 24, runtime_path)
+            assert cleanup_calls == [("shutdown", live_pid)]
+            assert not runtime_path.exists()
+        finally:
+            launcher.request_shutdown_for_runtime = original_shutdown
+            launcher.process_is_alive = original_alive
+            launcher.terminate_process_by_pid = original_terminate
+
         dashboard_runtime = data / ".dashboard-runtime.json"
         dashboard_log = data / "dashboard.log"
         fake_dashboard = root / "fake_dashboard.py"
@@ -218,7 +264,8 @@ assert "$shortcut.TargetPath = $PythonwPath" in installer
 assert "$shortcut.Arguments = '-s \"{0}\"' -f $LauncherPath" in installer
 assert "New-AppShortcut -PythonwPath $python.VenvPythonwPath -LauncherPath $launcherPath" in installer
 assert "Start-Process -FilePath $python.VenvPythonwPath -ArgumentList $launcherArguments" in installer
-assert "Wait-AppRuntimeReady -TimeoutSeconds 15" in installer
+assert "Wait-AppRuntimeReady -ExpectedLaunchId $launchId -TimeoutSeconds 15" in installer
+assert "--launch-id" in installer
 assert '"http://127.0.0.1:{0}/health"' in installer
 print("launcher shortcut and installer readiness checks: OK")
 

@@ -83,7 +83,7 @@ jobs:
       - name: Build and verify dedicated venv with PowerShell 7
         if: matrix.python-version != '3.12'
         shell: pwsh
-        run: ./tests/test_venv_integration.ps1 -BasePythonPath (Get-Command python.exe).Source
+        run: ./tests/test_venv_integration.ps1 -BasePythonPath (Get-Command python.exe).Source -RunLifecycle
 
       - name: Validate verified bootstrap with PowerShell 7
         shell: pwsh

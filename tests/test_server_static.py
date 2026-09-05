@@ -16,6 +16,8 @@ assert 'write_runtime_file(server.server_address[1])' in s
 assert 'if path == "/api/system/shutdown":' in s
 assert 'threading.Thread(target=self.server.shutdown, daemon=True).start()' in s
 assert 'secrets.compare_digest(str(supplied_token), CONTROL_TOKEN)' in s
+assert '"launch_id": LAUNCH_ID' in s
+assert 'AC6_TRACKER_LAUNCH_ID' in s
 assert 'if path == "/health":' in s
 assert 'def lifecycle_health(' in s
 assert 'GetExitCodeProcess' in s and 'exit_code.value == 259' in s
