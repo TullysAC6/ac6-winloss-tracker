@@ -867,8 +867,10 @@ def main(on_ready=None):
     except Exception as e:
         history_failure("startup", e)
 
+    detector_thread = None
     try:
-        threading.Thread(target=detector_supervisor, daemon=True).start()
+        detector_thread = threading.Thread(target=detector_supervisor, daemon=True)
+        detector_thread.start()
         write_runtime_file(server.server_address[1])
         if on_ready is not None:
             on_ready()
@@ -883,6 +885,8 @@ def main(on_ready=None):
         pass
     finally:
         stop_event.set()
+        if detector_thread is not None:
+            detector_thread.join(timeout=4.0)
         with history_lock:
             store = history
         if store is not None:

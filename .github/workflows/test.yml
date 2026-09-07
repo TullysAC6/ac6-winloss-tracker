@@ -7,8 +7,14 @@ on:
       - beta
       - test/python-source-install
       - release/**
+      - codex/wgc-rc-*
   pull_request:
   workflow_dispatch:
+    inputs:
+      native_wgc:
+        description: 'Run real WGC/DWM dummy-window checks (requires an interactive GPU desktop)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,6 +57,10 @@ jobs:
       - name: Check installed dependencies
         if: matrix.python-version != '3.12'
         run: python -m pip check
+
+      - name: Import Windows capture and UI dependencies
+        if: matrix.python-version != '3.12'
+        run: python -c "import tkinter, mss, PIL, ttkbootstrap, windows_capture, numpy, cv2"
 
       - name: Audit dependencies
         if: matrix.python-version != '3.12'
@@ -132,6 +142,12 @@ jobs:
       - name: Run full regression suite after launcher passes
         if: matrix.python-version != '3.12'
         run: python tests/run_all_tests.py
+
+      - name: Run opt-in native WGC and DWM checks
+        if: matrix.python-version != '3.12' && inputs.native_wgc == true
+        env:
+          AC6_RUN_WGC_INTEGRATION: '1'
+        run: python tests/test_windows_capture_integration.py
 
   required-windows-tests:
     name: Windows tests

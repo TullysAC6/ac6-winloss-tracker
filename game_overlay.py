@@ -31,6 +31,8 @@ from pathlib import Path
 from typing import Any
 
 from app_paths import data_dir
+from config_utils import load_config
+from effect_screenshot import EffectScreenshots
 
 ROOT = data_dir()
 STATS_PATH = ROOT / "stats.json"
@@ -428,6 +430,7 @@ class GameOverlay:
         self._effect_visible = False
         self._effect_stop = threading.Event()
         self._effect_thread_started = False
+        self._screenshots = EffectScreenshots()
 
         self.last_stats: dict[str, Any] = {
             "wins": 0,
@@ -878,6 +881,7 @@ class GameOverlay:
                     "started": time.monotonic(),
                     "duration": 6.0 if int(payload["milestone"]) == 50 else 3.5,
                     "render_key": None,
+                    "created_at_ms": int(payload["created_at_ms"]),
                 }
         except queue.Empty:
             pass
@@ -933,6 +937,15 @@ class GameOverlay:
                 self._hide_effect()
             self._hide()
 
+        try:
+            self._screenshots.tick(
+                self._active_effect if self._effect_visible else None, game,
+                (self.panel_hwnd, self.text_hwnd, self.effect_hwnd),
+                load_config().get("effect_screenshot_enabled", False),
+            )
+        except Exception as error:
+            print(f"[screenshot] optional capture failed: {type(error).__name__}: {error}")
+
         if self.debug:
             now = time.monotonic()
             if now - self._last_debug_at >= 1.0:
@@ -960,6 +973,10 @@ class GameOverlay:
             self.root.mainloop()
         finally:
             self._effect_stop.set()
+            try:
+                self._screenshots.close()
+            except Exception as error:
+                print(f"[screenshot] cleanup failed: {error}")
             if not self._closing:
                 self._finish_effect()
 

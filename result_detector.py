@@ -805,6 +805,20 @@ class ResultStateMachine:
                 self.post_result_clear_since = None
                 self.last_reject_reason = None
 
+    def note_capture_gap(self):
+        """Break consecutive evidence, retaining only time-limited gameplay proof.
+
+        Missing pixels never count as CLEAR or extend the five-second gameplay
+        window. A confirmed result/manual mutation's lock is left intact.
+        """
+        with self.lock:
+            self.candidate = None
+            self.candidate_hits = 0
+            self.clear_hits = 0
+            self.clear_ready = False
+            self.activity_hits = 0
+            self.post_result_clear_since = None
+
     def _observe_gameplay_activity(self, gameplay_activity, cooldown_seconds, now):
         """Use motion-confirmed gameplay as an alternate arm/re-arm path.
 
@@ -1010,11 +1024,22 @@ class WinApi:
         self.kernel32 = ctypes.windll.kernel32
 
         try:
-            self.user32.SetProcessDPIAware()
+            # Match the Overlay's physical per-monitor coordinates before MSS
+            # or WGC initializes; mixed-DPI monitors must not shift the ROI.
+            set_context = self.user32.SetProcessDpiAwarenessContext
+            set_context.argtypes = [ctypes.c_void_p]
+            set_context.restype = wintypes.BOOL
+            if not set_context(ctypes.c_void_p(-4)):
+                self.user32.SetProcessDPIAware()
         except Exception:
-            pass
+            try:
+                self.user32.SetProcessDPIAware()
+            except Exception:
+                pass
 
         self.user32.GetForegroundWindow.restype = wintypes.HWND
+        self.user32.IsWindowVisible.argtypes = [wintypes.HWND]
+        self.user32.IsIconic.argtypes = [wintypes.HWND]
         self.user32.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(RECT)]
         self.user32.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(POINT)]
         self.user32.GetWindowThreadProcessId.argtypes = [
@@ -1037,8 +1062,12 @@ class WinApi:
     def foreground_process_and_client(self):
         if os.name != "nt":
             return None, None
+        return self.process_and_client(self.user32.GetForegroundWindow())
 
-        hwnd = self.user32.GetForegroundWindow()
+    def process_and_client(self, hwnd):
+        if os.name != "nt":
+            return None, None
+
         if not hwnd:
             return None, None
 
@@ -1085,6 +1114,69 @@ class WinApi:
         }
 
 
+    def game_target(self):
+        """Identify by executable and HWND/PID, never a title substring."""
+        if os.name != "nt":
+            return None
+        targets = []
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def inspect(hwnd, _):
+            if not self.user32.IsWindowVisible(hwnd) or self.user32.IsIconic(hwnd):
+                return True
+            process, client = self.process_and_client(hwnd)
+            if process == TARGET_PROCESS and client:
+                pid = wintypes.DWORD()
+                self.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                bounds = RECT()
+                # WGC window frames use extended frame bounds (no invisible border).
+                dwm = ctypes.windll.dwmapi
+                dwm.DwmGetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD]
+                if dwm.DwmGetWindowAttribute(hwnd, 9, ctypes.byref(bounds), ctypes.sizeof(bounds)) != 0:
+                    return True
+                targets.append({"hwnd": int(hwnd), "pid": pid.value, "client": client,
+                                "bounds": (bounds.left, bounds.top, bounds.right, bounds.bottom)})
+            return True
+        def visit(hwnd, parameter):
+            try:
+                return inspect(hwnd, parameter)
+            except Exception:
+                return False
+        callback = callback_type(visit)
+        self.user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+        complete = self.user32.EnumWindows(callback, 0)
+        # Ambiguous multiple game windows are not a safe capture target.
+        return targets[0] if complete and len(targets) == 1 else None
+
+    def region_unobscured(self, hwnd, region, allowed=()):
+        """Conservative desktop fallback: reject any overlapping window above AC6."""
+        if os.name != "nt" or int(self.user32.GetForegroundWindow() or 0) != hwnd:
+            return False
+        clear = False
+        callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        self.user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(RECT)]
+        def inspect(window, _):
+            nonlocal clear
+            if int(window) == hwnd:
+                clear = True
+                return False
+            if int(window) in allowed or not self.user32.IsWindowVisible(window) or self.user32.IsIconic(window):
+                return True
+            rect = RECT()
+            if not self.user32.GetWindowRect(window, ctypes.byref(rect)):
+                return False
+            return not (rect.left < region["left"] + region["width"] and rect.right > region["left"]
+                        and rect.top < region["top"] + region["height"] and rect.bottom > region["top"])
+        def visit(window, parameter):
+            try:
+                return inspect(window, parameter)
+            except Exception:
+                return False
+        callback = callback_type(visit)
+        self.user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+        self.user32.EnumWindows(callback, 0)
+        return clear
+
+
 class DetectorHealth:
     def __init__(self, callback):
         self.lock = threading.Lock()
@@ -1128,8 +1220,8 @@ class ResultDetector:
         self.state = ResultStateMachine()
         self.health = DetectorHealth(event_callback)
         self.winapi = WinApi()
-        self._last_mismatch_log = 0.0
-        self._client_missing_since = None
+        from game_capture import GameCapture
+        self.capture = GameCapture(self.winapi)
         self._was_enabled = None
         self._last_phase_log = 0.0
         self._last_reject_log = 0.0
@@ -1188,7 +1280,7 @@ class ResultDetector:
 
                         if enabled != self._was_enabled:
                             self.state.reset_unarmed()
-                            self._client_missing_since = None
+                            self.capture.close()
                             self._was_enabled = enabled
                             self.health.update(
                                 status="starting" if enabled else "disabled",
@@ -1199,50 +1291,19 @@ class ResultDetector:
                             self.stop_event.wait(min(1.0, poll))
                             continue
 
-                        proc, client = self.winapi.foreground_process_and_client()
-                        expected = TARGET_PROCESS
-
-                        if proc != expected:
+                        shot = self.capture.grab(sct)
+                        if self.capture.identity_changed:
                             self.state.note_foreground(False)
+                        if shot is None:
+                            self.state.note_capture_gap()
                             self._last_motion_signature = None
-                            self._client_missing_since = None
-                            now = time.monotonic()
-                            if now - self._last_mismatch_log >= 10.0:
-                                print(
-                                    f"[result] foreground waiting: "
-                                    f"{proc or 'unknown'} (expected {expected})"
-                                )
-                                self._last_mismatch_log = now
-                            self.health.update(status="waiting", error=None)
+                            self.health.update(status="waiting", error=self.capture.status)
                             self.stop_event.wait(poll)
                             continue
-
-                        if client is None:
-                            self.state.note_foreground(False)
+                        if self.capture.discontinuity:
+                            self.state.note_capture_gap()
                             self._last_motion_signature = None
-                            now = time.monotonic()
-                            if self._client_missing_since is None:
-                                self._client_missing_since = now
-                            if now - self._client_missing_since >= 5.0:
-                                self.health.update(
-                                    status="degraded",
-                                    error="AC6 is foreground but client rectangle is unavailable",
-                                )
-                            else:
-                                self.health.update(status="waiting", error=None)
-                            self.stop_event.wait(poll)
-                            continue
 
-                        self._client_missing_since = None
-
-                        region = {
-                            "left": client["left"] + int(client["width"] * 0.20),
-                            "top": client["top"] + int(client["height"] * 0.43),
-                            "width": max(100, int(client["width"] * 0.60)),
-                            "height": max(40, int(client["height"] * 0.07)),
-                        }
-
-                        shot = sct.grab(region)
                         frame_state, debug = self.classifier.classify_bgra(
                             shot.raw, shot.width, shot.height
                         )
@@ -1257,6 +1318,7 @@ class ResultDetector:
                         gameplay_activity = _is_gameplay_activity(
                             frame_state, debug, motion_score
                         )
+                        debug["capture_source"] = self.capture.status
                         debug["motion_score"] = motion_score
                         debug["gameplay_activity"] = gameplay_activity
 
@@ -1265,6 +1327,7 @@ class ResultDetector:
 
                         if self.diagnostics:
                             compact = {
+                                "capture_source": self.capture.status,
                                 "frame_state": frame_state,
                                 "motion_score": None if motion_score is None else round(float(motion_score), 4),
                                 "gameplay_activity": bool(gameplay_activity),
@@ -1327,6 +1390,7 @@ class ResultDetector:
                             CLEAR_HITS_REQUIRED,
                             COOLDOWN_SECONDS,
                             gameplay_activity=gameplay_activity,
+                            now=self.capture.captured_at,
                         )
 
                         if self.diagnostics and result is not None:
@@ -1422,7 +1486,8 @@ class ResultDetector:
                         if self.diagnostics:
                             self.diagnostics.flush_frame_context("detector_error")
                             self.diagnostics.record("detector_error", error=msg)
-                        self.state.reset_unarmed()
+                        self.state.note_capture_gap()
+                        self._last_motion_signature = None
                         self.health.update(status="error", error=msg)
                         self.stop_event.wait(2.0)
 
@@ -1433,3 +1498,6 @@ class ResultDetector:
                 self.diagnostics.flush_frame_context("detector_init_error")
                 self.diagnostics.record("detector_init_error", error=msg)
             self.health.update(status="error", error=msg)
+
+        finally:
+            self.capture.close()

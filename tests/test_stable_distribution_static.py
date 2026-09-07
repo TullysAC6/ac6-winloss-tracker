@@ -114,8 +114,9 @@ assert "$process.WaitForExit()" in bootstrap
 assert "-Wait -PassThru" not in bootstrap
 
 lock = (ROOT / "requirements.lock").read_text(encoding="utf-8")
-for package in ("mss==10.2.0", "pillow==12.3.0", "ttkbootstrap==2.2.2"):
+for package in ("mss==10.2.0", "pillow==12.3.0", "ttkbootstrap==2.2.2",
+                "windows-capture==2.0.1", "numpy==2.5.3", "opencv-python==5.0.0.93"):
     assert package in lock
-assert lock.count("--hash=sha256:") == 4
+assert lock.count("--hash=sha256:") == 8
 
 print("Stable source distribution / immutable revision / installer static checks: OK")

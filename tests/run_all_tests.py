@@ -6,6 +6,9 @@ from pathlib import Path
 
 HERE=Path(__file__).resolve().parent
 files=[
+    "test_game_capture.py",
+    "test_effect_screenshot.py",
+    "test_windows_capture_integration.py",
     "test_app_overlay_dispatch.py",
     "test_overlay_lifecycle.py",
     "test_launcher.py",
@@ -26,6 +29,9 @@ files=[
     "test_server_static.py",
     "test_stable_distribution_static.py",
     "test_startup_preflight.py",
+    "../test_strict_clear_gate.py",
+    "../test_game_overlay_static.py",
+    "../test_game_overlay_lifecycle_static.py",
 ]
 for name in files:
     print("="*70)

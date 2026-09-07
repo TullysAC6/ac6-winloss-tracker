@@ -677,7 +677,7 @@ function Invoke-PipInstall {
     }
     Write-InstallLog 'pip install result: success'
 
-    $dependencyCode = 'from importlib.metadata import version; import mss, ttkbootstrap, PIL, tkinter, sqlite3; print("mss=" + mss.__version__ + "; ttkbootstrap=" + version("ttkbootstrap") + "; pillow=" + version("Pillow") + "; sqlite=" + sqlite3.sqlite_version)'
+    $dependencyCode = 'from importlib.metadata import version; import mss, ttkbootstrap, PIL, tkinter, sqlite3, windows_capture; print("mss=" + mss.__version__ + "; ttkbootstrap=" + version("ttkbootstrap") + "; pillow=" + version("Pillow") + "; sqlite=" + sqlite3.sqlite_version)'
     $dependencyResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-c', $dependencyCode)
     Write-InstallLog "dependency verification command: $($dependencyResult.Command)"
     Write-InstallLog "dependency verification exit code: $($dependencyResult.ExitCode)"

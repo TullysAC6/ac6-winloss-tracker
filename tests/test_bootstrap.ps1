@@ -7,6 +7,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('ac6-bootstrap-test-' + [Guid]::NewGuid().ToString('N'))
 $fixtureRoot = Join-Path $testRoot 'fixtures'
 New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
+$existingBootstrapDirectories = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory -Filter 'AC6Bootstrap-*' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
 
 function New-FixtureRelease {
     param(
@@ -113,7 +114,7 @@ exit 0
         if (-not $failed) { throw "$case case did not fail closed" }
     }
 
-    $leftovers = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory -Filter 'AC6Bootstrap-*' -ErrorAction SilentlyContinue)
+    $leftovers = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory -Filter 'AC6Bootstrap-*' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $existingBootstrapDirectories })
     if ($leftovers.Count -ne 0) { throw 'bootstrap temporary directory was not cleaned' }
     Write-Host 'Verified bootstrap tests: OK'
 } finally {
