@@ -381,15 +381,16 @@ def shutdown_tracker(log_path: Path = STARTUP_LOG) -> bool:
 
 def main() -> None:
     import tkinter as tk
+    from settings_window import open_settings
 
     root = tk.Tk()
     root.title(DISPLAY_NAME)
     root.resizable(False, False)
-    root.geometry("420x230")
+    root.geometry("420x280")
     root.update_idletasks()
     root.geometry(
-        f"420x230+{max(0, (root.winfo_screenwidth() - 420) // 2)}"
-        f"+{max(0, (root.winfo_screenheight() - 230) // 2)}"
+        f"420x280+{max(0, (root.winfo_screenwidth() - 420) // 2)}"
+        f"+{max(0, (root.winfo_screenheight() - 280) // 2)}"
     )
 
     title = tk.Label(root, text=DISPLAY_NAME, font=("Segoe UI", 13, "bold"))
@@ -402,6 +403,7 @@ def main() -> None:
     close_button = tk.Button(button_row, text="閉じる", width=12, command=root.destroy)
     shutdown_button = tk.Button(button_row, text="Trackerを終了", width=16)
     dashboard_button.pack(pady=(0, 8))
+    tk.Button(actions, text="設定", width=22, command=lambda: open_settings(root)).pack(pady=(0, 8))
     shutdown_button.pack(side="left", padx=6)
     close_button.pack(side="left", padx=6)
     button_row.pack()

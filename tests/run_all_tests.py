@@ -12,6 +12,7 @@ files=[
     "test_app_overlay_dispatch.py",
     "test_overlay_lifecycle.py",
     "test_launcher.py",
+    "test_settings_window.py",
     "test_shutdown.py",
     "test_profile_optimization.py",
     "test_detector.py",
