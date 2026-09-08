@@ -20,6 +20,7 @@ from config_utils import (
 )
 from diagnostics import RECORDER
 from event_bus import EventBus
+from history_analytics import latest_allowed_cutoff
 from history_store import HistoryStore, read_history_schema_version
 from result_detector import ResultDetector
 from result_gate import ResultGate
@@ -567,7 +568,6 @@ def reset_stats():
 
 
 MAX_CONTROL_BODY_BYTES = 4096
-PURGE_CUTOFF_MAX_SKEW_SECONDS = 86400.0
 
 
 def validate_purge_request(body, now=None):
@@ -588,8 +588,11 @@ def validate_purge_request(body, now=None):
         raise ValueError("cutoff must be a finite epoch timestamp")
     if cutoff < 0:
         raise ValueError("cutoff must not be negative")
-    if cutoff > now + PURGE_CUTOFF_MAX_SKEW_SECONDS:
-        raise ValueError("cutoff is too far in the future")
+    # Today's local midnight is the newest cutoff a client may ask for. A later
+    # one would delete matches the live session still counts in stats.json and
+    # leave the session and lifetime displays disagreeing.
+    if cutoff > latest_allowed_cutoff(now):
+        raise ValueError("cutoff must not be later than today's local midnight")
     return "before", cutoff
 
 

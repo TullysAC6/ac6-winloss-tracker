@@ -108,6 +108,15 @@ def period_start_text(period: str, now: float | None = None) -> str:
     return "制限なし（最初の記録から）" if start is None else format_local(start)
 
 
+def latest_allowed_cutoff(now: float | None = None) -> float:
+    """Newest purge cutoff a user may choose: today's local midnight.
+
+    A later cutoff would delete matches the current session still counts in
+    stats.json, leaving the session and lifetime displays inconsistent.
+    """
+    return period_start("today", now)
+
+
 def _aggregate(rows) -> dict[str, Any]:
     wins = sum(1 for row in rows if row["result"] == "win")
     losses = sum(1 for row in rows if row["result"] == "loss")

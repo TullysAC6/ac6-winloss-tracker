@@ -161,13 +161,24 @@ def purge_history_before(cutoff):
     return control_request(PURGE_ENDPOINT, {"mode": "before", "cutoff": float(cutoff)})
 
 
-def cutoff_for_date(text):
-    """Local midnight of ``YYYY-MM-DD``. Matches before that instant are removed."""
+def cutoff_for_date(text, now=None):
+    """Local midnight of ``YYYY-MM-DD``. Matches before that instant are removed.
+
+    Today is the newest accepted date. A future date would delete matches the
+    live session still counts in stats.json; server.py refuses the same range.
+    """
     try:
         day = datetime.strptime(str(text).strip(), "%Y-%m-%d")
     except (TypeError, ValueError) as error:
         raise ValueError("日付は YYYY-MM-DD の形式で入力してください。") from error
-    return day.timestamp()
+    cutoff = day.timestamp()
+    limit = history_analytics.latest_allowed_cutoff(now)
+    if cutoff > limit:
+        raise ValueError(
+            "指定できるのは今日までです（今日: "
+            f"{datetime.fromtimestamp(limit).strftime('%Y-%m-%d')}）。"
+        )
+    return cutoff
 
 
 def create_diagnostic_report():
@@ -444,8 +455,9 @@ class SettingsWindow:
         self.cutoff_entry.pack(side="left", padx=(6, 6))
         self.purge_before_button = ttk.Button(row, text="削除", command=self.confirm_purge_before)
         self.purge_before_button.pack(side="left")
-        ttk.Label(frame, text="YYYY-MM-DD 形式。指定日の 00:00（お使いのPCのローカル時刻）より前の"
-                              "試合を削除し、指定日当日の試合は残します。",
+        ttk.Label(frame, text="YYYY-MM-DD 形式。指定できるのは今日までです。指定日の 00:00"
+                              "（お使いのPCのローカル時刻）より前の試合を削除し、"
+                              "指定日当日の試合は残します。",
                   wraplength=440).pack(anchor="w", pady=(2, 0))
         self.purge_status = ttk.Label(frame, text="", wraplength=440, justify="left")
         self.purge_status.pack(anchor="w", pady=(8, 0))

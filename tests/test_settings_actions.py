@@ -10,6 +10,7 @@ import unittest
 import urllib.error
 import urllib.request
 import zipfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -21,6 +22,11 @@ import settings_window as settings
 from history_store import HistoryStore
 
 GUI = unittest.skipUnless(os.name == "nt", "real Tk controls on Windows")
+
+
+def day_text(offset_days=0):
+    """A YYYY-MM-DD date relative to the machine's local today."""
+    return (datetime.now() + timedelta(days=offset_days)).strftime("%Y-%m-%d")
 
 
 class SettingsFileTests(unittest.TestCase):
@@ -82,12 +88,55 @@ class SettingsFileTests(unittest.TestCase):
             self.assertFalse(config_utils.load_config()["effect_enabled"])
 
     def test_date_cutoff_uses_local_midnight_of_the_named_day(self):
-        cutoff = settings.cutoff_for_date("2026-09-09")
-        self.assertEqual(history_analytics.format_local(cutoff), "2026-09-09 00:00:00")
-        self.assertEqual(cutoff, settings.cutoff_for_date("  2026-09-09  "))
+        today = day_text()
+        cutoff = settings.cutoff_for_date(today)
+        self.assertEqual(history_analytics.format_local(cutoff), f"{today} 00:00:00")
+        self.assertEqual(cutoff, settings.cutoff_for_date(f"  {today}  "))
         for bad in ("2026/09/09", "20260909", "", "yesterday", None):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 settings.cutoff_for_date(bad)
+
+    def test_today_is_the_newest_selectable_deletion_date(self):
+        for offset in (0, -1, -30, -400):
+            with self.subTest(offset=offset):
+                self.assertIsInstance(settings.cutoff_for_date(day_text(offset)), float)
+        for offset in (1, 2, 400):
+            with self.subTest(offset=offset):
+                with self.assertRaises(ValueError) as caught:
+                    settings.cutoff_for_date(day_text(offset))
+                self.assertIn("今日まで", str(caught.exception))
+        # The boundary is the local midnight that starts today.
+        self.assertEqual(settings.cutoff_for_date(day_text()),
+                         history_analytics.latest_allowed_cutoff())
+
+
+class PurgeRequestValidationTests(unittest.TestCase):
+    """The server applies the same limit as the settings window, independently."""
+
+    def setUp(self):
+        import server
+        self.server = server
+        self.now = datetime(2026, 9, 9, 15, 30, 0).timestamp()
+        self.today = datetime(2026, 9, 9).timestamp()
+
+    def test_today_and_earlier_are_accepted(self):
+        for cutoff in (self.today, self.today - 1, self.today - 86400, 0.0):
+            with self.subTest(cutoff=cutoff):
+                self.assertEqual(
+                    self.server.validate_purge_request(
+                        {"mode": "before", "cutoff": cutoff}, now=self.now),
+                    ("before", float(cutoff)),
+                )
+
+    def test_anything_after_today_midnight_is_refused(self):
+        for offset in (1, 3600, 8 * 3600, 86400, 10 * 86400):
+            with self.subTest(offset=offset):
+                with self.assertRaises(ValueError) as caught:
+                    self.server.validate_purge_request(
+                        {"mode": "before", "cutoff": self.today + offset}, now=self.now)
+                self.assertIn("today", str(caught.exception))
+        self.assertEqual(self.server.validate_purge_request({"mode": "all"}, now=self.now),
+                         ("all", None))
 
 
 class OverlayScopeTests(unittest.TestCase):
@@ -298,7 +347,7 @@ class LiveServerPurgeTests(unittest.TestCase):
         self.server.invalidate_dashboard_summary()
 
     def test_settings_client_purges_before_a_local_date_boundary(self):
-        cutoff = settings.cutoff_for_date("2026-09-09")
+        cutoff = settings.cutoff_for_date(day_text())
         self.seed([cutoff - 1, cutoff, cutoff + 1])
         with patch.object(config_utils, "CONFIG_PATH", self.data / "config.json"):
             preview = history_analytics.count_before(self.data, cutoff)
@@ -330,6 +379,42 @@ class LiveServerPurgeTests(unittest.TestCase):
         time.sleep(5.05)
         self.assertTrue(self.server.record_result("win", "manual"))
         self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 1)
+
+    def test_a_future_cutoff_is_refused_by_the_api_and_changes_nothing(self):
+        # A live session row plus older history, so a future cutoff would be
+        # able to remove matches that stats.json still counts.
+        self.assertTrue(self.server.record_result("win", "manual"))
+        self.seed([1000.0, 2000.0])
+        stats_file = self.data / "stats.json"
+        before = {
+            "stats_bytes": stats_file.read_bytes(),
+            "stats": self.server.stats.snapshot(),
+            "session_id": self.server.history.current_session_id,
+            "lifetime": self.server.history.lifetime_summary(),
+            "rows": history_analytics.count_before(self.data, time.time() + 86400)["total"],
+        }
+        for offset in (1, 2, 30):
+            cutoff = datetime.strptime(day_text(offset), "%Y-%m-%d").timestamp()
+            with self.subTest(offset=offset):
+                with self.assertRaises(urllib.error.HTTPError) as caught:
+                    self.post("/api/history/purge", {"mode": "before", "cutoff": cutoff})
+                self.assertEqual(caught.exception.code, 400)
+                caught.exception.close()
+                # The settings window refuses the same date before sending it.
+                with self.assertRaises(ValueError):
+                    settings.cutoff_for_date(day_text(offset))
+        self.assertEqual(stats_file.read_bytes(), before["stats_bytes"])
+        self.assertEqual(self.server.stats.snapshot(), before["stats"])
+        self.assertEqual(self.server.history.current_session_id, before["session_id"])
+        self.assertEqual(self.server.history.lifetime_summary(), before["lifetime"])
+        self.assertEqual(
+            history_analytics.count_before(self.data, time.time() + 86400)["total"],
+            before["rows"],
+        )
+        # Today itself still works and leaves the live session's own row alone.
+        outcome = settings.purge_history_before(settings.cutoff_for_date(day_text()))
+        self.assertEqual(outcome["removed_matches"], 2)
+        self.assertEqual(self.server.stats.snapshot()["wins"], before["stats"]["wins"])
 
     def test_bad_requests_are_refused_without_touching_history(self):
         self.seed([1000.0, 2000.0])
@@ -533,6 +618,28 @@ class SettingsWindowTests(unittest.TestCase):
             self.window.confirm_purge_before()
             control.assert_not_called()
         self.assertIn("YYYY-MM-DD", self.window.purge_status.cget("text"))
+
+    def test_a_future_date_is_refused_by_the_window(self):
+        for offset in (1, 5, 365):
+            with self.subTest(offset=offset):
+                self.window.cutoff_date.set(day_text(offset))
+                with patch.object(settings, "control_request") as control, \
+                     patch.object(settings.history_analytics, "count_before") as preview:
+                    self.window.confirm_purge_before()
+                    self.root.update()
+                    control.assert_not_called()
+                    preview.assert_not_called()
+                self.assertIn("今日まで", self.window.purge_status.cget("text"))
+                self.assertEqual(self.window._busy, set())
+        # Today and earlier still reach the read-only preview.
+        for offset in (0, -1):
+            self.window.cutoff_date.set(day_text(offset))
+            with patch.object(settings.history_analytics, "count_before") as preview:
+                preview.return_value = {"cutoff": 0.0, "cutoff_text": "x",
+                                        "removable": 0, "total": 0, "kept": 0}
+                self.window.confirm_purge_before()
+                self.assertTrue(self.pump(lambda: not self.window._busy))
+                preview.assert_called_once()
 
     def test_repeated_diagnostic_clicks_run_one_export(self):
         gate = threading.Event()
