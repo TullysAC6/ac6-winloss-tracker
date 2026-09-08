@@ -267,6 +267,18 @@ class CaptureTests(unittest.TestCase):
 
 class CaptureGapTests(unittest.TestCase):
     @patch("result_detector.mss.mss")
+    def test_diagnostic_flush_failure_never_blocks_cleanup(self, desktop_factory):
+        stopped = Mock()
+        stopped.is_set.return_value = True
+        recorder = Mock()
+        recorder.flush_frame_context.side_effect = OSError("disk full")
+        detector = ResultDetector(Path(__file__).resolve().parents[1], lambda: {}, Mock(), Mock(), stopped,
+                                  diagnostic_recorder=recorder)
+        detector.capture = Mock()
+        detector.run()
+        detector.capture.close.assert_called_once()
+
+    @patch("result_detector.mss.mss")
     def test_detector_loop_gap_and_cleanup(self, desktop_factory):
         from mss.screenshot import ScreenShot
         for final, result in ((FINAL_WIN, "win"), (FINAL_LOSS, "loss"), (FINAL_DRAW, "draw")):
@@ -278,7 +290,7 @@ class CaptureGapTests(unittest.TestCase):
                 def wait(self, timeout):
                     cursor[0] += 1
             detector = ResultDetector(Path(__file__).resolve().parents[1],
-                lambda: {"result_detector_enabled": True}, Mock(return_value=True), Mock(), Stop())
+                lambda: {"result_detector_enabled": True}, Mock(return_value=True), Mock(), Stop(), diagnostic_recorder=Mock())
             capture = Mock(discontinuity=False, identity_changed=False, status="WGC")
             frame = ScreenShot.from_size(bytearray(128 * 40 * 4), 128, 40)
             def grab(desktop):
@@ -294,6 +306,7 @@ class CaptureGapTests(unittest.TestCase):
                 return True
             detector.on_result.side_effect = accept
             detector.run()
+            detector.diagnostics.flush_frame_context.assert_any_call("detector_stopped")
             self.assertEqual(detector.health.snapshot()["last_result"], result)
             self.assertTrue(detector.state.post_result_lock)
             self.assertEqual(detector.on_result.call_count, 0 if result == "draw" else 1)

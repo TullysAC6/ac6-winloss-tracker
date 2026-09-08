@@ -1523,4 +1523,9 @@ class ResultDetector:
             self.health.update(status="error", error=msg)
 
         finally:
+            try:
+                if self.diagnostics:
+                    self.diagnostics.flush_frame_context("detector_stopped")
+            except Exception:
+                pass  # Optional telemetry must never block worker cleanup.
             self.capture.close()

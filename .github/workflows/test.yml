@@ -143,6 +143,11 @@ jobs:
         if: matrix.python-version != '3.12'
         run: python tests/run_all_tests.py
 
+      - name: Validate isolated running source install update and uninstall
+        if: matrix.python-version != '3.12'
+        shell: pwsh
+        run: ./tests/test_source_install_flow.ps1 -PythonPath (Get-Command python.exe).Source
+
       - name: Run opt-in native WGC and DWM checks
         if: matrix.python-version != '3.12' && inputs.native_wgc == true
         env:

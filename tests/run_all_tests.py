@@ -22,6 +22,7 @@ files=[
     "test_event_bus.py",
     "test_issue4_effect_replay.py",
     "test_resource_optimization.py",
+    "test_diagnostic_report.py",
     "test_result_gate.py",
     "test_config.py",
     "test_settings_actions.py",
