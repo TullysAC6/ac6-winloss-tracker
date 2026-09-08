@@ -1,8 +1,11 @@
 import json
 import queue
 import threading
+import time
 import uuid
 from collections import deque
+
+EFFECT_TTL_MS = 3000
 
 
 class ClientConnection:
@@ -20,6 +23,7 @@ class EventBus:
         self.lock = threading.RLock()
         self.drop_count = 0
         self.client_queue_size = client_queue_size
+        self.recent_effect = None
 
     def _new_record_unlocked(self, event_type, payload, remember):
         self.seq += 1
@@ -35,7 +39,15 @@ class EventBus:
 
     def publish(self, event_type, payload, remember=True):
         with self.lock:
-            record = self._new_record_unlocked(event_type, payload, remember)
+            record = self._new_record_unlocked(event_type, payload, remember and event_type != "effect")
+            if event_type == "effect" and payload.get("effect") == "milestone":
+                created = payload.get("created_at_ms")
+                if type(created) is int and isinstance(payload.get("effect_id"), str) and payload["effect_id"]:
+                    age = time.time() * 1000 - created
+                    if 0 <= age < EFFECT_TTL_MS:
+                        previous = self.recent_effect
+                        if previous is None or created >= previous[0]:
+                            self.recent_effect = (created, time.monotonic() + (EFFECT_TTL_MS - age) / 1000, record)
             for client in list(self.clients):
                 try:
                     client.queue.put_nowait(record)
@@ -62,7 +74,15 @@ class EventBus:
         # event between replay capture, snapshot capture and registration.
         with self.lock:
             replay = self._replay_for_unlocked(last_event_id)
-            snapshots = snapshot_factory()
+            snapshots = list(snapshot_factory())
+            # Effects are a one-item, expiring snapshot, never stats history.
+            # Keep this inside the registration lock to avoid a delivery gap.
+            if self.recent_effect is not None:
+                created, deadline, record = self.recent_effect
+                if time.monotonic() < deadline and 0 <= time.time() * 1000 - created < EFFECT_TTL_MS:
+                    snapshots.append(("effect", json.loads(record["data"])))
+                else:
+                    self.recent_effect = None
             client = ClientConnection(self.client_queue_size)
             self.clients.add(client)
             return client, replay, snapshots

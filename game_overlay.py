@@ -33,6 +33,7 @@ from typing import Any
 from app_paths import data_dir
 from config_utils import load_config
 from effect_screenshot import EffectScreenshots
+from event_bus import EFFECT_TTL_MS
 
 ROOT = data_dir()
 STATS_PATH = ROOT / "stats.json"
@@ -426,6 +427,7 @@ class GameOverlay:
         self._sse_connected = threading.Event()
         self._next_stats_fallback_at = time.monotonic() + STATS_FALLBACK_SECONDS
         self._effect_ids: set[str] = set()
+        self._last_effect_created_at = 0
         self._active_effect: dict[str, Any] | None = None
         self._effect_visible = False
         self._effect_stop = threading.Event()
@@ -761,9 +763,12 @@ class GameOverlay:
             payload.get("effect") == "milestone"
             and effect_id
             and effect_id not in self._effect_ids
-            and created >= int(self._overlay_started_at * 1000) - 2000
+            and created >= int(self._overlay_started_at * 1000)
+            and 0 <= time.time() * 1000 - created < EFFECT_TTL_MS
+            and created >= getattr(self, "_last_effect_created_at", 0)
         ):
             self._effect_ids.add(effect_id)
+            self._last_effect_created_at = created
             self._effect_queue.put(payload)
 
     def _start_effect_listener(self, port: int) -> None:
@@ -873,6 +878,8 @@ class GameOverlay:
         try:
             while True:
                 payload = self._effect_queue.get_nowait()
+                if not 0 <= time.time() * 1000 - int(payload["created_at_ms"]) < EFFECT_TTL_MS:
+                    continue
                 if self._active_effect is not None:
                     self._finish_effect()
                 self._active_effect = {
