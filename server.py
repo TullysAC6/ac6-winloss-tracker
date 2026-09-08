@@ -327,6 +327,13 @@ def status_payload(s, milestone=None):
 
 
 def publish(event_type, payload, remember=True):
+    if event_type == "detector":
+        try:
+            RECORDER.record("detector_health", state=payload)
+            if payload.get("status") != "active":
+                RECORDER.flush_frame_context("capture_" + str(payload.get("status", "unknown")))
+        except Exception:
+            pass  # Optional diagnostics cannot prevent the health notification.
     return event_bus.publish(event_type, payload, remember=remember)
 
 
