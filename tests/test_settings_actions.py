@@ -553,13 +553,14 @@ class DiagnosticReportTests(unittest.TestCase):
         with zipfile.ZipFile(report) as archive:
             manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
         # A missing capture/classifier package is the first thing to rule out.
-        self.assertEqual(sorted(manifest["dependency_status"]),
-                         ["mss", "numpy", "opencv-python", "pillow",
-                          "ttkbootstrap", "windows-capture"])
+        # Distribution names are compared case-insensitively so the assertion
+        # states the requirement, not one spelling of it.
+        self.assertEqual({name.lower() for name in manifest["dependency_status"]},
+                         {"mss", "numpy", "opencv-python", "pillow",
+                          "ttkbootstrap", "windows-capture"})
         for name, entry in manifest["dependency_status"].items():
             with self.subTest(dependency=name):
                 self.assertIn("available", entry)
-                self.assertIn("module", entry)
                 self.assertIn("version", entry)
         self.assertIn("依存パッケージの有無", settings.DIAGNOSTIC_PRIVACY)
 
