@@ -454,6 +454,30 @@ class LiveServerPurgeTests(unittest.TestCase):
         self.assertEqual(self.server.stats.snapshot()["streak"], 10, "counting is unaffected")
         self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 10)
 
+    def test_live_diagnostics_flush_persists_the_reason_a_report_needs(self):
+        # The recorder is a process-wide singleton; ask it where it writes.
+        log = self.server.RECORDER.log_path
+        before = log.read_text(encoding="utf-8") if log.exists() else ""
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.post("/api/diagnostics/flush", {}, token="wrong")
+        self.assertEqual(caught.exception.code, 403)
+        caught.exception.close()
+
+        with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            outcome = settings.flush_live_diagnostics()
+        self.assertTrue(outcome["ok"])
+        self.assertIn("status", outcome["detector"])
+        rows = [json.loads(line) for line in
+                log.read_text(encoding="utf-8")[len(before):].splitlines() if line]
+        requested = [row for row in rows if row["kind"] == "diagnostics_requested"]
+        self.assertEqual(len(requested), 1)
+        # Everything a "played matches but 0/0" report has to separate.
+        for key in ("detector", "stats", "history_health", "config_health"):
+            self.assertIn(key, requested[0])
+        self.assertIn("status", requested[0]["detector"])
+        # The detector never stops just because a report was requested.
+        self.assertIn("wins", self.get("/stats"))
+
     def test_config_endpoint_publishes_the_display_scope_for_the_browser_overlay(self):
         self.assertEqual(self.get("/config")["overlay_stats_scope"], "session")
         self.write_config(overlay_stats_scope="lifetime")
@@ -521,12 +545,109 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertIn("history.db", settings.DIAGNOSTIC_PRIVACY)
         self.assertIn("フルスクリーン画像", settings.DIAGNOSTIC_PRIVACY)
 
+    def test_every_runtime_dependency_is_reported(self):
+        import diagnostics
+        with patch.object(diagnostics.Path, "home", return_value=self.home):
+            report = settings.create_diagnostic_report()
+        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        with zipfile.ZipFile(report) as archive:
+            manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+        # A missing capture/classifier package is the first thing to rule out.
+        self.assertEqual(sorted(manifest["dependency_status"]),
+                         ["mss", "numpy", "opencv-python", "pillow",
+                          "ttkbootstrap", "windows-capture"])
+        for name, entry in manifest["dependency_status"].items():
+            with self.subTest(dependency=name):
+                self.assertIn("available", entry)
+                self.assertIn("module", entry)
+                self.assertIn("version", entry)
+        self.assertIn("依存パッケージの有無", settings.DIAGNOSTIC_PRIVACY)
+
+    def test_install_and_startup_evidence_is_included(self):
+        import diagnostics
+        from app_paths import data_dir
+        root = data_dir()
+        (root / "installed-version.json").write_text(
+            json.dumps({"channel": "stable", "version": "1.0.1",
+                        "resolved_commit": "a" * 40, "python_role": "preferred"}),
+            encoding="utf-8")
+        (root / "startup.log").write_text("launch line\n", encoding="utf-8")
+        (diagnostics.RECORDER.root / "effect-screenshot.jsonl").write_text(
+            '{"status":"saved"}\n', encoding="utf-8")
+        self.addCleanup(lambda: (root / "installed-version.json").unlink(missing_ok=True))
+        self.addCleanup(lambda: (root / "startup.log").unlink(missing_ok=True))
+        with patch.object(diagnostics.Path, "home", return_value=self.home):
+            report = settings.create_diagnostic_report()
+        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        with zipfile.ZipFile(report) as archive:
+            names = archive.namelist()
+        for expected in ("installed-version.json", "startup.log", "effect-screenshot.jsonl"):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, names)
+        self.assertNotIn("history.db", names)
+        for expected in ("installed-version.json", "startup.log", "effect-screenshot.jsonl"):
+            self.assertIn(expected, settings.DIAGNOSTIC_PRIVACY)
+
     def test_failure_is_reported_and_raises_no_process(self):
         import diagnostics
         with patch.object(diagnostics.RECORDER, "export", side_effect=OSError("disk full")), \
              patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
             with self.assertRaises(OSError):
                 settings.create_diagnostic_report()
+
+    def test_export_still_works_when_no_tracker_is_running(self):
+        import diagnostics
+        with tempfile.TemporaryDirectory() as name:
+            with patch.object(config_utils, "CONFIG_PATH", Path(name) / "config.json"):
+                self.assertIsNone(settings.flush_live_diagnostics())
+                with patch.object(diagnostics.Path, "home", return_value=self.home):
+                    report = settings.create_diagnostic_report()
+        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        self.assertTrue(report.exists())
+
+
+class CaptureGapDiagnosticsTests(unittest.TestCase):
+    """A session that never captures a frame must still explain itself."""
+
+    def test_capture_gap_rows_are_recorded_and_rate_limited(self):
+        import result_detector
+        recorder = Mock()
+        detector = result_detector.ResultDetector.__new__(result_detector.ResultDetector)
+        detector.diagnostics = recorder
+        detector.capture = Mock(status="AC6 window unavailable or minimized")
+        detector.state = Mock()
+        detector.state.snapshot.return_value = {"armed": False}
+        detector._last_capture_gap_status = None
+        detector._last_capture_gap_log = 0.0
+
+        clock = [1000.0]
+        with patch.object(result_detector.time, "monotonic", lambda: clock[0]):
+            detector._record_capture_gap()
+            self.assertEqual(recorder.record.call_count, 1)
+            clock[0] += 1.0
+            detector._record_capture_gap()
+            self.assertEqual(recorder.record.call_count, 1, "unchanged status must not spam")
+            # A different reason is always worth recording immediately.
+            detector.capture.status = "WGC unavailable: RuntimeError: worker timed out"
+            detector._record_capture_gap()
+            self.assertEqual(recorder.record.call_count, 2)
+            # The same reason is repeated only after the rate-limit window.
+            clock[0] += result_detector.CAPTURE_GAP_LOG_SECONDS + 1
+            detector._record_capture_gap()
+            self.assertEqual(recorder.record.call_count, 3)
+
+        kind, payload = recorder.record.call_args.args[0], recorder.record.call_args.kwargs
+        self.assertEqual(kind, "capture_unavailable")
+        self.assertIn("WGC unavailable", payload["status"])
+        self.assertEqual(payload["state"], {"armed": False})
+
+    def test_no_recorder_means_no_work(self):
+        import result_detector
+        detector = result_detector.ResultDetector.__new__(result_detector.ResultDetector)
+        detector.diagnostics = None
+        detector._last_capture_gap_status = None
+        detector._last_capture_gap_log = 0.0
+        detector._record_capture_gap()  # Must not raise without a capture attribute.
 
 
 @GUI

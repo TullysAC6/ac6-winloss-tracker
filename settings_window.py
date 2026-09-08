@@ -28,6 +28,7 @@ LATEST_RELEASE_URL = "https://api.github.com/repos/TullysAC6/ac6-winloss-tracker
 RELEASES_PAGE_URL = "https://github.com/TullysAC6/ac6-winloss-tracker/releases/latest"
 RUNTIME_NAME = ".runtime.json"
 PURGE_ENDPOINT = "/api/history/purge"
+DIAGNOSTICS_FLUSH_ENDPOINT = "/api/diagnostics/flush"
 CONTROL_TIMEOUT_SECONDS = 20.0
 EDITABLE_KEYS = ("effect_enabled", "effect_screenshot_enabled", "overlay_stats_scope")
 
@@ -40,9 +41,11 @@ DIAGNOSTIC_STEPS = (
 DIAGNOSTIC_PRIVACY = (
     "ZIPに入るもの:\n"
     "・勝敗検出のテレメトリログ（detector.jsonl / detector.previous.jsonl / frame-buffer.jsonl）\n"
-    "・config.json と stats.json\n"
-    "・環境情報 manifest.json（アプリ版・OS・Python・依存関係・SQLite版・履歴スキーマ版・"
-    "画面解像度/DPI/モニタ数）\n"
+    "・スクリーンショットの保存結果ログ（effect-screenshot.jsonl）\n"
+    "・config.json / stats.json / installed-version.json（インストール方法の確認用）\n"
+    "・起動ログ startup.log（ローカルのファイルパスとPythonエラーを含みます）\n"
+    "・環境情報 manifest.json（アプリ版・OS・Python・依存パッケージの有無とバージョン・"
+    "SQLite版・履歴スキーマ版・画面解像度/DPI/モニタ数）\n"
     "・勝敗判定に使う画面の一部（ROI）のPNG画像\n"
     "含まれないもの: フルスクリーン画像、勝敗履歴データベース(history.db)"
 )
@@ -181,14 +184,28 @@ def cutoff_for_date(text, now=None):
     return cutoff
 
 
+def flush_live_diagnostics():
+    """Ask a running Tracker to persist its in-memory detector telemetry.
+
+    Best effort: the report is still produced when no Tracker is running.
+    """
+    try:
+        return control_request(DIAGNOSTICS_FLUSH_ENDPOINT, {}, timeout=10.0)
+    except TrackerUnavailable:
+        return None
+
+
 def create_diagnostic_report():
     """Reuse the exporter behind Create-Diagnostic-Report.bat.
 
     ``diagnostics.RECORDER.export()`` is the same single source that
     ``app.py --diagnostics`` calls. It only reads diagnostics files that have
     already been written, so no server, detector or overlay process starts.
+    The running Tracker is asked to write out its recent-frame ring first,
+    because that buffer only exists inside the Tracker process.
     """
     from diagnostics import RECORDER
+    flush_live_diagnostics()
     return Path(RECORDER.export())
 
 

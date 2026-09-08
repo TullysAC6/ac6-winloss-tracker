@@ -146,18 +146,24 @@ class DiagnosticRecorder:
         out = export_dir / f"AC6-Tracker-Diagnostics-{stamp}.zip"
 
         dependencies = {}
-        for dependency in ("mss", "ttkbootstrap"):
+        # Distribution name -> import name. Every runtime dependency is listed:
+        # a missing or unimportable one is the first thing to rule out when
+        # capture, classification or the UI misbehaves.
+        for dependency, module in (
+            ("mss", "mss"), ("ttkbootstrap", "ttkbootstrap"), ("pillow", "PIL"),
+            ("windows-capture", "windows_capture"), ("numpy", "numpy"),
+            ("opencv-python", "cv2"),
+        ):
+            entry = {"module": module, "available": False, "version": None}
             try:
-                dependencies[dependency] = {
-                    "available": importlib.util.find_spec(dependency) is not None,
-                    "version": importlib.metadata.version(dependency),
-                }
+                entry["available"] = importlib.util.find_spec(module) is not None
             except Exception as error:
-                dependencies[dependency] = {
-                    "available": False,
-                    "version": None,
-                    "error_type": type(error).__name__,
-                }
+                entry["import_error_type"] = type(error).__name__
+            try:
+                entry["version"] = importlib.metadata.version(dependency)
+            except Exception as error:
+                entry["error_type"] = type(error).__name__
+            dependencies[dependency] = entry
 
         display = {"available": False}
         if os.name == "nt":
@@ -202,7 +208,12 @@ class DiagnosticRecorder:
                 "history_schema": history_schema,
             },
             "display": display,
-            "privacy": "Contains detector telemetry and result-detection ROI images only; no full-screen capture.",
+            "privacy": (
+                "Contains detector telemetry, result-detection ROI images, the app "
+                "config/stats, the installed-revision record and the startup log "
+                "(which includes local file paths and Python errors); "
+                "no full-screen capture and no match history database."
+            ),
         }
         tmp_manifest = self.root / "manifest.json"
         tmp_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -213,6 +224,9 @@ class DiagnosticRecorder:
                 for path in (
                     self.log_path, self.old_log_path, tmp_manifest, buffer_export,
                     root / "config.json", root / "stats.json",
+                    root / "installed-version.json", root / "startup.log",
+                    self.root / "effect-screenshot.jsonl",
+                    self.root / "effect-screenshot.jsonl.1",
                 ):
                     if path is not None and path.exists():
                         zf.write(path, arcname=path.name)

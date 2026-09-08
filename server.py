@@ -634,6 +634,33 @@ def purge_history(mode, cutoff=None):
         return outcome
 
 
+def capture_live_diagnostics():
+    """Persist the live detector picture for a user-requested report.
+
+    The recent-frame ring only lives in this process, and it is normally
+    flushed by a confirmed result. A session that never detects anything would
+    otherwise export an empty report, so the settings window asks for this
+    first. Nothing about detection, the gate or capture is changed.
+    """
+    detector_state = detector_snapshot()
+    with history_lock:
+        health = dict(history_health)
+    try:
+        current = status_payload(stats.snapshot())
+    except Exception as e:
+        current = {"error": f"{type(e).__name__}: {e}"}
+    rows = RECORDER.flush_frame_context("diagnostics_requested")
+    RECORDER.record(
+        "diagnostics_requested",
+        detector=detector_state,
+        stats=current,
+        history_health=health,
+        config_health=get_config_health(),
+        buffered_frames=rows,
+    )
+    return {"buffered_frames": rows, "detector": detector_state}
+
+
 def detector_supervisor():
     global detector
     while not stop_event.is_set():
@@ -825,6 +852,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/stats/reset":
                 s = reset_stats()
                 self.json_response({"ok": True, "stats": status_payload(s)})
+                return
+            if path == "/api/diagnostics/flush":
+                self.json_response({"ok": True, **capture_live_diagnostics()})
                 return
             if path == "/api/history/purge":
                 try:
