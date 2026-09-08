@@ -1,0 +1,635 @@
+"""Settings actions: new options, history maintenance, updates and diagnostics."""
+import json
+import os
+import socket
+import sys
+import tempfile
+import threading
+import time
+import unittest
+import urllib.error
+import urllib.request
+import zipfile
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+import config_utils
+import history_analytics
+import settings_window as settings
+from history_store import HistoryStore
+
+GUI = unittest.skipUnless(os.name == "nt", "real Tk controls on Windows")
+
+
+class SettingsFileTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / "config.json"
+        self.raw = dict(config_utils.DEFAULT_CONFIG, port=9123)
+        self.path.write_text(json.dumps(self.raw), encoding="utf-8")
+        patcher = patch.object(config_utils, "CONFIG_PATH", self.path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        config_utils._last_good = config_utils._last_good_signature = None
+
+    def test_new_options_round_trip_and_keep_unrelated_keys(self):
+        self.assertEqual(settings.read_settings(), {
+            "effect_enabled": True,
+            "effect_screenshot_enabled": False,
+            "overlay_stats_scope": "session",
+        })
+        settings.save_settings({"effect_enabled": False, "overlay_stats_scope": "lifetime"})
+        stored = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertEqual(stored["port"], 9123)
+        self.assertEqual(stored["result_detector_enabled"], True)
+        self.assertEqual(settings.read_settings(), {
+            "effect_enabled": False,
+            "effect_screenshot_enabled": False,
+            "overlay_stats_scope": "lifetime",
+        })
+        # The screenshot helper still edits only its own key.
+        settings.save_screenshot_setting(True)
+        self.assertEqual(settings.read_settings()["overlay_stats_scope"], "lifetime")
+
+    def test_config_written_by_an_older_version_gains_the_defaults(self):
+        old = {k: v for k, v in self.raw.items()
+               if k not in ("effect_enabled", "overlay_stats_scope")}
+        old["config_version"] = 17
+        self.path.write_text(json.dumps(old), encoding="utf-8")
+        self.assertEqual(settings.read_settings()["effect_enabled"], True)
+        self.assertEqual(settings.read_settings()["overlay_stats_scope"], "session")
+        settings.save_settings({"overlay_stats_scope": "lifetime"})
+        self.assertEqual(config_utils.load_config()["overlay_stats_scope"], "lifetime")
+
+    def test_invalid_values_are_refused_and_the_file_is_untouched(self):
+        original = self.path.read_bytes()
+        for values in ({"overlay_stats_scope": "everything"}, {"effect_enabled": "yes"},
+                       {"effect_enabled": 1}, {"port": 1234}, {}):
+            with self.subTest(values=values):
+                with self.assertRaises(ValueError):
+                    settings.save_settings(values)
+                self.assertEqual(self.path.read_bytes(), original)
+        self.assertEqual(list(self.path.parent.glob(".config-*.tmp")), [])
+
+    def test_a_change_during_a_match_is_visible_without_restarting(self):
+        config_utils.load_config()  # Prime the process-local cache, as the Tracker does.
+        for scope in ("lifetime", "session", "lifetime"):
+            settings.save_settings({"overlay_stats_scope": scope, "effect_enabled": False})
+            self.assertEqual(config_utils.load_config()["overlay_stats_scope"], scope)
+            self.assertFalse(config_utils.load_config()["effect_enabled"])
+
+    def test_date_cutoff_uses_local_midnight_of_the_named_day(self):
+        cutoff = settings.cutoff_for_date("2026-09-09")
+        self.assertEqual(history_analytics.format_local(cutoff), "2026-09-09 00:00:00")
+        self.assertEqual(cutoff, settings.cutoff_for_date("  2026-09-09  "))
+        for bad in ("2026/09/09", "20260909", "", "yesterday", None):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                settings.cutoff_for_date(bad)
+
+
+class OverlayScopeTests(unittest.TestCase):
+    def test_lifetime_payload_validation(self):
+        import game_overlay
+        good = {"wins": 3, "losses": 1, "draws": 0, "win_rate": 75.0, "best_streak": 3}
+        self.assertEqual(game_overlay.normalize_lifetime(good),
+                         {"wins": 3, "losses": 1, "best_streak": 3, "win_rate": 75.0})
+        for bad in (None, {}, {"wins": -1, "losses": 0, "win_rate": 0.0, "best_streak": 0},
+                    {"wins": 1, "losses": 0, "win_rate": 101.0, "best_streak": 1},
+                    {"wins": "x", "losses": 0, "win_rate": 0.0, "best_streak": 0}):
+            with self.subTest(bad=bad):
+                self.assertIsNone(game_overlay.normalize_lifetime(bad))
+
+    def test_scope_switches_the_displayed_totals_but_not_the_streak(self):
+        import game_overlay
+        overlay = game_overlay.GameOverlay.__new__(game_overlay.GameOverlay)
+        overlay.last_stats = {"wins": 2, "losses": 1, "streak": 2, "best_streak": 2,
+                              "win_rate": 66.7, "status": "", "status_level": 0}
+        overlay._lifetime = {"wins": 40, "losses": 10, "best_streak": 9, "win_rate": 80.0}
+        overlay._stats_scope = "session"
+        self.assertEqual(overlay._display_values(), (2, 1, 66.7, 2, ""))
+        overlay._stats_scope = "lifetime"
+        self.assertEqual(overlay._display_values(), (40, 10, 80.0, 9, "累計 "))
+        # Without lifetime totals the session values remain in use.
+        overlay._lifetime = None
+        self.assertEqual(overlay._display_values(), (2, 1, 66.7, 2, ""))
+
+    def test_mid_match_scope_change_is_applied_and_repaints(self):
+        import game_overlay
+        import queue as queue_module
+        overlay = game_overlay.GameOverlay.__new__(game_overlay.GameOverlay)
+        overlay._stats_scope = "session"
+        overlay._lifetime = None
+        overlay._lifetime_queue = queue_module.Queue()
+        overlay._render = Mock()
+        overlay._lifetime_queue.put({"wins": 5, "losses": 5, "best_streak": 3, "win_rate": 50.0})
+        with patch.object(game_overlay, "load_config",
+                          return_value={"overlay_stats_scope": "lifetime"}):
+            overlay._drain_display_scope()
+        self.assertEqual(overlay._stats_scope, "lifetime")
+        self.assertEqual(overlay._lifetime["wins"], 5)
+        with patch.object(game_overlay, "load_config",
+                          return_value={"overlay_stats_scope": "session"}):
+            overlay._drain_display_scope()
+        self.assertEqual(overlay._stats_scope, "session")
+        # An unreadable config must never break the running overlay.
+        with patch.object(game_overlay, "load_config", side_effect=OSError("gone")):
+            overlay._drain_display_scope()
+        self.assertEqual(overlay._stats_scope, "session")
+        self.assertEqual(overlay._render.call_count, 3)
+
+    def test_browser_overlay_consumes_the_same_contract(self):
+        source = (ROOT / "overlay.html").read_text(encoding="utf-8")
+        self.assertIn('es.addEventListener("lifetime"', source)
+        self.assertIn('c.overlay_stats_scope==="lifetime"', source)
+        self.assertIn("function statsView()", source)
+        # Streak and status keep coming from the session payload.
+        self.assertIn("連勝 ${s.streak}", source)
+
+
+class PurgeStoreTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.store = HistoryStore(self.root)
+        self.session = self.store.start_session()
+        for index, created_at in enumerate((100.0, 200.0, 300.0)):
+            self.store.record_result(f"e{index}", "win", "test",
+                                     {"streak": index + 1, "wins": index + 1, "losses": 0},
+                                     created_at=created_at)
+            self.store.create_match_context(f"c{index}", f"e{index}",
+                                            result_detected_at=created_at)
+
+    def rows(self, table):
+        with self.store._connection() as connection:
+            return connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+
+    def test_purge_before_keeps_the_boundary_and_cascades_contexts(self):
+        outcome = self.store.purge_before(200.0)
+        self.assertEqual(outcome["removed_matches"], 1)
+        self.assertEqual(self.rows("matches"), 2)
+        self.assertEqual(self.rows("match_contexts"), 2)
+        summary = self.store.lifetime_summary()
+        self.assertEqual((summary["wins"], summary["best_streak"]), (2, 3))
+
+    def test_purge_all_clears_everything_and_keeps_recording_possible(self):
+        outcome = self.store.purge_all()
+        self.assertEqual(outcome["removed_matches"], 3)
+        self.assertEqual((self.rows("matches"), self.rows("match_contexts")), (0, 0))
+        self.assertEqual(self.rows("sessions"), 1, "a usable session must survive")
+        self.assertIsNotNone(self.store.current_session_id)
+        self.assertEqual(self.store.lifetime_summary()["wins"], 0)
+        self.store.record_result("after", "win", "test", {"streak": 1, "wins": 1, "losses": 0})
+        self.assertEqual(self.store.lifetime_summary()["wins"], 1)
+
+    def test_a_failure_midway_leaves_the_history_unchanged(self):
+        import sqlite3 as sqlite
+        real_connect = sqlite.connect
+
+        class FailingConnection(sqlite.Connection):
+            def execute(self, sql, *args):
+                if "UPDATE sessions" in sql or "DELETE FROM sessions" in sql:
+                    raise RuntimeError("simulated failure")
+                return super().execute(sql, *args)
+
+        def connect(*args, **kwargs):
+            return real_connect(*args, **dict(kwargs, factory=FailingConnection))
+
+        for method, arguments in ((HistoryStore.purge_before, (150.0,)),
+                                  (HistoryStore.purge_all, ())):
+            with self.subTest(method=method.__name__):
+                with patch("history_store.sqlite3.connect", connect):
+                    with self.assertRaises(RuntimeError):
+                        method(self.store, *arguments)
+                self.assertEqual(self.rows("matches"), 3, "a failed purge must roll back")
+                self.assertEqual(self.rows("match_contexts"), 3)
+                self.assertEqual(self.store.current_session_id, self.session)
+
+
+class LiveServerPurgeTests(unittest.TestCase):
+    """Real server.main, real history.db, isolated LOCALAPPDATA and port."""
+
+    # server.py owns process-global state, so the whole class shares one
+    # instance, exactly as the shipped Tracker runs it.
+    @classmethod
+    def setUpClass(cls):
+        cls.directory = tempfile.TemporaryDirectory(prefix="ac6-purge-")
+        cls.data = Path(cls.directory.name) / "AC6WinLossTracker"
+        cls.data.mkdir()
+        with socket.socket() as reservation:
+            reservation.bind(("127.0.0.1", 0))
+            cls.port = reservation.getsockname()[1]
+        cls.config = cls.data / "config.json"
+        cls.write_config()
+        cls.patches = [
+            patch.dict(os.environ, {"LOCALAPPDATA": cls.directory.name}),
+            patch.object(config_utils, "CONFIG_PATH", cls.config),
+        ]
+        for patcher in cls.patches:
+            patcher.start()
+        config_utils._last_good = config_utils._last_good_signature = None
+        import server  # Imported under the isolated root so its globals match.
+        cls.server = server
+        cls.ready = threading.Event()
+        cls.thread = threading.Thread(target=server.main,
+                                      kwargs={"on_ready": cls.ready.set}, daemon=True)
+        cls.thread.start()
+        assert cls.ready.wait(15), "server.main did not become ready"
+
+    @classmethod
+    def write_config(cls, **overrides):
+        payload = {
+            "config_version": config_utils.CONFIG_VERSION, "port": cls.port,
+            "stats_enabled": True, "result_detector_enabled": False,
+            "effect_screenshot_enabled": False, "effect_enabled": True,
+            "overlay_stats_scope": "session",
+        }
+        payload.update(overrides)
+        cls.config.write_text(json.dumps(payload), encoding="utf-8")
+        config_utils._last_good = config_utils._last_good_signature = None
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.ready.is_set():
+            try:
+                cls.post("/api/system/shutdown")
+            except Exception:
+                pass
+        cls.thread.join(10)
+        for patcher in reversed(cls.patches):
+            patcher.stop()
+        cls.directory.cleanup()
+
+    def setUp(self):
+        self.write_config()
+        self.server.history.purge_all()
+        self.server.history_event_ids.clear()
+        self.server.stats.reset()
+        self.server.result_gate.clear_for_manual_correction()
+        self.server.invalidate_dashboard_summary()
+
+    @classmethod
+    def post(cls, endpoint, payload=None, token=None):
+        body = b"" if payload is None else json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{cls.port}{endpoint}", data=body, method="POST",
+            headers={"X-Control-Token": cls.server.CONTROL_TOKEN if token is None else token,
+                     "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    @classmethod
+    def get(cls, endpoint):
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{cls.port}{endpoint}", timeout=10
+        ) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    def seed(self, timestamps):
+        for index, created_at in enumerate(timestamps):
+            self.server.history.record_result(
+                f"seed-{index}", "win", "manual",
+                {"streak": index + 1, "wins": index + 1, "losses": 0}, created_at=created_at,
+            )
+        self.server.invalidate_dashboard_summary()
+
+    def test_settings_client_purges_before_a_local_date_boundary(self):
+        cutoff = settings.cutoff_for_date("2026-09-09")
+        self.seed([cutoff - 1, cutoff, cutoff + 1])
+        with patch.object(config_utils, "CONFIG_PATH", self.data / "config.json"):
+            preview = history_analytics.count_before(self.data, cutoff)
+            self.assertEqual((preview["removable"], preview["kept"]), (1, 2))
+            with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+                outcome = settings.purge_history_before(cutoff)
+        self.assertEqual(outcome["removed_matches"], 1)
+        self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 2)
+        # The boundary row itself is kept.
+        self.assertEqual(history_analytics.count_before(self.data, cutoff)["removable"], 0)
+
+    def test_purge_all_resets_the_session_and_recording_still_works(self):
+        detector_before = self.server.detector_snapshot()["status"]
+        self.assertTrue(self.server.record_result("win", "manual"))
+        self.seed([1000.0, 2000.0])
+        self.assertGreaterEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 3)
+        with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            outcome = settings.purge_all_history()
+        self.assertEqual(outcome["mode"], "all")
+        self.assertTrue(outcome["session_reset"])
+        summary = self.get("/api/dashboard/summary")
+        self.assertEqual(summary["lifetime"]["wins"], 0)
+        self.assertEqual(summary["session"]["wins"], 0)
+        self.assertEqual(summary["history_health"]["status"], "active")
+        # The detector supervisor and HTTP server are untouched by a purge.
+        self.assertEqual(self.server.detector_snapshot()["status"], detector_before)
+        self.assertIn("wins", self.get("/stats"))
+        # A purge locks the gate, so wait it out and confirm recording resumes.
+        time.sleep(5.05)
+        self.assertTrue(self.server.record_result("win", "manual"))
+        self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 1)
+
+    def test_bad_requests_are_refused_without_touching_history(self):
+        self.seed([1000.0, 2000.0])
+        for payload in ({}, {"mode": "everything"}, {"mode": "before"},
+                        {"mode": "before", "cutoff": "yesterday"},
+                        {"mode": "before", "cutoff": True},
+                        {"mode": "before", "cutoff": -1},
+                        {"mode": "before", "cutoff": time.time() + 10 * 86400}):
+            with self.subTest(payload=payload):
+                with self.assertRaises(urllib.error.HTTPError) as caught:
+                    self.post("/api/history/purge", payload)
+                self.assertEqual(caught.exception.code, 400)
+                caught.exception.close()
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.post("/api/history/purge", {"mode": "all"}, token="wrong")
+        self.assertEqual(caught.exception.code, 403)
+        caught.exception.close()
+        self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 2)
+
+    def test_effect_publish_follows_the_setting_while_the_tracker_runs(self):
+        published = []
+        with patch.object(self.server, "publish",
+                          side_effect=lambda *a, **k: published.append(a[0])):
+            self.server.stats.reset()
+            for streak in range(1, 6):
+                self.server.result_gate.clear_for_manual_correction()
+                self.assertTrue(self.server.record_result("win", "manual"))
+            self.assertIn("effect", published)
+
+            # Turned off mid-session, exactly as the settings window writes it.
+            self.write_config(effect_enabled=False)
+            published.clear()
+            for streak in range(6, 11):
+                self.server.result_gate.clear_for_manual_correction()
+                self.assertTrue(self.server.record_result("win", "manual"))
+        self.assertNotIn("effect", published, "effects must stop when the setting is off")
+        self.assertEqual(self.server.stats.snapshot()["streak"], 10, "counting is unaffected")
+        self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 10)
+
+    def test_config_endpoint_publishes_the_display_scope_for_the_browser_overlay(self):
+        self.assertEqual(self.get("/config")["overlay_stats_scope"], "session")
+        self.write_config(overlay_stats_scope="lifetime")
+        self.assertEqual(self.get("/config")["overlay_stats_scope"], "lifetime")
+        self.assertFalse(self.get("/config")["effect_enabled"] is None)
+
+
+class StoppedTrackerTests(unittest.TestCase):
+    def test_maintenance_reports_a_stopped_tracker_instead_of_starting_one(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            (root / "config.json").write_text(
+                json.dumps(config_utils.DEFAULT_CONFIG), encoding="utf-8")
+            with patch.object(config_utils, "CONFIG_PATH", root / "config.json"), \
+                 patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+                for call in (settings.purge_all_history,
+                             lambda: settings.purge_history_before(0.0),
+                             settings.read_runtime):
+                    with self.assertRaises(settings.TrackerUnavailable) as caught:
+                        call()
+                    self.assertIn("Tracker", str(caught.exception))
+                for broken in ('{"port": 1, "token": "x"}', "{}", "not json",
+                               '{"port": 9000, "token": "short"}'):
+                    (root / ".runtime.json").write_text(broken, encoding="utf-8")
+                    with self.assertRaises(settings.TrackerUnavailable):
+                        settings.read_runtime()
+            self.assertEqual(sorted(p.name for p in root.iterdir()),
+                             [".runtime.json", "config.json"])
+
+
+class DiagnosticReportTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.home = Path(self.directory.name) / "home"  # No Desktop: falls back to data_dir.
+        self.home.mkdir()
+
+    def test_reuses_the_existing_recorder_export(self):
+        import diagnostics
+        with patch.object(diagnostics.RECORDER, "export",
+                          return_value=Path("C:/tmp/report.zip")) as export:
+            self.assertEqual(settings.create_diagnostic_report(), Path("C:/tmp/report.zip"))
+        export.assert_called_once_with()
+
+    def test_real_export_contains_only_documented_content(self):
+        import diagnostics
+        diagnostics.RECORDER.record("selftest", note="unit")
+        with patch.object(diagnostics.Path, "home", return_value=self.home), \
+             patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            report = settings.create_diagnostic_report()
+        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        self.assertTrue(report.exists())
+        self.assertTrue(report.name.startswith("AC6-Tracker-Diagnostics-"))
+        with zipfile.ZipFile(report) as archive:
+            names = archive.namelist()
+            manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+        self.assertIn("detector.jsonl", names)
+        self.assertNotIn("history.db", names)
+        self.assertTrue(all(not name.endswith(".db") for name in names))
+        self.assertTrue(all(name == "manifest.json" or not name.startswith("roi/")
+                            or name.endswith(".png") for name in names))
+        self.assertIn("no full-screen capture", manifest["privacy"])
+        # The privacy text shown in the UI must match what the exporter collects.
+        self.assertIn("detector.jsonl", settings.DIAGNOSTIC_PRIVACY)
+        self.assertIn("history.db", settings.DIAGNOSTIC_PRIVACY)
+        self.assertIn("フルスクリーン画像", settings.DIAGNOSTIC_PRIVACY)
+
+    def test_failure_is_reported_and_raises_no_process(self):
+        import diagnostics
+        with patch.object(diagnostics.RECORDER, "export", side_effect=OSError("disk full")), \
+             patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            with self.assertRaises(OSError):
+                settings.create_diagnostic_report()
+
+
+@GUI
+class SettingsWindowTests(unittest.TestCase):
+    def setUp(self):
+        import tkinter as tk
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / "config.json"
+        self.path.write_text(json.dumps(config_utils.DEFAULT_CONFIG), encoding="utf-8")
+        patcher = patch.object(config_utils, "CONFIG_PATH", self.path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        config_utils._last_good = config_utils._last_good_signature = None
+        self.no_spawn = patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn"))
+        self.no_spawn.start()
+        self.addCleanup(self.no_spawn.stop)
+        self.root = tk.Tk()
+        self.root.withdraw()
+        self.addCleanup(self.root.destroy)
+        self.window = settings.open_settings(self.root)
+        self.root.update()
+
+    def pump(self, predicate, timeout=10.0):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.root.update()
+            if predicate():
+                return True
+            time.sleep(0.02)
+        return False
+
+    def test_every_option_saves_from_one_window(self):
+        self.assertTrue(self.window.effect_enabled.get())
+        self.assertEqual(self.window.scope.get(), "session")
+        self.window.effect_enabled.set(False)
+        self.window.enabled.set(True)
+        self.window.scope.set("lifetime")
+        self.window.save_button.invoke()
+        self.assertEqual(settings.read_settings(), {
+            "effect_enabled": False,
+            "effect_screenshot_enabled": True,
+            "overlay_stats_scope": "lifetime",
+        })
+        self.window.window.withdraw()
+        settings.open_settings(self.root)
+        self.assertFalse(self.window.effect_enabled.get())
+        self.assertEqual(self.window.scope.get(), "lifetime")
+
+    def test_destructive_actions_require_confirmation(self):
+        preview = ("all", {"total_matches": 7})
+        self.window._messagebox = Mock()
+        self.window._messagebox.askyesno.return_value = False
+        with patch.object(settings, "purge_all_history") as purge:
+            self.window._purge_preview_done(True, preview)
+            purge.assert_not_called()
+        self.assertIn("中止", self.window.purge_status.cget("text"))
+        self.assertIn("7", self.window._messagebox.askyesno.call_args.args[1])
+
+        self.window._messagebox.askyesno.return_value = True
+        with patch.object(settings, "purge_all_history",
+                          return_value={"mode": "all", "removed_matches": 7,
+                                        "session_reset": True}) as purge:
+            self.window._purge_preview_done(True, preview)
+            self.assertTrue(self.pump(lambda: "7 件を削除" in
+                                      self.window.purge_status.cget("text")))
+            purge.assert_called_once_with()
+
+    def test_before_date_confirmation_states_the_boundary(self):
+        self.window._messagebox = Mock()
+        self.window._messagebox.askyesno.return_value = False
+        self.window._purge_preview_done(True, ("before", {
+            "cutoff": 1000.0, "cutoff_text": "2026-09-09 00:00:00",
+            "removable": 4, "kept": 6, "total": 10,
+        }))
+        question = self.window._messagebox.askyesno.call_args.args[1]
+        self.assertIn("2026-09-09 00:00:00", question)
+        self.assertIn("4 件", question)
+        self.assertIn("6 件は残ります", question)
+        self.window._purge_preview_done(True, ("before", {
+            "cutoff": 1000.0, "cutoff_text": "2026-09-09 00:00:00",
+            "removable": 0, "kept": 10, "total": 10,
+        }))
+        self.assertIn("履歴はありません", self.window.purge_status.cget("text"))
+
+    def test_invalid_date_never_reaches_the_tracker(self):
+        self.window.cutoff_date.set("2026/09/09")
+        with patch.object(settings, "control_request") as control:
+            self.window.confirm_purge_before()
+            control.assert_not_called()
+        self.assertIn("YYYY-MM-DD", self.window.purge_status.cget("text"))
+
+    def test_repeated_diagnostic_clicks_run_one_export(self):
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        calls = []
+
+        def slow_export():
+            calls.append(1)
+            gate.wait(5)
+            return Path(self.directory.name) / "AC6-Tracker-Diagnostics-test.zip"
+
+        with patch.object(settings, "create_diagnostic_report", side_effect=slow_export):
+            for _ in range(5):
+                self.window.create_report()
+            self.root.update()
+            self.assertEqual(len(calls), 1, "a second export must not start")
+            self.assertIn("作成中です", self.window.diagnostics_status.cget("text"))
+            gate.set()
+            self.assertTrue(self.pump(
+                lambda: "作成しました" in self.window.diagnostics_status.cget("text")))
+        self.assertEqual(str(self.window.open_report_button.cget("state")), "normal")
+        self.assertIn("AC6-Tracker-Diagnostics-test.zip",
+                      self.window.diagnostics_status.cget("text"))
+
+    def test_diagnostic_failure_keeps_the_window_usable(self):
+        with patch.object(settings, "create_diagnostic_report", side_effect=OSError("denied")):
+            self.window.create_report()
+            self.assertTrue(self.pump(
+                lambda: "作成できませんでした" in self.window.diagnostics_status.cget("text")))
+        self.assertIn("Trackerは動作したまま", self.window.diagnostics_status.cget("text"))
+        self.assertEqual(str(self.window.open_report_button.cget("state")), "disabled")
+        self.assertEqual(self.window._busy, set())
+
+    def test_update_check_only_enables_install_when_newer(self):
+        for message, expected in (
+            ("新しいバージョン v2.0.0 があります（現在 1.0.1）。", "normal"),
+            ("最新の公開バージョンです（1.0.1）。", "disabled"),
+            ("更新を確認できませんでした: offline", "disabled"),
+        ):
+            with self.subTest(message=message):
+                with patch.object(settings, "check_latest_release", return_value=message):
+                    self.window.check()
+                    self.assertTrue(self.pump(lambda: not self.window.checking))
+                self.assertEqual(self.window.update_status.cget("text"), message)
+                self.assertEqual(str(self.window.install_button.cget("state")), expected)
+
+    def test_install_button_only_opens_the_official_page(self):
+        with patch.object(settings, "open_releases_page", return_value=True) as opened:
+            self.window.open_release_page()
+        opened.assert_called_once_with()
+        self.assertIn("正式インストーラー", self.window.update_status.cget("text"))
+        with patch("settings_window.webbrowser.open", return_value=True) as browser:
+            settings.open_releases_page()
+        browser.assert_called_once_with(settings.RELEASES_PAGE_URL, new=2)
+        self.assertTrue(settings.RELEASES_PAGE_URL.startswith(
+            "https://github.com/TullysAC6/ac6-winloss-tracker/releases"))
+
+    def test_analytics_and_export_report_failures_in_the_window(self):
+        self.window.refresh_analytics()
+        self.assertTrue(self.pump(
+            lambda: "集計できませんでした" in self.window.analytics_status.cget("text")))
+        with patch.object(self.window, "_filedialog") as dialog:
+            dialog.asksaveasfilename.return_value = ""
+            self.window.export_csv()
+        self.assertIn("中止", self.window.analytics_status.cget("text"))
+
+    def test_analytics_renders_a_real_summary(self):
+        store = HistoryStore(self.path.parent)
+        store.start_session()
+        now = time.time()
+        for index, result in enumerate(("win", "win", "loss", "draw")):
+            store.record_result(f"a{index}", result, "test",
+                                {"streak": 2, "wins": 2, "losses": 1}, created_at=now - index)
+        self.window.refresh_analytics()
+        self.assertTrue(self.pump(
+            lambda: "集計しました" in self.window.analytics_status.cget("text")))
+        text = self.window.analytics_text.get("1.0", "end")
+        for expected in ("今日", "今週（月曜開始）", "今月", "全期間",
+                         "直近10戦", "直近30戦", "直近100戦",
+                         "DRAWは勝率の分母に含みません"):
+            self.assertIn(expected, text)
+        destination = Path(self.directory.name) / "export.csv"
+        with patch.object(self.window, "_filedialog") as dialog:
+            dialog.asksaveasfilename.return_value = str(destination)
+            self.window.export_csv()
+            self.assertTrue(self.pump(
+                lambda: "件を書き出しました" in self.window.analytics_status.cget("text")))
+        self.assertTrue(destination.read_bytes().startswith(b"\xef\xbb\xbf"))
+
+    def test_pending_work_is_cancelled_when_the_window_is_destroyed(self):
+        with patch.object(settings, "create_diagnostic_report", return_value=Path("x.zip")):
+            self.window.create_report()
+            self.window.window.destroy()
+            self.root.update()
+        self.assertIsNone(self.window._task_poll_id)
+        self.assertIsNone(self.window.poll_id)
+
+
+if __name__ == "__main__":
+    unittest.main()

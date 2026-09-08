@@ -239,10 +239,7 @@ def _dashboard_summary_uncached():
     with history_lock:
         store = history
         health = dict(history_health)
-    empty_lifetime = {
-        "wins": 0, "losses": 0, "draws": 0, "matches": 0,
-        "win_rate": 0.0, "best_streak": 0,
-    }
+    empty_lifetime = dict(EMPTY_LIFETIME)
     session_meta = None
     lifetime = empty_lifetime
     recent = []
@@ -368,6 +365,7 @@ def safe_snapshot_bundle():
 
     snapshots.append(("config_health", {"system": True, "kind": "config_health", **get_config_health()}))
     snapshots.append(("detector", detector_snapshot()))
+    snapshots.append(("lifetime", lifetime_payload()))
     return snapshots
 
 
@@ -387,6 +385,33 @@ def encode_snapshot(event_type, payload):
         f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
     ).encode("utf-8")
 
+
+
+EMPTY_LIFETIME = {
+    "wins": 0, "losses": 0, "draws": 0, "matches": 0,
+    "win_rate": 0.0, "best_streak": 0,
+}
+
+
+def lifetime_payload():
+    """Lifetime totals for overlays that display the accumulated scope.
+
+    Read under history_lock only. It must never take result_lock or the event
+    bus lock, because the SSE snapshot path already holds the bus lock here.
+    """
+    with history_lock:
+        store = history
+    summary = dict(EMPTY_LIFETIME)
+    if store is not None:
+        try:
+            summary = store.lifetime_summary()
+        except Exception as e:
+            history_failure("lifetime_summary", e)
+    return {"system": True, "kind": "lifetime", **summary}
+
+
+def publish_lifetime():
+    publish("lifetime", lifetime_payload(), remember=False)
 
 
 def publish_stats_active(s):
@@ -471,8 +496,9 @@ def record_result(result, source):
                     error=f"{type(e).__name__}: {e}",
                 )
         history_event_ids.append(stored_event_id)
+        publish_lifetime()
 
-        if milestone:
+        if milestone and c["effect_enabled"]:
             publish("effect", {
                 "system": True,
                 "kind": "effect",
@@ -512,6 +538,7 @@ def undo_result():
                 set_history_health("active")
             except Exception as e:
                 history_failure("undo", e)
+        publish_lifetime()
         return s, removed
 
 
@@ -534,8 +561,74 @@ def reset_stats():
             except Exception as e:
                 history_failure("reset_session", e)
         history_event_ids.clear()
+        publish_lifetime()
         return s
 
+
+
+MAX_CONTROL_BODY_BYTES = 4096
+PURGE_CUTOFF_MAX_SKEW_SECONDS = 86400.0
+
+
+def validate_purge_request(body, now=None):
+    """Reject anything but an explicit, in-range purge instruction."""
+    now = time.time() if now is None else float(now)
+    if not isinstance(body, dict):
+        raise ValueError("purge request must be a JSON object")
+    mode = body.get("mode")
+    if mode not in ("all", "before"):
+        raise ValueError("mode must be 'all' or 'before'")
+    if mode == "all":
+        return "all", None
+    cutoff = body.get("cutoff")
+    if type(cutoff) is bool or not isinstance(cutoff, (int, float)):
+        raise ValueError("cutoff must be an epoch timestamp")
+    cutoff = float(cutoff)
+    if cutoff != cutoff or cutoff in (float("inf"), float("-inf")):
+        raise ValueError("cutoff must be a finite epoch timestamp")
+    if cutoff < 0:
+        raise ValueError("cutoff must not be negative")
+    if cutoff > now + PURGE_CUTOFF_MAX_SKEW_SECONDS:
+        raise ValueError("cutoff is too far in the future")
+    return "before", cutoff
+
+
+def purge_history(mode, cutoff=None):
+    """Delete lifetime history in the owning process, under the result lock.
+
+    The detector is never stopped and the session keeps a valid history row, so
+    a purge cannot leave the Tracker unable to record the next result.
+    """
+    with result_lock:
+        with history_lock:
+            store = history
+        if store is None:
+            raise RuntimeError("history store is unavailable")
+        if mode == "all":
+            outcome = store.purge_all()
+            history_event_ids.clear()
+        else:
+            outcome = store.purge_before(cutoff)
+        set_history_health("active")
+        invalidate_dashboard_summary()
+        outcome["mode"] = mode
+        outcome["session_reset"] = False
+        if mode == "all":
+            # A cleared lifetime history with a non-zero session counter would
+            # be contradictory on the overlay, so the session is reset too.
+            try:
+                s = stats.reset()
+                result_gate.lock_now()
+                with detector_lock:
+                    current = detector
+                if current:
+                    current.external_mutation()
+                publish_stats_active(s)
+                outcome["session_reset"] = True
+            except Exception as e:
+                outcome["session_error"] = f"{type(e).__name__}: {e}"
+        publish_lifetime()
+        return outcome
 
 
 def detector_supervisor():
@@ -616,6 +709,8 @@ class Handler(BaseHTTPRequestHandler):
                 c = load_config()
                 self.json_response({
                     "stats_enabled": c["stats_enabled"],
+                    "effect_enabled": c["effect_enabled"],
+                    "overlay_stats_scope": c["overlay_stats_scope"],
                     "config_health": get_config_health(),
                 })
             except Exception as e:
@@ -693,6 +788,17 @@ class Handler(BaseHTTPRequestHandler):
 
         self.json_response({"error": "not found"}, 404)
 
+    def read_json_body(self, limit=MAX_CONTROL_BODY_BYTES):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except (TypeError, ValueError):
+            raise ValueError("invalid Content-Length")
+        if length < 0 or length > limit:
+            raise ValueError("request body is too large")
+        if length == 0:
+            return {}
+        return json.loads(self.rfile.read(length).decode("utf-8"))
+
     def do_POST(self):
         path = urlparse(self.path).path
         supplied_token = self.headers.get("X-Control-Token", "")
@@ -716,6 +822,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/stats/reset":
                 s = reset_stats()
                 self.json_response({"ok": True, "stats": status_payload(s)})
+                return
+            if path == "/api/history/purge":
+                try:
+                    mode, cutoff = validate_purge_request(self.read_json_body())
+                except (ValueError, json.JSONDecodeError) as e:
+                    self.json_response({"error": f"invalid purge request: {e}"}, 400)
+                    return
+                self.json_response({"ok": True, **purge_history(mode, cutoff)})
                 return
             self.json_response({"error": "not found"}, 404)
         except StatsCorruptError as e:
