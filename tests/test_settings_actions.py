@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 import config_utils
 import history_analytics
 import settings_window as settings
-from history_store import HistoryStore
+from history_store import ActiveSessionOverlap, HistoryStore
 
 GUI = unittest.skipUnless(os.name == "nt", "real Tk controls on Windows")
 
@@ -204,12 +204,19 @@ class PurgeStoreTests(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.store = HistoryStore(self.root)
+        self.store.start_session()
+        self.record((100.0, 200.0, 300.0))
+        # Those three belong to a finished session; a new one is now open, so
+        # they are ordinary past history rather than live-session rows.
+        self.store.close_session("test")
         self.session = self.store.start_session()
-        for index, created_at in enumerate((100.0, 200.0, 300.0)):
-            self.store.record_result(f"e{index}", "win", "test",
+
+    def record(self, timestamps, prefix="e"):
+        for index, created_at in enumerate(timestamps):
+            self.store.record_result(f"{prefix}{index}", "win", "test",
                                      {"streak": index + 1, "wins": index + 1, "losses": 0},
                                      created_at=created_at)
-            self.store.create_match_context(f"c{index}", f"e{index}",
+            self.store.create_match_context(f"c{prefix}{index}", f"{prefix}{index}",
                                             result_detected_at=created_at)
 
     def rows(self, table):
@@ -223,6 +230,35 @@ class PurgeStoreTests(unittest.TestCase):
         self.assertEqual(self.rows("match_contexts"), 2)
         summary = self.store.lifetime_summary()
         self.assertEqual((summary["wins"], summary["best_streak"]), (2, 3))
+
+    def test_a_cutoff_inside_the_active_session_is_refused_before_any_delete(self):
+        self.record((400.0, 500.0), prefix="live")
+        before = (self.rows("matches"), self.rows("match_contexts"),
+                  self.rows("sessions"), self.store.lifetime_summary())
+        for cutoff in (450.0, 500.0, 1000.0):
+            with self.subTest(cutoff=cutoff):
+                with self.assertRaises(ActiveSessionOverlap) as caught:
+                    self.store.purge_before(cutoff)
+                self.assertGreaterEqual(caught.exception.matches, 1)
+                self.assertEqual((self.rows("matches"), self.rows("match_contexts"),
+                                  self.rows("sessions"), self.store.lifetime_summary()), before)
+                self.assertEqual(self.store.current_session_id, self.session)
+
+    def test_a_cutoff_at_the_first_active_row_leaves_the_session_untouched(self):
+        self.record((400.0, 500.0), prefix="live")
+        # created_at < cutoff is strict, so the row at exactly 400.0 stays and
+        # the active session loses nothing.
+        outcome = self.store.purge_before(400.0)
+        self.assertEqual(outcome["removed_matches"], 3)
+        self.assertEqual(self.rows("matches"), 2)
+        self.assertEqual(self.store.current_session_id, self.session)
+        self.assertEqual(self.store.lifetime_summary()["wins"], 2)
+
+    def test_purge_all_is_not_restricted_by_the_active_session(self):
+        self.record((400.0,), prefix="live")
+        outcome = self.store.purge_all()
+        self.assertEqual(outcome["removed_matches"], 4)
+        self.assertEqual(self.rows("matches"), 0)
 
     def test_purge_all_clears_everything_and_keeps_recording_possible(self):
         outcome = self.store.purge_all()
@@ -338,26 +374,87 @@ class LiveServerPurgeTests(unittest.TestCase):
         ) as response:
             return json.loads(response.read().decode("utf-8"))
 
-    def seed(self, timestamps):
+    def seed(self, timestamps, prefix="seed"):
+        """Record into the session that is currently open."""
         for index, created_at in enumerate(timestamps):
             self.server.history.record_result(
-                f"seed-{index}", "win", "manual",
+                f"{prefix}-{index}", "win", "manual",
                 {"streak": index + 1, "wins": index + 1, "losses": 0}, created_at=created_at,
             )
         self.server.invalidate_dashboard_summary()
 
+    def seed_closed(self, timestamps, prefix="old"):
+        """Record into a session that is then closed, as a previous run leaves it."""
+        self.seed(timestamps, prefix)
+        self.server.history.close_session("test")
+        self.server.history.start_session()
+        self.server.history_event_ids.clear()
+        self.server.invalidate_dashboard_summary()
+
     def test_settings_client_purges_before_a_local_date_boundary(self):
         cutoff = settings.cutoff_for_date(day_text())
-        self.seed([cutoff - 1, cutoff, cutoff + 1])
-        with patch.object(config_utils, "CONFIG_PATH", self.data / "config.json"):
-            preview = history_analytics.count_before(self.data, cutoff)
-            self.assertEqual((preview["removable"], preview["kept"]), (1, 2))
-            with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
-                outcome = settings.purge_history_before(cutoff)
+        self.seed_closed([cutoff - 1, cutoff, cutoff + 1])
+        preview = history_analytics.count_before(self.data, cutoff)
+        self.assertEqual((preview["removable"], preview["kept"]), (1, 2))
+        self.assertEqual(preview["active_session_removable"], 0)
+        with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            outcome = settings.purge_history_before(cutoff)
         self.assertEqual(outcome["removed_matches"], 1)
         self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 2)
         # The boundary row itself is kept.
         self.assertEqual(history_analytics.count_before(self.data, cutoff)["removable"], 0)
+
+    def test_a_cutoff_crossing_the_active_session_is_refused_and_changes_nothing(self):
+        cutoff = settings.cutoff_for_date(day_text())
+        # A session that began before the cutoff and is still open, which is
+        # what an overnight session looks like.
+        self.seed_closed([cutoff - 5000], prefix="closed")
+        self.seed([cutoff - 100, cutoff - 50, cutoff + 10], prefix="live")
+        stats_file = self.data / "stats.json"
+        before = {
+            "stats_bytes": stats_file.read_bytes(),
+            "session_id": self.server.history.current_session_id,
+            "lifetime": self.server.history.lifetime_summary(),
+            "total": history_analytics.count_before(self.data, time.time())["total"],
+        }
+        preview = history_analytics.count_before(self.data, cutoff)
+        self.assertEqual(preview["removable"], 3)
+        self.assertEqual(preview["active_session_removable"], 2)
+        self.assertEqual(preview["active_session_id"], before["session_id"])
+
+        with self.assertRaises(urllib.error.HTTPError) as caught:
+            self.post("/api/history/purge", {"mode": "before", "cutoff": cutoff})
+        self.assertEqual(caught.exception.code, 409)
+        body = json.loads(caught.exception.read().decode("utf-8"))
+        caught.exception.close()
+        self.assertEqual(body["error"], history_analytics.ACTIVE_SESSION_PURGE_MESSAGE)
+        self.assertEqual(body["active_session_matches"], 2)
+
+        # The settings-window client surfaces the Tracker's own explanation.
+        with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            with self.assertRaises(settings.TrackerUnavailable) as refused:
+                settings.purge_history_before(cutoff)
+        self.assertIn("現在のセッション", str(refused.exception))
+
+        self.assertEqual(stats_file.read_bytes(), before["stats_bytes"])
+        self.assertEqual(self.server.history.current_session_id, before["session_id"])
+        self.assertEqual(self.server.history.lifetime_summary(), before["lifetime"])
+        self.assertEqual(history_analytics.count_before(self.data, time.time())["total"],
+                         before["total"])
+        self.assertIn("wins", self.get("/stats"))
+
+    def test_a_cutoff_at_the_active_session_boundary_is_allowed(self):
+        cutoff = settings.cutoff_for_date(day_text())
+        self.seed_closed([cutoff - 200], prefix="closed")
+        # The live session starts exactly on the boundary: "created_at < cutoff"
+        # is strict, so nothing it counts is in range.
+        self.seed([cutoff, cutoff + 1], prefix="live")
+        preview = history_analytics.count_before(self.data, cutoff)
+        self.assertEqual((preview["removable"], preview["active_session_removable"]), (1, 0))
+        with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+            outcome = settings.purge_history_before(cutoff)
+        self.assertEqual(outcome["removed_matches"], 1)
+        self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 2)
 
     def test_purge_all_resets_the_session_and_recording_still_works(self):
         detector_before = self.server.detector_snapshot()["status"]
@@ -381,10 +478,10 @@ class LiveServerPurgeTests(unittest.TestCase):
         self.assertEqual(self.get("/api/dashboard/summary")["lifetime"]["wins"], 1)
 
     def test_a_future_cutoff_is_refused_by_the_api_and_changes_nothing(self):
-        # A live session row plus older history, so a future cutoff would be
-        # able to remove matches that stats.json still counts.
+        # Old history in a closed session, plus a live session row, so a future
+        # cutoff would be able to remove matches that stats.json still counts.
+        self.seed_closed([1000.0, 2000.0])
         self.assertTrue(self.server.record_result("win", "manual"))
-        self.seed([1000.0, 2000.0])
         stats_file = self.data / "stats.json"
         before = {
             "stats_bytes": stats_file.read_bytes(),
@@ -733,6 +830,30 @@ class SettingsWindowTests(unittest.TestCase):
             "removable": 0, "kept": 10, "total": 10,
         }))
         self.assertIn("履歴はありません", self.window.purge_status.cget("text"))
+
+    def test_a_cutoff_crossing_the_active_session_is_refused_by_the_window(self):
+        self.window._messagebox = Mock()
+        with patch.object(settings, "control_request") as control:
+            self.window._purge_preview_done(True, ("before", {
+                "cutoff": 1000.0, "cutoff_text": "2026-09-09 00:00:00",
+                "removable": 5, "kept": 3, "total": 8,
+                "active_session_id": 7, "active_session_removable": 2,
+            }))
+            control.assert_not_called()
+        self.window._messagebox.askyesno.assert_not_called()
+        message = self.window.purge_status.cget("text")
+        self.assertIn("現在のセッションに削除対象の試合が含まれています", message)
+        self.assertIn("Trackerを再起動", message)
+        self.assertIn("2 件", message)
+        self.assertEqual(self.window._busy, set())
+        # With none of the active session in range the confirmation still runs.
+        self.window._messagebox.askyesno.return_value = False
+        self.window._purge_preview_done(True, ("before", {
+            "cutoff": 1000.0, "cutoff_text": "2026-09-09 00:00:00",
+            "removable": 5, "kept": 3, "total": 8,
+            "active_session_id": 7, "active_session_removable": 0,
+        }))
+        self.window._messagebox.askyesno.assert_called_once()
 
     def test_invalid_date_never_reaches_the_tracker(self):
         self.window.cutoff_date.set("2026/09/09")

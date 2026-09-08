@@ -20,8 +20,8 @@ from config_utils import (
 )
 from diagnostics import RECORDER
 from event_bus import EventBus
-from history_analytics import latest_allowed_cutoff
-from history_store import HistoryStore, read_history_schema_version
+from history_analytics import ACTIVE_SESSION_PURGE_MESSAGE, latest_allowed_cutoff
+from history_store import ActiveSessionOverlap, HistoryStore, read_history_schema_version
 from result_detector import ResultDetector
 from result_gate import ResultGate
 from stats_manager import StatsCorruptError, StatsManager
@@ -869,7 +869,14 @@ class Handler(BaseHTTPRequestHandler):
                 except (ValueError, json.JSONDecodeError) as e:
                     self.json_response({"error": f"invalid purge request: {e}"}, 400)
                     return
-                self.json_response({"ok": True, **purge_history(mode, cutoff)})
+                try:
+                    self.json_response({"ok": True, **purge_history(mode, cutoff)})
+                except ActiveSessionOverlap as e:
+                    # Nothing was deleted: the store refuses before it writes.
+                    self.json_response({
+                        "error": ACTIVE_SESSION_PURGE_MESSAGE,
+                        "active_session_matches": e.matches,
+                    }, 409)
                 return
             self.json_response({"error": "not found"}, 404)
         except StatsCorruptError as e:

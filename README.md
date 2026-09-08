@@ -172,15 +172,20 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 
 ## トラブル時
 
-Tracker起動中は「設定」→「サポート」→「Diagnostic Reportを作成」、Trackerが起動していないときはインストール先にある`Create-Diagnostic-Report.bat`を実行すると、デスクトップに診断ZIPが作成されます。どちらも同じ内容です。問題が起きた直後、Trackerを終了・再起動する前に作成すると、そのときの検出状況が残ります。
+**問題が起きた直後、Trackerを終了・再起動する前に作成してください。** 直前の検出状況はTrackerのメモリ上にあり、終了すると失われます。Tracker起動中に「設定」→「サポート」→「Diagnostic Reportを作成」を押すと、その時点の検出状況をディスクへ書き出してからZIPにまとめます。
 
-ZIPには勝敗検出のテレメトリログ、スクリーンショットの保存結果ログ、`config.json` / `stats.json` / `installed-version.json`、起動ログ`startup.log`（ローカルのファイルパスとPythonエラーを含みます）、環境情報（OS・Python・依存パッケージの有無とバージョン・画面情報）、勝敗判定に使う画面の一部（ROI）のPNGが入ります。フルスクリーン画像と勝敗履歴データベース(`history.db`)は含まれません。
+1. 未カウントやPNG未保存が起きても、そのままTrackerを終了しない
+2. 「設定」→「サポート」→「Diagnostic Reportを作成」を実行する
+3. 作成されたZIPをそのまま保存する
+4. 開発者から依頼された場合に提出する
+
+すでにTrackerを終了してしまった場合や、Trackerが起動しない場合でも、インストール先の`Create-Diagnostic-Report.bat`でディスクに残っている情報からZIPを作成できます（メモリ上にしかなかった直前の情報は含まれません）。
+
+ZIPには勝敗検出のテレメトリログ、スクリーンショットの保存結果ログ（`effect-screenshot.jsonl`とローテーション済みログ）、`config.json` / `stats.json` / `installed-version.json`、起動・導入ログ（`startup.log` / `source-install.log` など。ローカルのファイルパスとPythonエラーを含みます）、環境情報（OS・Python・依存パッケージの有無とバージョン・主要ソースのハッシュ・画面情報）、勝敗判定に使う画面の一部（ROI）のPNGが入ります。capture失敗、検出候補の拒否、導入ファイルの混在を切り分けるための情報です。フルスクリーン画像、勝敗履歴データベース(`history.db`)、認証用runtimeファイルは含まれません。
+
+保存先はWindowsのデスクトップです。デスクトップの移動先（OneDriveなど）も追従します。取得できない場合の保存先は`%LOCALAPPDATA%\AC6WinLossTracker\`です。
 
 診断情報は自動送信されません。問題を報告するときだけ、ご自身でZIPを共有してください。
-
-デスクトップの移動先（OneDriveなど）も追従します。取得できない場合の保存先は`%LOCALAPPDATA%\AC6WinLossTracker\`です。
-未カウントやPNG未保存を報告する場合は、可能なら再現後にLauncherの「Trackerを終了」で終了してから診断ZIPを作成してください。終了時に直前の検出情報を保存します。強制終了直前のメモリ内情報は復元できません。
-ZIPには起動・導入ログ、導入commit情報、依存バージョン、主要ソースのハッシュ、`effect-screenshot.jsonl`とローテーション済みログを含めます。capture失敗、検出候補の拒否、導入ファイルの混在を切り分けるための情報です。全画面画像や認証用runtimeファイルは収録しません。
 
 ## Security
 

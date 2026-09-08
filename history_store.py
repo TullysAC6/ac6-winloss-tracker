@@ -9,6 +9,16 @@ from pathlib import Path
 from typing import Any
 
 
+class ActiveSessionOverlap(RuntimeError):
+    """A purge cutoff would remove matches the active session still counts."""
+
+    def __init__(self, matches: int):
+        self.matches = int(matches)
+        super().__init__(
+            f"cutoff removes {self.matches} match(es) from the active session"
+        )
+
+
 def read_history_schema_version(root: str | Path) -> int:
     """Inspect history.db without creating a database, journal, or WAL file."""
     path = Path(root) / "history.db"
@@ -490,11 +500,25 @@ class HistoryStore:
         match_contexts rows are removed by the ON DELETE CASCADE foreign key,
         session aggregates are recomputed from the surviving matches, and
         sessions left with no matches are dropped unless one is still active.
+
+        A cutoff that would remove matches the active session still counts in
+        stats.json raises ActiveSessionOverlap before anything is deleted, so
+        the session and lifetime displays cannot end up disagreeing.
         """
         cutoff = float(cutoff)
         with self._lock:
             session_id = self._current_session_id
             with self._connection() as connection:
+                if session_id is not None:
+                    overlap = int(
+                        connection.execute(
+                            "SELECT COUNT(*) FROM matches "
+                            "WHERE session_id=? AND created_at < ?",
+                            (session_id, cutoff),
+                        ).fetchone()[0]
+                    )
+                    if overlap:
+                        raise ActiveSessionOverlap(overlap)
                 removed = int(
                     connection.execute(
                         "SELECT COUNT(*) FROM matches WHERE created_at < ?", (cutoff,)

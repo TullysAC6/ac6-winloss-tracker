@@ -37,6 +37,10 @@ CSV_COLUMNS = (
 )
 CSV_ORDER_DESCRIPTION = "古い試合が先頭（created_at 昇順、同時刻は記録順）"
 RESULT_LABELS = {"win": "WIN", "loss": "LOSE", "draw": "DRAW"}
+ACTIVE_SESSION_PURGE_MESSAGE = (
+    "現在のセッションに削除対象の試合が含まれています。"
+    "Trackerを再起動して新しいセッションを開始してから実行してください。"
+)
 
 
 class HistoryUnavailable(RuntimeError):
@@ -186,7 +190,13 @@ def summarize(
 
 
 def count_before(root: str | Path, cutoff: float) -> dict[str, Any]:
-    """Read-only preview of how many matches a ``before`` purge would remove."""
+    """Read-only preview of how many matches a ``before`` purge would remove.
+
+    ``active_session_removable`` is the part of that which the still-open
+    session also counts in stats.json. Removing those would leave the session
+    and lifetime displays disagreeing, so both the settings window and
+    server.py refuse a cutoff where it is not zero.
+    """
     with open_readonly(root) as connection:
         if not _has_matches_table(connection):
             raise HistoryUnavailable("履歴テーブルがまだ作成されていません。")
@@ -195,6 +205,15 @@ def count_before(root: str | Path, cutoff: float) -> dict[str, Any]:
             "FROM matches WHERE created_at < ?",
             (float(cutoff),),
         ).fetchone()
+        active = connection.execute(
+            "SELECT id FROM sessions WHERE ended_at IS NULL ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        active_removable = 0
+        if active is not None:
+            active_removable = int(connection.execute(
+                "SELECT COUNT(*) FROM matches WHERE session_id=? AND created_at < ?",
+                (int(active["id"]), float(cutoff)),
+            ).fetchone()[0])
     removable, total = int(row["removable"]), int(row["total"])
     return {
         "cutoff": float(cutoff),
@@ -202,6 +221,8 @@ def count_before(root: str | Path, cutoff: float) -> dict[str, Any]:
         "removable": removable,
         "total": total,
         "kept": total - removable,
+        "active_session_id": None if active is None else int(active["id"]),
+        "active_session_removable": active_removable,
     }
 
 

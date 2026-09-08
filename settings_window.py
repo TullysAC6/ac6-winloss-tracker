@@ -149,6 +149,10 @@ def control_request(endpoint, payload, timeout=CONTROL_TIMEOUT_SECONDS):
     except urllib.error.HTTPError as error:
         detail = error.read(4096).decode("utf-8", errors="replace")
         error.close()
+        try:  # Prefer the Tracker's own explanation over the raw JSON body.
+            detail = json.loads(detail).get("error") or detail
+        except (ValueError, TypeError, AttributeError):
+            pass
         raise TrackerUnavailable(
             f"Trackerが要求を拒否しました（HTTP {error.code}）: {detail}"
         ) from error
@@ -691,6 +695,14 @@ class SettingsWindow:
                 self.purge_status.config(
                     text=f"{preview['cutoff_text']} より前の履歴はありません"
                          f"（全 {preview['total']} 件）。"
+                )
+                return
+            # server.py refuses the same range; stop here so the confirmation
+            # dialog never offers an operation the Tracker will reject.
+            if preview.get("active_session_removable", 0):
+                self.purge_status.config(
+                    text=f"{history_analytics.ACTIVE_SESSION_PURGE_MESSAGE}\n"
+                         f"（対象 {preview['active_session_removable']} 件）"
                 )
                 return
             question = (

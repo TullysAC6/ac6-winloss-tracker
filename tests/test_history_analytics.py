@@ -112,6 +112,27 @@ class PeriodTests(unittest.TestCase):
         preview = analytics.count_before(self.root, today)
         self.assertEqual((preview["removable"], preview["kept"], preview["total"]), (1, 2, 3))
 
+    def test_count_before_reports_the_open_session_overlap(self):
+        today = analytics.period_start("today", NOW)
+        store = build(self.root, [(today - 500, "win", 1)])
+        store.close_session("test")
+        session = store.start_session()
+        for index, created_at in enumerate((today - 100, today, today + 100)):
+            store.record_result(f"live-{index}", "win", "test",
+                                {"streak": 1, "wins": 1, "losses": 0}, created_at=created_at)
+        preview = analytics.count_before(self.root, today)
+        self.assertEqual(preview["removable"], 2)
+        self.assertEqual(preview["active_session_id"], session)
+        self.assertEqual(preview["active_session_removable"], 1)
+        # Exactly at the first live row the open session loses nothing.
+        earlier = analytics.count_before(self.root, today - 100)
+        self.assertEqual((earlier["removable"], earlier["active_session_removable"]), (1, 0))
+        # With no open session there is nothing to protect.
+        store.close_session("test")
+        closed = analytics.count_before(self.root, today)
+        self.assertIsNone(closed["active_session_id"])
+        self.assertEqual(closed["active_session_removable"], 0)
+
 
 class ExportTests(unittest.TestCase):
     def setUp(self):
