@@ -46,6 +46,7 @@ history_health = {"status": "starting", "error": None}
 history_event_ids = []
 dashboard_cache_lock = threading.Lock()
 dashboard_cache = None
+DASHBOARD_RECENT_MATCH_LIMIT = 50
 
 detector = None
 detector_lock = threading.Lock()
@@ -249,7 +250,7 @@ def _dashboard_summary_uncached():
         try:
             session_meta = store.session_metadata()
             lifetime = store.lifetime_summary()
-            recent = store.recent_matches(10)
+            recent = store.recent_matches(DASHBOARD_RECENT_MATCH_LIMIT)
             set_history_health("active")
             with history_lock:
                 health = dict(history_health)

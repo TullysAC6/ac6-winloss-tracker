@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import ctypes
 import hashlib
+import json
+import logging
+from logging.handlers import RotatingFileHandler
 import multiprocessing as mp
 import os
 import time
@@ -12,6 +15,59 @@ from datetime import datetime
 from pathlib import Path
 
 from owned_worker import KillOnCloseJob, owned_entry, stop_process
+
+
+def _record(effect, status, **details):
+    """Optional bounded log independent of pythonw/spawn standard handles.
+
+    Only event metadata is recorded, never desktop pixels or window titles.
+    Logging failures must not affect capture, counting, or worker cleanup.
+    """
+    try:
+        from app_paths import diagnostics_dir
+        message = json.dumps({"ts": time.time(), "pid": os.getpid(),
+                              "effect_id": effect.get("effect_id"),
+                              "milestone": effect.get("milestone"),
+                              "status": status, **details}, ensure_ascii=False)
+        handler = RotatingFileHandler(diagnostics_dir() / "effect-screenshot.jsonl",
+                                      maxBytes=256 * 1024, backupCount=1, encoding="utf-8")
+        try:
+            handler.handle(logging.LogRecord("screenshot", logging.INFO, "", 0, message, (), None))
+        finally:
+            handler.close()
+    except Exception:
+        pass
+
+
+def _blocking_window(api, game_hwnd, client, allowed):
+    """Explain an already rejected capture; never changes the safety decision."""
+    from result_detector import RECT
+    found = {}
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def inspect(hwnd, _):
+        try:
+            if int(hwnd) == game_hwnd:
+                return False
+            if int(hwnd) in allowed or not api.user32.IsWindowVisible(hwnd) or api.user32.IsIconic(hwnd):
+                return True
+            rect = RECT()
+            if not api.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+                return False
+            if (rect.left < client["left"] + client["width"] and rect.right > client["left"]
+                    and rect.top < client["top"] + client["height"] and rect.bottom > client["top"]):
+                process, _ = api.process_and_client(hwnd)
+                found.update(hwnd=int(hwnd), process=process,
+                             rect=[rect.left, rect.top, rect.right, rect.bottom])
+                return False
+            return True
+        except Exception:
+            return False
+    try:
+        api.user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
+        api.user32.EnumWindows(callback_type(inspect), 0)
+    except Exception:
+        pass
+    return found
 
 
 def desktop_directory():
@@ -97,41 +153,64 @@ def _save_visible_effect(effect, game, allowed, deadline):
     api = WinApi()
     target = api.game_target()
     if target is None or target["hwnd"] != game[0]:
+        _record(effect, "skipped", reason="target_changed")
         return
     client = target["client"]
     if (client["left"], client["top"], client["width"], client["height"]) != tuple(game[1:]):
+        _record(effect, "skipped", reason="client_changed")
         return
 
-    def visible():
-        return (time.monotonic() < deadline and api.game_target() == target
-                and all(api.user32.IsWindowVisible(hwnd) for hwnd in allowed)
-                and api.region_unobscured(target["hwnd"], client, allowed))
+    def visible(phase):
+        reason, details = None, {}
+        if time.monotonic() >= deadline:
+            reason = "deadline"
+        elif api.game_target() != target:
+            reason = "target_changed"
+        elif not all(api.user32.IsWindowVisible(hwnd) for hwnd in allowed):
+            reason = "overlay_hidden"
+        elif not api.region_unobscured(target["hwnd"], client, allowed):
+            if int(api.user32.GetForegroundWindow() or 0) != target["hwnd"]:
+                reason = "not_foreground"
+            else:
+                reason = "occluded"
+                details["blocker"] = _blocking_window(api, target["hwnd"], client, allowed)
+        if reason:
+            _record(effect, "skipped", reason=reason, phase=phase, **details)
+            return False
+        return True
 
-    if not visible():
+    if not visible("before_capture"):
         return
     with mss.mss() as desktop:
         virtual = desktop.monitors[0]
         if (client["left"] < virtual["left"] or client["top"] < virtual["top"]
                 or client["left"] + client["width"] > virtual["left"] + virtual["width"]
                 or client["top"] + client["height"] > virtual["top"] + virtual["height"]):
+            _record(effect, "skipped", reason="outside_desktop")
             return
         shot = desktop.grab(client)  # Windows MSS includes layered windows (CAPTUREBLT).
-        if not visible():
+        if not visible("after_capture"):
             return
         image = Image.frombytes("RGB", shot.size, shot.rgb)
     # A black/unavailable exclusive-fullscreen surface is not a useful screenshot.
     if not contains_effect_banner(image, int(effect["milestone"])):
+        _record(effect, "skipped", reason="banner_pixels_missing")
         print("[screenshot] skipped: overlay banner is not present in desktop capture", flush=True)
         return
     destination = desktop_directory() / screenshot_name(effect)
     if save_once(image, destination):
+        _record(effect, "saved", filename=destination.name)
         print(f"[screenshot] saved: {destination}", flush=True)
+    else:
+        _record(effect, "skipped", reason="duplicate_or_pending")
 
 
 def _screenshot_worker(effect, game, allowed, deadline):
     try:
+        _record(effect, "worker_started")
         _save_visible_effect(effect, game, allowed, deadline)
     except Exception as error:
+        _record(effect, "failed", error_type=type(error).__name__, error=str(error))
         print(f"[screenshot] save failed: {type(error).__name__}: {error}", flush=True)
 
 
@@ -156,6 +235,9 @@ class EffectScreenshots:
 
     def tick(self, effect, game, allowed, enabled):
         now = time.monotonic()
+        if effect and not effect.get("screenshot_observed"):
+            effect["screenshot_observed"] = True
+            _record(effect, "observed", enabled=bool(enabled), game_present=bool(game))
         if self.process is not None:
             if (not self.process.is_alive() or now - self.worker_started > 8.0 or not enabled
                     or not effect or effect["effect_id"] != self.worker_effect_id):
@@ -173,6 +255,7 @@ class EffectScreenshots:
             return
         # Set before spawn/save: errors can never enqueue the same event again.
         effect["screenshot_attempted"] = True
+        _record(effect, "spawn_requested")
         ready = self.context.Event()
         arguments = (dict(effect), tuple(game), tuple(allowed), effect["started"] + effect["duration"] - .1)
         process = self.context.Process(target=owned_entry,
@@ -185,7 +268,8 @@ class EffectScreenshots:
             ready.set()
             self.worker_started = now
             self.worker_effect_id = effect["effect_id"]
-        except Exception:
+        except Exception as error:
+            _record(effect, "spawn_failed", error_type=type(error).__name__)
             if process.pid is not None:
                 self.close()
             else:

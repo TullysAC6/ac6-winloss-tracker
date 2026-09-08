@@ -214,6 +214,7 @@ with tempfile.TemporaryDirectory() as temporary:
                         "win_rate": 0.0, "best_streak": 0}
 
             def recent_matches(self, limit):
+                assert limit == server.DASHBOARD_RECENT_MATCH_LIMIT == 50
                 self.calls += 1
                 return []
 

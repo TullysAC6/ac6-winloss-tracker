@@ -947,7 +947,10 @@ class GameOverlay:
         try:
             self._screenshots.tick(
                 self._active_effect if self._effect_visible else None, game,
-                (self.panel_hwnd, self.text_hwnd, self.effect_hwnd),
+                # A 0% panel is intentionally hidden; text and the actual
+                # effect remain mandatory visible windows for capture.
+                ((self.panel_hwnd,) if self.panel_opacity > 0 else ())
+                + (self.text_hwnd, self.effect_hwnd),
                 load_config().get("effect_screenshot_enabled", False),
             )
         except Exception as error:

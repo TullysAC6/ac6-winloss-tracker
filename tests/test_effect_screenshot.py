@@ -1,4 +1,7 @@
 import sys
+import os
+import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +20,34 @@ def effect(milestone=5):
 
 
 class ScreenshotTests(unittest.TestCase):
+    def test_diagnostics_without_stdout_and_io_failure_isolation(self):
+        from effect_screenshot import _record
+        with tempfile.TemporaryDirectory() as directory, patch("app_paths.diagnostics_dir", return_value=Path(directory)):
+            with patch("sys.stdout", None):
+                _record(effect(), "skipped", reason="deadline")
+            path = Path(directory) / "effect-screenshot.jsonl"
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["reason"], "deadline")
+            path.write_text("x" * (256 * 1024), encoding="utf-8")
+            _record(effect(), "saved")
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["status"], "saved")
+            self.assertTrue(path.with_name(path.name + ".1").exists())
+            with patch("effect_screenshot.RotatingFileHandler", side_effect=OSError("disk full")):
+                _record(effect(), "saved")  # Optional telemetry never raises.
+
+    @unittest.skipUnless(os.name == "nt", "Windows pythonw")
+    def test_real_pythonw_worker_has_durable_skip_reason(self):
+        pythonw = Path(sys.executable).with_name("pythonw.exe")
+        with tempfile.TemporaryDirectory() as directory:
+            environment = dict(os.environ, LOCALAPPDATA=directory)
+            subprocess.run([str(pythonw), "-c", "from effect_screenshot import _screenshot_worker; "
+                            "_screenshot_worker({'effect_id':'headless','milestone':5}, (0,0,0,640,360), (), 0)"],
+                           cwd=Path(__file__).resolve().parents[1], env=environment,
+                           creationflags=subprocess.CREATE_NO_WINDOW, check=True, timeout=15)
+            path = Path(directory) / "AC6WinLossTracker" / "diagnostics" / "effect-screenshot.jsonl"
+            rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([row["status"] for row in rows], ["worker_started", "skipped"])
+            self.assertEqual(rows[-1]["reason"], "target_changed")
+
     def test_filename_and_dedup_and_write_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / screenshot_name(effect())
@@ -157,6 +188,7 @@ class ScreenshotTests(unittest.TestCase):
         api.game_target.return_value = target
         api.region_unobscured.return_value = True
         api.user32.IsWindowVisible.return_value = True
+        api.user32.GetForegroundWindow.return_value = 1
         desktop = mss_factory.return_value.__enter__.return_value
         desktop.monitors = [client]
         # This represents the final compositor pixels, including a gold effect.

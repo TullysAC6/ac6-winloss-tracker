@@ -71,7 +71,8 @@ class SettingsTests(unittest.TestCase):
 
     def test_existing_overlay_tick_observes_both_changes_without_restart(self):
         import game_overlay
-        overlay = Mock(always_show=False, debug=False, _effect_visible=False, _active_effect=None)
+        overlay = Mock(always_show=False, debug=False, _effect_visible=False, _active_effect=None,
+                       panel_opacity=10, panel_hwnd=1, text_hwnd=2, effect_hwnd=3)
         overlay._sse_connected.is_set.return_value = True
         config_utils.load_config()  # Prime the existing process-local config cache.
         with patch("game_overlay.foreground_game_client", return_value=None), \
@@ -80,6 +81,10 @@ class SettingsTests(unittest.TestCase):
                 settings.save_screenshot_setting(enabled)
                 game_overlay.GameOverlay._tick(overlay)
                 self.assertIs(overlay._screenshots.tick.call_args.args[3], enabled)
+                self.assertEqual(overlay._screenshots.tick.call_args.args[2], (1, 2, 3))
+            overlay.panel_opacity = 0
+            game_overlay.GameOverlay._tick(overlay)
+            self.assertEqual(overlay._screenshots.tick.call_args.args[2], (2, 3))
 
     @unittest.skipUnless(os.name == "nt", "real Tk controls on Windows")
     def test_running_launcher_opens_settings_without_spawning(self):
