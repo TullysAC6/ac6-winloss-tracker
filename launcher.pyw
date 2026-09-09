@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
@@ -408,6 +409,34 @@ def main() -> None:
     close_button.pack(side="left", padx=6)
     button_row.pack()
 
+    # Workers only publish Python data. All Tk calls, including after(), belong
+    # to the thread running mainloop; a closed root must never be called by them.
+    results = queue.SimpleQueue()
+    watched_pid = None
+
+    def run_worker(operation, callback, failure):
+        def worker():
+            try:
+                result = operation()
+            except Exception:
+                result = failure
+            results.put((callback, result))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def poll_results():
+        while True:
+            try:
+                callback, result = results.get_nowait()
+            except queue.Empty:
+                break
+            callback(result)
+        # Another Launcher can stop this exact Tracker. Status windows must
+        # follow that process, rather than remaining open indefinitely.
+        if watched_pid is not None and not process_is_alive(watched_pid):
+            root.destroy()
+            return
+        root.after(100, poll_results)
+
     def dashboard_finish(ok: bool) -> None:
         dashboard_button.config(state="normal")
         if ok:
@@ -418,10 +447,7 @@ def main() -> None:
     def begin_dashboard() -> None:
         dashboard_button.config(state="disabled")
         status.config(text="ダッシュボードを開いています...")
-        threading.Thread(
-            target=lambda: root.after(0, dashboard_finish, open_dashboard()),
-            daemon=True,
-        ).start()
+        run_worker(open_dashboard, dashboard_finish, False)
 
     dashboard_button.config(command=begin_dashboard)
 
@@ -434,19 +460,27 @@ def main() -> None:
             status.config(text="AC6 Win/Loss Trackerを\n完全に終了できませんでした。\n診断ログを確認してください。")
 
     def begin_shutdown() -> None:
+        nonlocal watched_pid
+        # Keep failure messages visible even if shutdown only partly succeeds.
+        watched_pid = None
         actions.pack_forget()
         status.config(text="終了しています...")
-        threading.Thread(
-            target=lambda: root.after(0, shutdown_finish, shutdown_tracker()), daemon=True
-        ).start()
+        run_worker(shutdown_tracker, shutdown_finish, False)
 
     shutdown_button.config(command=begin_shutdown)
 
     def finish(result: str) -> None:
+        nonlocal watched_pid
         if result == "started":
             status.config(text="AC6 Win/Loss Trackerを\n正常に起動しました。")
             root.after(2000, root.destroy)
         elif result == "already_running":
+            runtime = read_runtime()
+            watched_pid = runtime["pid"] if runtime else None
+            if runtime is None:
+                # Shutdown may finish between the worker's readiness check and
+                # this UI callback. Do not leave an unbound status window.
+                root.after(2000, root.destroy)
             status.config(text="AC6 Win/Loss Trackerは\n正常に起動中です。")
             actions.pack(pady=16)
         else:
@@ -455,11 +489,8 @@ def main() -> None:
                 "ゲームオーバーレイまたは診断ログを確認してください。"
             )
 
-    def worker() -> None:
-        result = launch_once()
-        root.after(0, finish, result)
-
-    root.after(100, lambda: threading.Thread(target=worker, daemon=True).start())
+    root.after(100, lambda: run_worker(launch_once, finish, "failed"))
+    root.after(100, poll_results)
     root.mainloop()
 
 

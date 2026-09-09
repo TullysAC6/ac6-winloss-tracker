@@ -12,7 +12,8 @@
 
 ## レビューと限定修正
 
-新規High以上の勝敗・キャプチャ・所有管理・配布処理の不具合は今回の検証では見つからなかった。
+勝敗・キャプチャ・所有管理・配布処理の新規High以上は今回の検証では見つからなかった。
+その後の実機報告を受け、Launcher残留の経路を限定修正した（下記）。
 診断には次の不足があり、分類／ResultGate／CLEAR／WGC安全条件を変えず補った。
 
 - 診断ZIPが新しいScreenshotログ、startup/installログ、installed-version情報を収録していなかった。
@@ -24,6 +25,28 @@ ZIPに現行/ローテーション済みScreenshot・startupログ、導入/削�
 全6依存の情報と主要ソース/lockのSHA-256をmanifestへ追加。
 health遷移と終了時だけ直前情報を保存し、通常フレームは従来どおりメモリ内に保持する。
 診断失敗がhealth通知やworker cleanupを止めないことをテストした。
+
+### Launcher残留の追加修正
+
+既に起動中のTrackerを表示するLauncherには、別のLauncherからTrackerが終了されたことを
+検知する処理がなく、状態表示のmainloopが無期限に残っていた。実Tk子プロセスで再現した。
+また起動・Dashboard・終了のworkerが直接Tkの`after()`を呼び、worker例外時には
+結果表示へ戻らない経路があった。報告されたPIDそのもののスタックは採取しておらず、
+押したLauncherのTk呼び出しが実機で停止したとまでは断定していない。
+
+workerはPythonキューへ結果だけを渡し、Tkメインスレッドで表示と終了を行う。
+既存Trackerの状態表示窓は紐づいたPIDの終了に追従する。自身の終了操作中はこの監視を外し、
+部分的な終了失敗も画面に残す。Server/Overlay/Dashboardのshutdown処理は変更しない。
+
+`test_launcher_gui_lifecycle.py`は隔離LOCALAPPDATAと実HTTPのTracker代替を使用し、
+実Tk/pythonw子プロセスの7テストで3回の起動・終了、複数状態窓、Tracker異常終了、
+失敗表示・例外・部分終了失敗、起動確認直後の終了競合を検証する。起動結果はfixtureで与え、終了要求・PID監視は
+実Launcher処理を使う。実アプリ起動経路は別のsource install flowで検証する。
+修正前のテストは残留・workerのTk呼び出し・例外時表示でREDを確認した。
+従来のテストは起動中更新時にinstallerがLauncherを回収する経路を検証していたため、
+Launcher自身だけで終了するこの欠落を検出できていなかった。
+Launcher修正のローカル3.14全回帰は成功。3.13の追加ローカル実行はWindowsの
+アプリケーション制御が`_ctypes` DLLを拒否したため、OS設定を変更せずCIで確認する。
 
 ## Windows検証
 
