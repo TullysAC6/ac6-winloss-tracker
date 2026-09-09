@@ -32,7 +32,7 @@ No application code was changed to record any of this.
 |---|---|
 | Stable (public) | **v1.0.1** — commit `54ba0d8` |
 | `main` | `a6b7994` |
-| Current RC | `codex/wgc-rc-validation-20260908` — `746f73f`, 7 commits ahead of `main` |
+| Current RC | `codex/wgc-rc-validation-20260908` — `b9d627c`, 8 commits ahead of `main` (Astra is still pushing to it) |
 | Open PRs | [#5](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5) settings/analytics (**draft**) · [#13](https://github.com/TullysAC6/ac6-winloss-tracker/pull/13) coordination docs (**draft**) |
 
 ## Active branches
