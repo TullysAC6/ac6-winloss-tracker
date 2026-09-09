@@ -244,7 +244,20 @@ recognition, then statistics.
 
 ## T0-T3 acceptance gates
 
-**Decision: every meaningful change progresses T0 to T3, and T0-T2 pass before the user is asked for T3.**
+**Decision: every meaningful change progresses T0 to T3 in a fixed order, and T0-T2 pass before the PR goes to review — not merely before T3.**
+
+```text
+Implementation
+→ T0  Unit / DB / Static
+→ T1  Fixture Replay
+→ T2  Isolated E2E / Lifecycle
+→ PR handoff
+→ Codex/Astra independent review
+→ Required fixes
+→ Re-run the affected T0-T2
+→ T3  Real AC6 Smoke
+→ main
+```
 
 | Gate | Human AC6 operation | Content |
 |---|---|---|
@@ -258,8 +271,18 @@ cleanup policy in the process-safety decision above. Only the smallest real-game
 actually requires is asked of the user - a full manual regression suite is not requested when
 automated evidence already covers the untouched areas.
 
+Two ordering rules that are part of this decision:
+
+- **Review comes after T0-T2, not before.** The reviewer reads the gate evidence as part of the
+  change. Handing over an unverified change spends review effort on defects an automated gate
+  would have caught, and produces conclusions about code that is about to change anyway.
+- **A review fix invalidates the gate evidence for the paths it touched.** Re-run the affected
+  T0-T2 before requesting T3. Pre-fix results are not carried forward.
+
 Why: the bottleneck on this project is defects that are only found in a real AC6 session. Moving
-detection earlier is worth more than adding another assistant.
+detection earlier is worth more than adding another assistant - and T3 is the one step that costs
+the user a play session, so it is spent last, on code that has already passed automation and
+review.
 
 ---
 

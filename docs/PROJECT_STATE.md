@@ -104,16 +104,49 @@ update check.
 
 ## GitHub Project board
 
-Still not created. The local `gh` token lacks the project scopes:
+**[AC6 Win/Loss Tracker Development](https://github.com/users/TullysAC6/projects/1)** — created
+2026-09-09 once the `project` scope was authorised. Private to the owner. It is the only project
+on this account; no duplicate was created.
+
+Status column: **Backlog · Planned · In Progress · Review · Blocked · Done**.
+`Done` means released and in use — never "an assistant says the code is written".
+
+Current placement, which must stay consistent with the table above and with `ROADMAP.md`:
+
+| Status | Items | Why |
+|---|---|---|
+| **In Progress** | #6, #7 | #6 is the living coordination entry point; #7 is the current focus — real-AC6 acceptance of the RC |
+| **Blocked** | #4, #8, #9, PR #5 | All waiting on RC acceptance. #4's fix is on the RC; #8 and #9 are implemented across the RC and PR #5; PR #5 stays draft until the RC lands and it is reconciled |
+| **Review** | PR #13 | Documentation review — a separate track from real-AC6 acceptance |
+| **Planned** | #14, #15, #16, #17, #18 | Phase D and Phases 7A–8E |
+| **Backlog** | #10, #11, #12 | Phase 8C slices, waiting on #17 |
+| **Done** | — | Nothing yet. v1.0.1 predates the board |
+
+When an item moves here, move it on the board too — and when they disagree, this file and
+`ROADMAP.md` are right.
+
+## Development flow
+
+Every item follows this order (`MASTER_REQUIREMENTS.md` §3):
 
 ```text
-error: your authentication token is missing required scopes [read:project]
-To request it, run:  gh auth refresh -s read:project
+Implementation
+→ T0  Unit / DB / Static
+→ T1  Fixture Replay
+→ T2  Isolated E2E / Lifecycle
+→ PR handoff
+→ Codex/Astra independent review
+→ Required fixes
+→ Re-run the affected T0–T2
+→ T3  Real AC6 Smoke
+→ main
 ```
 
-Until the user authorises that scope, #6 and `docs/ROADMAP.md` are the roadmap surface. The
-intended board is `AC6 Win/Loss Tracker Development` with columns
-Backlog / Planned / In Progress / Review / Blocked / Done.
+T0–T2 pass **before the PR goes to review**, and the affected gates are re-run after review fixes.
+T3 is last because it is the only step that costs the user a play session.
+
+T1 does not exist yet — the fixture/replay harness is #14, which is why #7's real-AC6 list is as
+long as it is.
 
 ## Next actions
 
