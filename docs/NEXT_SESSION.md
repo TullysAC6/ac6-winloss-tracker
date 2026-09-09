@@ -17,7 +17,7 @@ Get the RC through real-AC6 acceptance. No code work is blocking it.
 
 ## Current branch
 
-`codex/wgc-rc-validation-20260908` (RC, `746f73f`) — acceptance tracked in
+`codex/wgc-rc-validation-20260908` (RC, `b9d627c` at the time of writing; Astra is still pushing to it) — acceptance tracked in
 [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7)
 
 ## Current PRs
