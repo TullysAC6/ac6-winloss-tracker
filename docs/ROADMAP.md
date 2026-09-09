@@ -2,6 +2,10 @@
 
 Entry point on GitHub: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6). Current position: [PROJECT_STATE.md](PROJECT_STATE.md).
 
+This file records **implementation order and status only**. The requirement itself lives in
+[MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) and the reasoning in [DECISIONS.md](DECISIONS.md).
+An item appearing here is not authorisation to implement it now.
+
 Status vocabulary:
 
 | Status | Meaning |
@@ -12,8 +16,77 @@ Status vocabulary:
 | **PLANNED** | Agreed direction, scheduled after the current phases |
 | **BACKLOG** | Agreed direction, not scheduled, no design yet |
 | **DEFERRED** | Deliberately not doing it now; the reason is recorded |
+| **FUTURE / EXPERIMENTAL** | Agreed as a direction, but a design bar must be met before it may be built |
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
+
+---
+
+## Phase numbering — 2026-09-09 reorganisation
+
+Master Requirements Revision 2 added a development-acceleration track, a match-metadata
+foundation and a full opponent-build programme. Rather than renumber existing phases and break
+every existing reference, the old phases were **folded in place**:
+
+| Old | Now | Note |
+|---|---|---|
+| Phase 1–6 | unchanged | Still accurate |
+| Phase 7 — Advanced statistics | **Phase 7B** | The daily/weekly/monthly series is now one part of growth analytics, and gains Phase 7A as its prerequisite |
+| Phase 8 — Opponent weapon analysis ([#10](https://github.com/TullysAC6/ac6-winloss-tracker/issues/10)) | **Phase 8C** slice | One slice of one capture pipeline, not its own pipeline |
+| Phase 9 — Opponent leg analysis ([#11](https://github.com/TullysAC6/ac6-winloss-tracker/issues/11)) | **Phase 8C** slice | Same |
+| Phase 10 — Opponent build analysis ([#12](https://github.com/TullysAC6/ac6-winloss-tracker/issues/12)) | **Phase 8A–8C** | The superset; it is now the whole capture programme |
+| Phase 11 — UX / distribution | unchanged | Number kept |
+| — | **Phase D** (new) | Development acceleration; cross-cutting, runs first |
+
+No phase number was reused for a different subject, and no item was dropped.
+
+---
+
+## Implementation priority
+
+Two independent tracks. Phase D is not a feature, and it comes first because it changes how
+expensive every later phase is to verify.
+
+**Development acceleration (Phase D)**
+
+1. Fixture / replay harness
+2. Standard PR handoff template
+3. T0–T3 acceptance gates
+4. Optional feature flags
+5. Performance / security regression checks
+
+**User analytics**
+
+1. Recent 10 / 30 / 100 + day / week / month
+2. Ranked / Custom + Single / Team
+3. Self rank vs opponent rank
+4. Rolling win rate
+5. Full Opponent Build
+6. Part / build matchup win rates
+7. Recently improved matchup
+8. Session / post-loss tendencies
+9. Next Goal
+10. Future self-build cross analysis
+
+Prerequisite foundations may be implemented before the visible feature that depends on them.
+
+---
+
+## Phase D — Development acceleration
+
+The bottleneck is defects that only surface in a real AC6 session. This phase moves detection
+earlier. Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 38–42.
+
+| Item | Status | Notes |
+|---|---|---|
+| Fixture / replay harness | **PLANNED — HIGH PRIORITY** | `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md) |
+| Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
+| T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the user is asked for T3 |
+| Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
+| Performance / security regression checks | PLANNED | Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists on the RC branch |
+
+`ADOPTED (process)` means the rule is in force for future work — a documentation state, not a
+shipped application feature.
 
 ---
 
@@ -75,16 +148,16 @@ Everything in this phase is the current RC. See [#7](https://github.com/TullysAC
 
 ## Phase 5 — Settings
 
-Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8). The settings screen does not exist in v1.0.1 at all.
+Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8). The settings screen does not exist in v1.0.1 at all — `settings_window.py` is not in the `v1.0.1` tag.
 
 | Item | Status | Notes |
 |---|---|---|
-| Screenshot ON / OFF (`effect_screenshot_enabled`) | ACCEPTANCE PENDING | Config key and launcher settings entry are on the RC, not in v1.0.1 |
+| Screenshot ON / OFF (`effect_screenshot_enabled`) | ACCEPTANCE PENDING | Config key and launcher settings entry are **on the RC branch**, not in v1.0.1 |
+| Check for a new version | ACCEPTANCE PENDING | Introduced **on the RC branch** (launcher settings, commit `5fcc325`) and extended in draft PR #5. Not in v1.0.1 |
 | Milestone effect ON / OFF (`effect_enabled`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Session / lifetime display switch (`overlay_stats_scope`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Reset all win/loss history | ACCEPTANCE PENDING | Draft PR #5 |
 | Delete history before a given date | ACCEPTANCE PENDING | Draft PR #5. Capped at today; refuses a cutoff crossing the open session |
-| Check for a new version | ACCEPTANCE PENDING | Draft PR #5 |
 | Automatic update | DEFERRED | Deliberate. See [DECISIONS.md](DECISIONS.md) |
 
 ## Phase 6 — Match analytics
@@ -99,34 +172,152 @@ Umbrella issue: [#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9).
 | DB integrity check (`quick_check` / `integrity_check`) | ACCEPTANCE PENDING |
 | History maintenance (reset all, delete before a date) | ACCEPTANCE PENDING |
 
-Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any new statistic reuses this definition.
+Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any new statistic reuses this definition, and always displays its sample size: `80.0% (8W-2L / 10 matches)`.
 
-## Phase 7 — Advanced statistics
+---
+
+## Phase 7 — Match metadata and growth analytics
+
+Everything below is **PLANNED**. Nothing here is implemented, and the whole phase depends on 7A.
+
+### Phase 7A — Match metadata foundation
+
+The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 10–15.
 
 | Item | Status | Notes |
 |---|---|---|
+| `match_type` — ranked / custom / unknown | PLANNED | |
+| `match_format` — single / team / unknown | PLANNED | |
+| `self_rank` | PLANNED | Single and Team, where reliable |
+| `opponent_rank` | PLANNED | Single only. Team opponent ranks deferred |
+| `metadata_recognition_status` / `metadata_recognition_version` | PLANNED | |
+| TEAM recorded through the normal result path | PLANNED | WIN/LOSE/DRAW, match history and win-rate stats. **Supersedes the previous "SINGLE only" scope decision** — see [DECISIONS.md](DECISIONS.md) |
+| Match-history row shows mode / format / ranks | PLANNED | `RANKED · SINGLE`, `自分 A / 相手 S`. Unknown shown honestly |
+| Win-rate breakdown by Ranked / Custom / Single / Team | PLANNED | Top-level UI may stay Overall / Single / Team, with the detail elsewhere |
+| `相手機体: TEAMのため対象外` distinct from `未取得` | PLANNED | |
+
+Not negotiable in this phase: metadata failure never discards a result; `unknown` is never
+inferred into a specific category; existing historical rows stay `unknown`.
+
+### Phase 7B — Growth trend analytics
+
+Absorbs the former Phase 7 (daily / weekly / monthly series). Priority **HIGH**.
+
+| Item | Status | Notes |
+|---|---|---|
+| Recent 10 / 30 / 100 | ACCEPTANCE PENDING | Already in draft PR #5 (Phase 6) |
+| Today / this week / **previous week** / this month | PLANNED | Previous-week comparison is new in Revision 2 |
 | Daily win-rate series | PLANNED | Period *aggregates* exist; a per-day *trend* does not |
 | Weekly win-rate series | PLANNED | |
 | Monthly win-rate series | PLANNED | |
+| 30-match rolling win rate | PLANNED | The recommended primary trend |
+| Period-vs-period comparison | PLANNED | Shows both sample sizes, the difference in percentage points and a sparse-data marker. `最近30戦 57% / 前30戦 51% / +6pt` |
 | Statistics UI (charts / trends) | PLANNED | Needs a home in the dashboard |
 
-## Phase 8 — Opponent weapon analysis
+### Phase 7C — Rank-relative performance
 
-[#10](https://github.com/TullysAC6/ac6-winloss-tracker/issues/10) — **BACKLOG**. Nothing records opponent loadout today. Needs a data-source decision, a schema migration and enrichment that stays outside the authoritative result write.
+Priority **HIGH once rank metadata is reliable**. Depends on 7A.
 
-## Phase 9 — Opponent leg analysis
+| Item | Status | Notes |
+|---|---|---|
+| vs higher rank / same rank / lower rank | PLANNED | Only matches whose rank metadata is sufficiently reliable. Unknown ranks are not classified |
+| Expected Performance vs a rank-conditioned baseline | **FUTURE / EXPERIMENTAL** | Must not be built as a hand-written expectation. Needs transparent methodology, adequate sample, a defined baseline population, uncertainty handling, and validation that it is not misleading. Until then, raw rank-relative W/L is preferred |
 
-[#11](https://github.com/TullysAC6/ac6-winloss-tracker/issues/11) — **BACKLOG**. Same blocker as Phase 8.
+### Phase 7D — Session tendencies, goals and achievements
 
-## Phase 10 — Opponent build analysis
+| Item | Status | Notes |
+|---|---|---|
+| Session tendencies | PLANNED | Matches 1–5 / 6–10 / 11+; after a win; after a loss; after 2 and after 3 consecutive losses. Requires an adequate sample. Neutral wording only — surface a pattern, never diagnose psychology |
+| Next Goal cards | PLANNED / USER-CHOSEN | A few actionable cards (今の調子 / 最近の成長 / 次に注目) with `[このMatchupを目標にする]`. Recommended, never imposed |
+| Personal Best / achievements | PLANNED | Best streak, best 30-match win rate, higher-rank wins, largest matchup improvement, match milestones. Improvement itself counts as an achievement. No manipulative or excessive notification |
 
-[#12](https://github.com/TullysAC6/ac6-winloss-tracker/issues/12) — **BACKLOG**. The superset of Phases 8 and 9: if opponent data is ever captured it should be captured once and sliced three ways. Includes richer match history and the statistics UI that depends on it.
+---
+
+## Phase 8 — Opponent recognition and build analytics
+
+The feature is **full opponent build recognition**, not weapon recognition. One capture pipeline
+feeds every opponent statistic. Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md)
+sections 16–26 and 53. Everything below is **PLANNED / BACKLOG** — nothing records opponent
+loadout today.
+
+### Phase 8A — Opponent recognition foundation
+
+| Item | Status | Notes |
+|---|---|---|
+| Local versioned parts master | PLANNED | `part_id`, `category`, `display_name`, `aliases`, `game_version`, `active`. Game8 is reference material only, never a runtime dependency |
+| Opponent-build schema | PLANNED | Per match: 4 weapons, HEAD / CORE / ARMS / LEGS, BOOSTER, FCS, GENERATOR, EXPANSION |
+| `recognition_status` / `recognition_source` / `recognition_version`, `recognized_at`, `confidence`, `manual_corrected` | PLANNED | Status distinguishes complete / partial / failed / not acquired / not supported for TEAM |
+| Build Fingerprint | PLANNED | Deterministic, for grouping only. Never replaces the component fields |
+| Short-lived recognition lifecycle | PLANNED | No always-on worker. Post-result, event or user initiated, exits when done |
+| Self / opponent UI identification | PLANNED | Verified from UI / player context. "The parts differ from mine" is not sufficient evidence |
+| Feature flag `opponent_build_recognition` | PLANNED | Defaults OFF before acceptance |
+
+### Phase 8B — Live opponent build recognition
+
+| Item | Status | Notes |
+|---|---|---|
+| Single only, after the result is finalised | PLANNED | WIN / LOSE / DRAW all valid |
+| Capture only the required frame(s), recognise, normalise, save to that match, exit | PLANNED | |
+| Partial recognition stored, not discarded | PLANNED | |
+| Manual correction | PLANNED | Updates the current value; no unbounded edit log |
+| **Never carry a build forward between matches** | PLANNED — CRITICAL | The same opponent, the same visible weapons or frame is not a source. FCS / GENERATOR / EXPANSION can change invisibly. See [DECISIONS.md](DECISIONS.md) |
+| Build failure never affects the result | PLANNED | |
+
+### Phase 8C — Opponent statistics
+
+Replaces the former Phases 8 / 9 / 10 as slices of one dataset.
+[#10](https://github.com/TullysAC6/ac6-winloss-tracker/issues/10) weapons ·
+[#11](https://github.com/TullysAC6/ac6-winloss-tracker/issues/11) legs ·
+[#12](https://github.com/TullysAC6/ac6-winloss-tracker/issues/12) build.
+
+| Item | Status | Notes |
+|---|---|---|
+| Per-slot win rates — weapons, HEAD, CORE, ARMS, LEGS, BOOSTER, FCS, GENERATOR, EXPANSION | BACKLOG | Every figure carries its match count |
+| Complete-build win rate | BACKLOG | Grouped by Build Fingerprint |
+| Combinations (weapon + legs, and so on) | BACKLOG | Only where the sample is meaningful |
+| 得意な相手 / 苦手な相手 summary | BACKLOG | A short summary, not every dimension by default. Minimum-sample rule or a visible sparse marker |
+| Improved-matchup highlight | BACKLOG | `vs Tetra: previous 30 31% / recent 10 50% / +19pt`. Consistent selection rule, no cherry-picking |
+| Single and Team analysis kept separate | BACKLOG | |
+
+### Phase 8D — Manual historical backfill
+
+| Item | Status | Notes |
+|---|---|---|
+| `[対戦履歴から取得]` on an eligible Single match with no build | PLANNED | Explicit dashboard action only |
+| Target `match_id` fixed before recognition | PLANNED | |
+| Soft evidence matching; ambiguous asks the user; a clear mismatch does not write | PLANNED | Timestamp is a signal, not a strict gate; time proximity alone never associates |
+| `recognition_source = history_manual` | PLANNED | |
+| Cancel action; a pending backfill is cleared on restart | PLANNED | |
+| Browsing AC6 history never triggers recognition or a DB write | PLANNED | |
+
+### Phase 8E — Recognition regression tests
+
+| Item | Status | Notes |
+|---|---|---|
+| Fixture-based recognition regression tests | PLANNED | Built on the Phase D harness. Eventually mandatory for recognition changes. Expected labels are never edited to make a failing test pass |
+
+---
 
 ## Phase 11 — UX / distribution improvements
+
+Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
 | Dedicated venv isolation | DEFERRED | Phase 3 note |
-| Support for CUSTOM MATCH / RANK MATCH: TEAM | DEFERRED | Explicitly out of scope in the README; detection is unverified for those modes |
+| Support for CUSTOM MATCH / RANK MATCH: TEAM | **PLANNED — moved to Phase 7A** | No longer deferred. Revision 2 requires TEAM and CUSTOM to be recorded as normal matches. The README statement stays accurate for the *shipped* release until 7A passes acceptance |
+| Patch / version awareness (`game_version`, `parts_master_version`, `recognition_version`, `analytics_version`) | PLANNED | Leaves room for before/after balance-patch comparison. Existing data is not back-filled with a guessed version |
 | Localisation beyond Japanese | BACKLOG | |
 | Signed installer / SmartScreen reputation | BACKLOG | |
+
+---
+
+## Much later
+
+| Item | Status | Notes |
+|---|---|---|
+| Self-build linkage (`Current Build` selection, self × opponent cross analysis) | FUTURE | Does not require per-match OCR. Must not delay the current roadmap |
+| TEAM three-opponent build recognition | DEFERRED | Request-driven only |
+| Safe automatic historical completion | DEFERRED | Only if justified |
+| Discord login | DEFERRED | Local-first is mandatory: with no login every core function still works, and a Discord outage disables nothing. Internal identity stays separate from external identity |
+| Cloud sync / community features | DEFERRED | |
