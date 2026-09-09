@@ -10,6 +10,7 @@ files=[
     "test_effect_screenshot.py",
     "test_windows_capture_integration.py",
     "test_native_effect_screenshot.py",
+    "test_occlusion_cloaked.py",
     "test_app_overlay_dispatch.py",
     "test_overlay_lifecycle.py",
     "test_launcher.py",
