@@ -42,11 +42,29 @@ worktree from the new `main`.
 Two unmerged generations already exist: the RC (under acceptance) and PR #5 (under review). The
 limit is two. A third starts only after the RC reaches `main` and PR #5 is reconciled with it.
 
-## Before handing anything to the user for testing
+## The development flow, in order
 
-T0 (unit / DB / static) and T2 (isolated E2E, lifecycle, process cleanup, feature-flag OFF) must
-pass first, and T1 (fixture replay) once #14 exists. Ask only for the smallest real-AC6 set the
-change actually needs — not a full manual regression pass. See [DECISIONS.md](DECISIONS.md).
+```text
+Implementation
+→ T0  Unit / DB / Static
+→ T1  Fixture Replay
+→ T2  Isolated E2E / Lifecycle
+→ PR handoff
+→ Codex/Astra independent review
+→ Required fixes
+→ Re-run the affected T0–T2
+→ T3  Real AC6 Smoke
+→ main
+```
+
+**T0–T2 pass before the PR goes to review**, not merely before T3 — the reviewer reads the gate
+evidence as part of the change. T1 (fixture replay) does not exist yet; it is #14.
+
+**A review fix invalidates the gate evidence for the paths it touched.** Re-run the affected
+T0–T2 before asking the user for T3.
+
+Ask the user only for the smallest real-AC6 set the change actually needs — not a full manual
+regression pass. See [DECISIONS.md](DECISIONS.md).
 
 Every implementation PR fills in
 [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is

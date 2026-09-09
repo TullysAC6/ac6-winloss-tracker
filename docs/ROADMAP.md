@@ -77,11 +77,26 @@ Prerequisite foundations may be implemented before the visible feature that depe
 The bottleneck is defects that only surface in a real AC6 session. This phase moves detection
 earlier. Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 38–42.
 
+The development flow every item on this roadmap follows (MASTER_REQUIREMENTS §3):
+
+```text
+Implementation
+→ T0  Unit / DB / Static
+→ T1  Fixture Replay
+→ T2  Isolated E2E / Lifecycle
+→ PR handoff
+→ Codex/Astra independent review
+→ Required fixes
+→ Re-run the affected T0–T2
+→ T3  Real AC6 Smoke
+→ main
+```
+
 | Item | Status | Notes |
 |---|---|---|
 | Fixture / replay harness | **PLANNED — HIGH PRIORITY** | `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md) |
 | Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
-| T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the user is asked for T3 |
+| T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the **PR goes to review**; the affected gates are re-run after review fixes; T3 last |
 | Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
 | Performance / security regression checks | PLANNED | Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists on the RC branch |
 

@@ -87,18 +87,52 @@ Project coordination and cross-review:
 
 # 3. Required development flow
 
-For each feature or release unit:
+For each feature or release unit, in this order:
 
-1. Implement
-2. Independent Codex/Astra review
-3. Fix defects/regressions
-4. CI / automated verification
-5. Real AC6 acceptance testing
-6. Merge to `main`
+```text
+Implementation
+→ T0  Unit / DB / Static
+→ T1  Fixture Replay
+→ T2  Isolated E2E / Lifecycle
+→ PR handoff
+→ Codex/Astra independent review
+→ Required fixes
+→ Re-run the affected T0–T2
+→ T3  Real AC6 Smoke
+→ merge to main
+```
+
+1. **Implement.**
+2. **T0 — unit / DB / static.** See §39.
+3. **T1 — fixture replay.** See §38, §39.
+4. **T2 — isolated E2E / lifecycle / process cleanup.** See §39.
+5. **PR handoff.** The structured handoff in §40 is filled in. `Not changed` is mandatory.
+6. **Independent Codex/Astra review.** Review is a review of *evidence*, not of an untested
+   change: T0–T2 results are part of what is being reviewed.
+7. **Required fixes.**
+8. **Re-run the affected T0–T2.** A fix invalidates the gate evidence for the paths it touched.
+   Do not carry pre-fix T0–T2 results forward as if they still applied.
+9. **T3 — real AC6 smoke / acceptance**, performed by the user, and only for the smallest real-game
+   set the change actually needs.
+10. **Merge to `main`.**
+
+Two orderings that are wrong and were previously written down here:
+
+- **Review before T0–T2.** Handing an unverified change to a reviewer spends review effort on
+  defects an automated gate would have caught, and produces review conclusions about code that is
+  about to change anyway.
+- **T3 before review, or T3 before the post-fix re-run.** Real-AC6 testing is the scarcest resource
+  in this project — it costs the user a play session. It is spent last, on a change that has
+  already passed automation and review.
+
+Steps 2–4 and 8 are automated and cost nothing but time. Step 9 costs the user a real session.
+That asymmetry is the whole reason for the ordering.
 
 `Code exists` is not equivalent to `accepted`.
 
 `CI green` is not equivalent to `real-AC6 accepted`.
+
+`Reviewed` is not equivalent to `accepted` either — review comes before T3, not instead of it.
 
 ---
 
@@ -933,13 +967,24 @@ Destructive history actions:
 # 34. Roadmap
 
 ## Current near-term release flow
-1. Current RC real-AC6 acceptance
+
+This is §3 applied to the two units currently in flight. The RC is already past T0-T2 and past
+review, so it enters at T3.
+
+1. Current RC **T3** real-AC6 acceptance
 2. Merge accepted RC to `main`
-3. Codex/Astra review of Claude settings/analytics addition
-4. Fix
-5. Real-AC6 acceptance
-6. Merge to `main`
-7. During review, Claude may implement only the next generation in a separate branch/worktree
+3. Reconcile the Claude settings/analytics branch with the new `main`, and confirm **T0-T2** are
+   green on the reconciled branch
+4. PR handoff (§40) - take PR #5 out of draft
+5. Codex/Astra independent review
+6. Fix
+7. **Re-run the T0-T2 gates the fixes affect**
+8. **T3** real-AC6 acceptance
+9. Merge to `main`
+10. During review, Claude may implement only the next generation in a separate branch/worktree
+
+Steps 3 and 7 are the ones most often skipped: gate evidence produced before a rebase or before a
+review fix does not describe the code that would actually be merged.
 
 ## Phase 7A — Match Metadata Foundation
 - Ranked / Custom recognition
@@ -1189,7 +1234,13 @@ Potential checks include:
 - optional build capture
 - clean shutdown
 
-T0–T2 should pass before work is handed to the user for T3.
+T0–T2 pass **before the PR is handed to review** (§3), not merely before T3. Review reads the gate
+evidence as part of the change.
+
+After review fixes, **re-run the T0–T2 gates the fix affects** before requesting T3. Pre-fix gate
+results do not carry forward across a change to the paths they covered.
+
+T3 is requested only once T0–T2 are green on the code as it will be merged.
 
 Do not ask the user to repeat a full manual regression suite when automated evidence already covers unrelated areas.
 

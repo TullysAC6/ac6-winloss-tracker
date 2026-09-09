@@ -72,11 +72,26 @@ A documentation-only PR may answer N/A to the implementation fields, but must st
 
 ## Acceptance state
 
-<!-- Tick only what is actually true. "Code exists" is not "accepted". -->
+<!-- Tick only what is actually true. "Code exists" is not "accepted", and neither is "reviewed".
+     The order below is the required order — see docs/MASTER_REQUIREMENTS.md section 3. -->
+
+```text
+Implementation
+→ T0 → T1 → T2 → PR handoff → review → fixes → re-run affected T0–T2 → T3 → main
+```
 
 - [ ] T0 — unit / DB / static passes
 - [ ] T1 — fixture replay passes (or: no fixture path exists for this change)
 - [ ] T2 — isolated E2E / lifecycle / process cleanup / feature-flag OFF passes
+- [ ] **T0–T2 are green on this branch as it stands now** — this PR is ready for review
+- [ ] Codex/Astra independent review complete
+- [ ] Review fixes applied, and the **affected T0–T2 gates re-run afterwards**
 - [ ] T3 — confirmed by the user in a real AC6 session
+
+T0–T2 are expected to be green **when the PR goes to review**, not merely before T3: the reviewer
+reads that evidence as part of the change.
+
+A review fix invalidates the gate evidence for the paths it touched. Re-run those gates before
+requesting T3 — do not carry pre-fix results forward.
 
 Merging before T3 is not permitted for anything that can change a recorded result.
