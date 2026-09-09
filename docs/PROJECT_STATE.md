@@ -4,7 +4,7 @@ Where the project is right now. Keep this short — requirements belong in
 [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md), phases in [ROADMAP.md](ROADMAP.md),
 reasoning in [DECISIONS.md](DECISIONS.md), and detail in the GitHub issues.
 
-Last updated: 2026-09-09
+Last updated: 2026-09-10
 
 ## Requirements baseline
 
@@ -32,14 +32,17 @@ No application code was changed to record any of this.
 |---|---|
 | Stable (public) | **v1.0.1** — commit `54ba0d8` |
 | `main` | `a6b7994` |
-| Current RC | `codex/wgc-rc-validation-20260908` — `b9d627c`, 8 commits ahead of `main` (Astra is still pushing to it) |
+| Current RC | `codex/wgc-rc-validation-20260908` — `3853cfd` (PR #19 integrated); pre-fix baseline `b9d627c` |
 | Open PRs | [#5](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5) settings/analytics (**draft**) · [#13](https://github.com/TullysAC6/ac6-winloss-tracker/pull/13) coordination docs (**draft**) |
+
+PR #19 is merged into the RC, with focused T3 pending; it is not released.
 
 ## Active branches
 
 | Branch | Owner | Purpose |
 |---|---|---|
-| `codex/wgc-rc-validation-20260908` | Astra | WGC / Alt+Tab / screenshot stability RC |
+| `codex/wgc-rc-validation-20260908` | Claude Code (handoff from Astra) | WGC / Alt+Tab / screenshot stability RC |
+| `fix/rc-screenshot-occlusion-20260909` | Claude Code | PR #19, `cdefd57`, merged into RC `3853cfd`; focused T3 pending |
 | `claude/settings-analytics-20260909` | Claude Code | Settings screen, analytics, CSV, DB check, history maintenance (PR #5) |
 | `coordination/project-management-20260909` | — | Documentation only (PR #13) |
 
@@ -51,8 +54,10 @@ At most two unmerged generations are allowed (see [DECISIONS.md](DECISIONS.md)).
 
 | Generation | Branch | State |
 |---|---|---|
-| A — under review / acceptance | RC `codex/wgc-rc-validation-20260908` | acceptance pending (#7) |
+| A — under review / acceptance | RC `codex/wgc-rc-validation-20260908` + corrective PR #19 | technical review PASS / focused real-AC6 T3 pending; RC acceptance pending (#7) |
 | B — implemented, awaiting review | `claude/settings-analytics-20260909` (PR #5) | draft |
+
+PR #19 is Generation A's corrective child, not a third feature generation.
 
 **The limit is reached.** A third feature generation does not start until the RC reaches `main`
 and PR #5 has been reconciled with the new `main`. The coordination branch does not count — it
@@ -74,25 +79,71 @@ contains no application code.
 | [#17](https://github.com/TullysAC6/ac6-winloss-tracker/issues/17) | `[EPIC]` full opponent build recognition — Phase 8A–8B |
 | [#18](https://github.com/TullysAC6/ac6-winloss-tracker/issues/18) | `[EPIC]` manual historical backfill — Phase 8D |
 
-## Current focus
+## Current focus and evidence (2026-09-10)
 
-Real-AC6 acceptance of the RC (#7). No code work is blocking it.
+**RC owner: Claude Code (handoff from Astra). PR #19 owner: Claude Code.**
+The immediate blocker is **PR #19 focused real-AC6 T3 pending**.
+
+PR #19 (`cdefd57`) was merged into the RC at `3853cfd` on 2026-09-10 JST.
+Its pre-fix RC baseline was `b9d627c`. It is no longer Draft or unmerged.
+This RC integration is not a merge to `main`, release, or real-AC6 acceptance.
+
+| Gate for PR #19 | Status |
+|---|---|
+| T0 | PASS |
+| T1 | N/A — formal fixture/replay harness #14 is not implemented; no PASS claimed |
+| T2 | PASS |
+| Independent technical review | PASS — supports RC integration and focused T3 |
+| GitHub review state | COMMENTED, not APPROVED: the author account cannot approve its own PR |
+| Focused real-AC6 T3 | Pending |
+
+Evidence: [2026-09-09 real session](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7#issuecomment-5603490470),
+[PR #19 and independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/19),
+[Windows CI](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34363401003).
+The gate results describe the reviewed fix; no new test execution is claimed by this documentation sync.
+Ordinary PR CI skips native screenshot paths; the independent opt-in Windows runs supply that evidence.
+
+The 2026-09-09 session confirmed WIN detection/counting and the five-win banner.
+Screenshot PNG saving FAILED because a DWM-cloaked shell window was treated as an occluder.
+The cause is identified and corrected in PR #19, now integrated into the RC, but the actual
+AC6 scene plus Tracker banner in one saved PNG remains unaccepted.
+Earlier blanket statements that no code defect blocked the RC are superseded by this evidence.
+
+### Focused screenshot T3
+
+1. Turn Screenshot ON on the fixed RC.
+2. Reach a five-win milestone.
+3. Observe the Tracker banner.
+4. Confirm exactly one PNG is saved to the Desktop for that effect.
+5. Confirm the PNG contains the actual AC6 scene and Tracker banner together.
+6. Confirm `effect-screenshot.jsonl` records `status=saved` for the same effect.
+
+**Focused T3 PASS does not complete RC-wide acceptance (#7).**
+Preserve relevant existing T3 evidence; do not repeat unrelated accepted observations merely
+because the screenshot-only correction was integrated.
 
 ## Release blockers
 
-Only unverified real-AC6 behaviour. There is no known code defect blocking the RC.
+Issue #7 remains the RC-wide acceptance checklist. Retain all unaccepted items, including:
 
-- Real WIN / LOSE detection and counting
-- DRAW leaves WIN / LOSE / streak unchanged
-- No double counting
-- Alt+Tab recovery, WGC stall recovery, stale-frame safety, client-rect change
-- Milestone effect renders in game; effect screenshot is actually written
-- Milestone reached during an SSE reconnect shows exactly once (#4)
+- LOSE detection/counting
+- DRAW semantics: WIN / LOSE / streak unchanged
+- No double counting across a match sequence
+- Alt+Tab recovery
+- WGC stall recovery
+- Stale-frame safety
+- Client-rect changes
+- SSE reconnect effect behavior: exactly-once fresh milestone playback
+- Focused screenshot T3 above, and any remaining milestone coverage in #7
+
+WIN/counting and the five-win banner have dated real-session evidence; this is not acceptance
+of all result cases or all milestone levels. Reconcile evidence with #7 without claiming unchecked
+items passed. Its older body and review-pending comment must be read with the newer PR #19 review
+and merge state; this sync does not tick its acceptance boxes.
 
 ## Implemented but not accepted
 
-Code exists and CI is green; behaviour has not been confirmed in a real session or in a released
-build. Do not count these as done when planning a release.
+Code exists and CI is green; full acceptance and release are not complete; the limited dated observations above remain valid. Do not count these as done when planning a release.
 
 **On the RC branch:** WGC capture path, guarded desktop fallback, effect screenshots, launcher
 settings entry, `effect_screenshot_enabled`, version check, #4 effect replay, dashboard 50-row
@@ -115,7 +166,7 @@ Current placement, which must stay consistent with the table above and with `ROA
 
 | Status | Items | Why |
 |---|---|---|
-| **In Progress** | #6, #7 | #6 is the living coordination entry point; #7 is the current focus — real-AC6 acceptance of the RC |
+| **In Progress** | #6, #7, PR #19 | RC owner Claude Code; PR #19 is merged to RC but focused T3 remains pending, so it is not Done |
 | **Blocked** | #4, #8, #9, PR #5 | All waiting on RC acceptance. #4's fix is on the RC; #8 and #9 are implemented across the RC and PR #5; PR #5 stays draft until the RC lands and it is reconciled |
 | **Review** | PR #13 | Documentation review — a separate track from real-AC6 acceptance |
 | **Planned** | #14, #15, #16, #17, #18 | Phase D and Phases 7A–8E |
@@ -150,12 +201,24 @@ long as it is.
 
 ## Next actions
 
-1. Run the #7 acceptance checklist against real AC6.
-2. If it passes, merge the RC to `main` and release; close #4 with that release.
-3. Re-check PR #5 against the RC head, then take it out of draft for review.
-4. Only after 1–3: start Phase D (fixture / replay harness, #14) on a fresh branch from `main`.
+1. Claude: PR #19 integration into the RC is complete (`3853cfd`); confirm the fixed RC used for T3 includes it. Do not merge the RC to `main` yet.
+2. User: perform the focused screenshot T3 above.
+3. Complete the remaining Issue #7 T3 acceptance, retaining valid unrelated evidence.
+4. After all RC acceptance passes, proceed through the normal RC → `main` → release process.
+5. Close #4 with a reference to the release containing its fix.
+6. Reconcile PR #5 with the new `main` without reset, rebase or force-push.
+7. On reconciled PR #5: T0 → T1 (where available; otherwise explicitly N/A) → T2 → PR handoff / review → fixes → affected gate rerun → T3, then merge only after acceptance.
+8. After that, begin #14 on a fresh branch/worktree from the new `main`.
+
+## Ownership and process safety
+
+The RC handoff does not waive process ownership. Before reusing Astra-origin processes or
+worktrees, Claude must check PID, port, mutex/lock/runtime files and residual processes.
+Avoid duplicate launch; use bounded timeouts, maintain ownership, clean up on every exit path,
+and verify child processes and port/lock release. No long-running process is needed for this
+documentation/project-management sync.
 
 ## Do not
 
-Merge PR #5, merge the RC, create a tag or a release, or change `install.ps1` / version strings
+Merge PR #5, merge the RC to `main`, create a tag or a release, or change `install.ps1` / version strings
 until #7 passes. Do not start a third unmerged feature generation.
