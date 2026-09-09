@@ -22,11 +22,17 @@ def fixture_worker(effect, game, allowed, deadline):
                      'requires unlocked Windows desktop')
 class NativeEffectScreenshotTests(unittest.TestCase):
     def test_production_layered_banner_and_owned_worker(self):
-        for milestone, opacity, obscured in ((5, 0, False), (10, 10, False), (50, 10, False), (5, 10, True)):
-            with self.subTest(milestone=milestone, opacity=opacity, obscured=obscured):
-                self.capture_case(milestone, opacity, obscured)
+        # `origin` places the fake game client at (0, 0), which is where a real
+        # borderless full-screen AC6 sits. Degenerate shell windows live at the
+        # desktop origin, so an offset-only fixture cannot reach that failure.
+        for milestone, opacity, obscured, origin in (
+                (5, 0, False, False), (10, 10, False, False), (50, 10, False, False),
+                (5, 10, True, False), (5, 10, False, True), (10, 10, True, True)):
+            with self.subTest(milestone=milestone, opacity=opacity,
+                              obscured=obscured, origin=origin):
+                self.capture_case(milestone, opacity, obscured, origin)
 
-    def capture_case(self, milestone, opacity, obscured):
+    def capture_case(self, milestone, opacity, obscured, origin=False):
         with tempfile.TemporaryDirectory(prefix='AC6-screenshot-日本語-') as directory, patch.dict(
                 os.environ, {'LOCALAPPDATA': directory, 'AC6_TEST_SCREENSHOT_DIR': directory,
                              'AC6_TEST_TARGET_PROCESS': Path(sys.executable).name.lower()}):
@@ -37,7 +43,7 @@ class NativeEffectScreenshotTests(unittest.TestCase):
             api = result_detector.WinApi()
             dummy = tk.Tk()
             dummy.overrideredirect(True)
-            dummy.geometry('1000x700+80+80')
+            dummy.geometry('1000x700+0+0' if origin else '1000x700+80+80')
             dummy.configure(bg='#102030')
             dummy.attributes('-topmost', True)
             dummy.update()
@@ -57,7 +63,7 @@ class NativeEffectScreenshotTests(unittest.TestCase):
                     if obscured:
                         blocker = tk.Toplevel(dummy)
                         blocker.overrideredirect(True)
-                        blocker.geometry('200x100+100+300')
+                        blocker.geometry('200x100+20+220' if origin else '200x100+100+300')
                         blocker.attributes('-topmost', True)
                         dummy.update()
                     foreground_thread = api.user32.GetWindowThreadProcessId(api.user32.GetForegroundWindow(), None)

@@ -48,7 +48,10 @@ def _blocking_window(api, game_hwnd, client, allowed):
         try:
             if int(hwnd) == game_hwnd:
                 return False
-            if int(hwnd) in allowed or not api.user32.IsWindowVisible(hwnd) or api.user32.IsIconic(hwnd):
+            # Same filter as region_unobscured(), so the reported blocker is
+            # the window that actually rejected the capture.
+            if (int(hwnd) in allowed or not api.user32.IsWindowVisible(hwnd)
+                    or api.user32.IsIconic(hwnd) or api.is_cloaked(hwnd)):
                 return True
             rect = RECT()
             if not api.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
