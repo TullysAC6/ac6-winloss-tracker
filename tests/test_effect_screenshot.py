@@ -186,7 +186,6 @@ class ScreenshotTests(unittest.TestCase):
         target = {"hwnd": 1, "pid": 10, "client": client, "bounds": (-640, 0, 0, 360)}
         api = api_factory.return_value
         api.game_target.return_value = target
-        api.region_unobscured.return_value = True
         api.user32.IsWindowVisible.return_value = True
         api.user32.GetForegroundWindow.return_value = 1
         desktop = mss_factory.return_value.__enter__.return_value
@@ -205,10 +204,17 @@ class ScreenshotTests(unittest.TestCase):
                 self.assertEqual(saved.tobytes(), pixels.tobytes())
             desktop.grab.assert_called_once_with(client)
             path.unlink()
-            api.region_unobscured.side_effect = [True, False]
+            # A painted window elsewhere over the AC6 client is part of the
+            # user's visible composition and must not reject the screenshot.
+            api.region_unobscured.return_value = False
+            _save_visible_effect(effect(), (1, -640, 0, 640, 360), (2, 3, 4), 103)
+            self.assertTrue(path.exists())
+            api.region_unobscured.assert_not_called()
+            path.unlink()
+            api.user32.GetForegroundWindow.return_value = 0
             _save_visible_effect(effect(), (1, -640, 0, 640, 360), (2, 3, 4), 103)
             self.assertFalse(path.exists())
-            api.region_unobscured.side_effect = None
+            api.user32.GetForegroundWindow.return_value = 1
             desktop.grab.return_value = Mock(size=(640, 360), rgb=bytes(640 * 360 * 3))
             _save_visible_effect(effect(), (1, -640, 0, 640, 360), (2, 3, 4), 103)
             self.assertFalse(path.exists())

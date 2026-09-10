@@ -70,7 +70,9 @@ class NativeEffectScreenshotTests(unittest.TestCase):
                     current_thread = api.kernel32.GetCurrentThreadId()
                     api.user32.AttachThreadInput(current_thread, foreground_thread, True)
                     try:
-                        api.user32.SetForegroundWindow(overlay._tk_toplevel_hwnd(dummy.winfo_id()))
+                        dummy_hwnd = overlay._tk_toplevel_hwnd(dummy.winfo_id())
+                        api.user32.BringWindowToTop(dummy_hwnd)
+                        api.user32.SetForegroundWindow(dummy_hwnd)
                         dummy.focus_force()
                         dummy.update()
                     finally:
@@ -98,17 +100,13 @@ class NativeEffectScreenshotTests(unittest.TestCase):
                     self.assertEqual(len(worker_pids), 1)
                     log_path = Path(directory) / 'AC6WinLossTracker' / 'diagnostics' / 'effect-screenshot.jsonl'
                     log_text = log_path.read_text(encoding='utf-8') if log_path.exists() else 'no diagnostic log'
-                    self.assertEqual(path.exists(), not obscured, log_text)
-                    self.assertEqual(len(list(Path(directory).glob('AC6_*.png'))), 0 if obscured else 1)
+                    self.assertTrue(path.exists(), log_text)
+                    self.assertEqual(len(list(Path(directory).glob('AC6_*.png'))), 1)
                     self.assertFalse(list(Path(directory).glob('*.pending')))
                     import json
                     rows = [json.loads(line) for line in log_text.splitlines()]
                     self.assertEqual(sum(row['status'] == 'spawn_requested' for row in rows), 1)
-                    if obscured:
-                        self.assertEqual(rows[-1]['reason'], 'occluded')
-                        self.assertEqual(rows[-1]['blocker']['hwnd'], overlay._tk_toplevel_hwnd(blocker.winfo_id()))
-                    else:
-                        self.assertEqual(rows[-1]['status'], 'saved')
+                    self.assertEqual(rows[-1]['status'], 'saved')
             finally:
                 mp.set_executable(sys.executable)
                 if hud:
