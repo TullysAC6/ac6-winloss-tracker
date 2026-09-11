@@ -5,3 +5,10 @@ pillow==12.3.0 \
     --hash=sha256:fdafc9cce40277e0f7a0feabce0ee50dd2fa1800f3b38015e51296b5e814048d
 ttkbootstrap==2.2.2 \
     --hash=sha256:b268daf53e73fb3d50482ec743a675e325ec644afe7fb706b6bbee35fda489f8
+windows-capture==2.0.1; sys_platform == "win32" \
+    --hash=sha256:209c2318e2168802b9afd1005e99499639e8835e71a1e188a3ddc77c7ccc3f04
+numpy==2.5.3; sys_platform == "win32" \
+    --hash=sha256:71cad2b2a7451ab79d8f5e71b453485b6775963d5cf794179144a7463fe6e8ec \
+    --hash=sha256:2c25dfa72943e4336ddb6b0ee4277b47a0c85bede0807530ec68103bf58e2c10
+opencv-python==5.0.0.93; sys_platform == "win32" \
+    --hash=sha256:f90ba04b8f73bc5c3814037699739f0156f597338a98f05956c684e7c3ca10d2

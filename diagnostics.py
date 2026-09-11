@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import importlib.metadata
 import importlib.util
 import os
@@ -14,7 +15,7 @@ import zipfile
 from collections import deque
 from pathlib import Path
 
-from app_paths import VERSION, data_dir, diagnostics_dir
+from app_paths import VERSION, data_dir, diagnostics_dir, resource_dir
 from history_store import read_history_schema_version
 
 try:
@@ -137,19 +138,27 @@ class DiagnosticRecorder:
         except OSError:
             pass
 
-    def export(self) -> Path:
+    def export(self, destination_dir=None) -> Path:
         root = data_dir()
-        export_dir = Path.home() / "Desktop"
+        export_dir = Path(destination_dir) if destination_dir is not None else Path.home() / "Desktop"
+        if destination_dir is None and os.name == "nt":
+            try:
+                from effect_screenshot import desktop_directory
+                export_dir = desktop_directory()
+            except OSError:
+                export_dir = root
         if not export_dir.exists():
             export_dir = root
         stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
         out = export_dir / f"AC6-Tracker-Diagnostics-{stamp}.zip"
 
         dependencies = {}
-        for dependency in ("mss", "ttkbootstrap"):
+        for dependency, module in (("mss", "mss"), ("ttkbootstrap", "ttkbootstrap"),
+                                   ("Pillow", "PIL"), ("windows-capture", "windows_capture"),
+                                   ("numpy", "numpy"), ("opencv-python", "cv2")):
             try:
                 dependencies[dependency] = {
-                    "available": importlib.util.find_spec(dependency) is not None,
+                    "available": importlib.util.find_spec(module) is not None,
                     "version": importlib.metadata.version(dependency),
                 }
             except Exception as error:
@@ -180,7 +189,15 @@ class DiagnosticRecorder:
         except Exception as error:
             history_schema = f"unreadable:{type(error).__name__}"
 
+        source_hashes = {}
+        for name in ("app.py", "app_paths.py", "server.py", "result_detector.py", "game_capture.py",
+                     "game_overlay.py", "effect_screenshot.py", "launcher.pyw", "dashboard.py", "requirements.lock"):
+            try:
+                source_hashes[name] = hashlib.sha256((resource_dir() / name).read_bytes()).hexdigest()
+            except OSError as error:
+                source_hashes[name] = f"unavailable:{type(error).__name__}"
         manifest = {
+            "source_hashes": source_hashes,
             "app_version": VERSION,
             "created_at": time.time(),
             "platform": platform.platform(),
@@ -202,7 +219,7 @@ class DiagnosticRecorder:
                 "history_schema": history_schema,
             },
             "display": display,
-            "privacy": "Contains detector telemetry and result-detection ROI images only; no full-screen capture.",
+            "privacy": "Contains local runtime/install diagnostics, settings, stats and result-detection ROI images; no full-screen capture. Runtime ownership/token files are excluded.",
         }
         tmp_manifest = self.root / "manifest.json"
         tmp_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -213,6 +230,9 @@ class DiagnosticRecorder:
                 for path in (
                     self.log_path, self.old_log_path, tmp_manifest, buffer_export,
                     root / "config.json", root / "stats.json",
+                    root / "installed-version.json", root / "source-install.log",
+                    root / "source-uninstall.log", root / "startup.log", root / "startup.log.1",
+                    self.root / "effect-screenshot.jsonl", self.root / "effect-screenshot.jsonl.1",
                 ):
                     if path is not None and path.exists():
                         zf.write(path, arcname=path.name)

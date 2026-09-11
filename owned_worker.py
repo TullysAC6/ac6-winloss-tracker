@@ -1,0 +1,79 @@
+"""Bounded child cleanup and Windows parent-death containment."""
+import ctypes
+import multiprocessing as mp
+import os
+from ctypes import wintypes
+
+
+def owned_entry(ready, target, args):
+    """Do no native work until the parent has installed containment."""
+    owner = mp.parent_process()
+    while owner is not None and owner.is_alive():
+        if ready.wait(.1):
+            target(*args)
+            return
+
+
+class KillOnCloseJob:
+    def __init__(self, pid):
+        self.handle = None
+        if os.name != "nt":
+            return
+        class Basic(ctypes.Structure):
+            _fields_ = [("process_time", ctypes.c_longlong), ("job_time", ctypes.c_longlong),
+                        ("flags", wintypes.DWORD), ("minimum", ctypes.c_size_t),
+                        ("maximum", ctypes.c_size_t), ("active", wintypes.DWORD),
+                        ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                        ("scheduling", wintypes.DWORD)]
+        class IO(ctypes.Structure):
+            _fields_ = [(name, ctypes.c_ulonglong) for name in
+                        ("read_ops", "write_ops", "other_ops", "read", "write", "other")]
+        class Extended(ctypes.Structure):
+            _fields_ = [("basic", Basic), ("io", IO), ("process_memory", ctypes.c_size_t),
+                        ("job_memory", ctypes.c_size_t), ("peak_process", ctypes.c_size_t),
+                        ("peak_job", ctypes.c_size_t)]
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.kernel = kernel
+        handle = kernel.CreateJobObjectW(None, None)
+        if not handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        process = None
+        try:
+            limits = Extended()
+            limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            if not kernel.SetInformationJobObject(handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            process = kernel.OpenProcess(0x0101, False, pid)  # SET_QUOTA | TERMINATE
+            if not process or not kernel.AssignProcessToJobObject(handle, process):
+                raise ctypes.WinError(ctypes.get_last_error())
+            self.handle = handle
+        finally:
+            if process:
+                kernel.CloseHandle(process)
+            if self.handle is None:
+                kernel.CloseHandle(handle)
+
+    def close(self):
+        if self.handle is not None:
+            self.kernel.CloseHandle(self.handle)
+            self.handle = None
+
+
+def stop_process(process):
+    process.join(timeout=.3)
+    if process.is_alive():
+        process.terminate()
+        process.join(timeout=.5)
+    if process.is_alive():
+        process.kill()
+        process.join(timeout=.5)
+    if process.is_alive():
+        raise RuntimeError("worker could not be stopped")
+    process.close()
