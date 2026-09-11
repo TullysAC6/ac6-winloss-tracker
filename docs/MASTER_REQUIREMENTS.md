@@ -936,7 +936,7 @@ Do not design Discord/cloud into the core data model now beyond avoiding future 
 
 Maintain these decisions:
 
-- Screenshot ON/OFF
+- Screenshot ON/OFF. Effect Screenshot saves the composition actually visible over the AC6 client; visible user overlays/windows such as SteamP2PScanner, NVIDIA, Steam, or Discord are part of that composition and overlap alone is not a rejection reason. AC6 foreground/target/client geometry, Tracker-effect visibility, real banner pixels, duplicate suppression, and bounded worker ownership remain mandatory. Detector MSS fallback retains its separate `region_unobscured()` safety gate.
 - Milestone effect ON/OFF
 - Session/Lifetime display scope
 - Reset history controls
@@ -968,23 +968,23 @@ Destructive history actions:
 
 ## Current near-term release flow
 
-This is §3 applied to the two units currently in flight. The RC is already past T0-T2 and past
-review, so it enters at T3.
+This is §3 applied to the two units currently in flight. Runtime RC `93d5a57` has completed its
+required real-AC6 T3; v1.1.0 release metadata and distribution checks remain before publication.
 
-1. Current RC **T3** real-AC6 acceptance
-2. Merge accepted RC to `main`
-3. Reconcile the Claude settings/analytics branch with the new `main`, and confirm **T0-T2** are
+1. Complete v1.1.0 release preparation and re-run affected T0/T2 gates; T1 remains N/A until #14 exists
+2. Independently review the release-preparation diff
+3. Merge the accepted RC to `main`, verify CI, then tag and publish v1.1.0 only if every release safety check passes
+4. Reconcile the Claude settings/analytics branch with the new `main`, and confirm **T0-T2** are
    green on the reconciled branch
-4. PR handoff (§40) - take PR #5 out of draft
-5. Codex/Astra independent review
-6. Fix
+5. PR handoff (§40) - take PR #5 out of draft
+6. Codex/Astra independent review and required fixes
 7. **Re-run the T0-T2 gates the fixes affect**
 8. **T3** real-AC6 acceptance
 9. Merge to `main`
 10. During review, Claude may implement only the next generation in a separate branch/worktree
 
-Steps 3 and 7 are the ones most often skipped: gate evidence produced before a rebase or before a
-review fix does not describe the code that would actually be merged.
+The release-diff review and the post-fix gate rerun must not be skipped: gate evidence produced
+before a rebase or before a review fix does not describe the code that would actually be merged.
 
 ## Phase 7A — Match Metadata Foundation
 - Ranked / Custom recognition

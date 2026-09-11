@@ -173,7 +173,7 @@ class ReleaseTests(unittest.TestCase):
     def test_numeric_comparison_and_metadata_only(self, urlopen):
         response = urlopen.return_value.__enter__.return_value
         for latest, current, expected in (("v1.10.0", "1.9.0", "新しいバージョン"),
-                                          ("v1.0.1", "1.0.1", "最新の公開バージョンです"),
+                                          ("v1.1.0", "1.1.0", "最新の公開バージョンです"),
                                           ("v1.0.1", "1.1.0", "より新しいバージョンです")):
             response.read.return_value = json.dumps({"tag_name": latest, "draft": False, "prerelease": False}).encode()
             self.assertIn(expected, settings.check_latest_release(current))
