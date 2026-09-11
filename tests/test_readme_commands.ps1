@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
 $readmePath = Join-Path $root 'README.md'
 $readme = [System.IO.File]::ReadAllText($readmePath)
-$expectedHash = '8A8E509AAF2CB91D1F921218F12133E48B9D1264F634DA49C66411E8902B6CA3'
+$expectedHash = '435F7755D3F65A2756F1E3F0BAC3453E6F05A55F6FBBFDEA788CCAC57A1F422F'
 
 function Get-ReadmeCommand {
     param([Parameter(Mandatory = $true)][string]$Heading)
