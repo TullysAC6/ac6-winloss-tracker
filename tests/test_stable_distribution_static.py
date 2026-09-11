@@ -74,7 +74,7 @@ assert "現在のTrackerは変更していません" in installer
 assert "Invoke-Expression" not in readme
 assert "refs/tags/v1.1.0/bootstrap.ps1" in readme
 assert "Get-FileHash $p -Algorithm SHA256" in readme
-assert "435F7755D3F65A2756F1E3F0BAC3453E6F05A55F6FBBFDEA788CCAC57A1F422F" in readme
+assert "2FDE252FA841430C845681BB23860E2D365F8A575CB2ED39515AC5F9F2CB41B7" in readme
 assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "install.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "uninstall.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
