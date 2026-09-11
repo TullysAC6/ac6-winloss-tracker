@@ -1,7 +1,7 @@
 # AC6 Win/Loss Tracker — Master Requirements & Development Policy
 
-Last consolidated: 2026-09-09 (Revision 2)  
-Status: **CANONICAL PROJECT REQUIREMENTS**  
+Last consolidated: 2026-09-09 (Revision 2)
+Status: **CANONICAL PROJECT REQUIREMENTS**
 Scope: AC6 Win/Loss Tracker / AC6tool
 
 > This document is the consolidated source of truth for requirements and development policy agreed with the user.
@@ -1802,4 +1802,3 @@ Codex/Astra review should specifically verify:
 - analytics language does not overclaim weak samples
 - opponent build is not carried across matches by inference
 - new dependencies are justified
-
