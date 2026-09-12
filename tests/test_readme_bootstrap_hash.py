@@ -59,8 +59,10 @@ if len(found) != 2:
     )
 install_hash, uninstall_hash = found
 
-# `Get-FileHash ... .Hash` is uppercase, and the README compares with -ne, so a
-# lowercase literal would never match at install time.
+# A convention check, not a correctness one: `Get-FileHash ... .Hash` emits
+# uppercase, so an uppercase literal is what the README should carry. PowerShell
+# `-ne` is case-insensitive, so a lowercase literal would still have matched at
+# install time -- only `-cne` would not.
 for value in found:
     if value != value.upper():
         raise SystemExit(f"README bootstrap hash must be uppercase hex: {value}")
@@ -71,6 +73,18 @@ if install_hash != uninstall_hash:
         f"{install_hash} vs {uninstall_hash}"
     )
 
+# Name the v1.1.0 failure mode specifically before the general check, so the
+# error says what went wrong rather than only that two hashes differ. This is
+# reachable only while the two byte streams differ, which is exactly when the
+# mistake is possible.
+if worktree != blob and install_hash == worktree_hash:
+    raise SystemExit(
+        "README bootstrap SHA-256 matches the working-tree (CRLF) bytes rather "
+        "than the published blob. This is the v1.1.0 defect.\n"
+        f"  README / working tree : {install_hash}\n"
+        f"  published Git blob    : {blob_hash}"
+    )
+
 if install_hash != blob_hash:
     raise SystemExit(
         "README bootstrap SHA-256 does not match the committed Git blob, which is "
@@ -79,15 +93,6 @@ if install_hash != blob_hash:
         f"  Git blob      : {blob_hash}\n"
         f"  working tree  : {worktree_hash}\n"
         "Compute it from `git show HEAD:bootstrap.ps1`, never from the file on disk."
-    )
-
-# The specific way this went wrong before: the literal matched the CRLF working
-# tree. Only assert it where the two actually differ, so the test stays valid on
-# a checkout without line-ending translation.
-if worktree != blob and install_hash == worktree_hash:
-    raise SystemExit(
-        "README bootstrap SHA-256 matches the working-tree (CRLF) bytes rather "
-        "than the published blob. This is the v1.1.0 defect."
     )
 
 print(f"README bootstrap SHA-256 matches the published Git blob: {blob_hash}")
