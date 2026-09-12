@@ -243,9 +243,13 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | Match-history row shows mode / format / ranks | PLANNED | `RANKED · SINGLE`, `自分 A / 相手 S`. Unknown shown honestly |
 | Win-rate breakdown by Ranked / Custom / Single / Team | PLANNED | Top-level UI may stay Overall / Single / Team, with the detail elsewhere |
 | `相手機体: TEAMのため対象外` distinct from `未取得` | PLANNED | |
+| Rank / Season / Rating acquisition | PLANNED | Added 2026-09-12 for [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28). Event-driven only — **no continuous OCR** |
+| Rank / Season / Rating persistence | PLANNED | Conceptual shape in MASTER_REQUIREMENTS §64. Rating is never carried forward across seasons |
+| Distinguish the below-A and the S recognition system | PLANNED | The `rating_mode` distinction. Without it the two systems collapse into one column and every later chart misstates the progression |
 
 Not negotiable in this phase: metadata failure never discards a result; `unknown` is never
-inferred into a specific category; existing historical rows stay `unknown`.
+inferred into a specific category; existing historical rows stay `unknown`. Rank/Rating recognition
+failure never affects WIN/LOSE, ResultGate, streak or match persistence.
 
 ### Phase 7B — Growth trend analytics
 
@@ -261,6 +265,11 @@ Absorbs the former Phase 7 (daily / weekly / monthly series). Priority **HIGH**.
 | 30-match rolling win rate | PLANNED | The recommended primary trend |
 | Period-vs-period comparison | PLANNED | Shows both sample sizes, the difference in percentage points and a sparse-data marker. `最近30戦 57% / 前30戦 51% / +6pt` |
 | Statistics UI (charts / trends) | PLANNED | Needs a home in the dashboard |
+| Per-season Rank / Rating progression | PLANNED | Added 2026-09-12 for [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28), MASTER_REQUIREMENTS §64. Gated on reliable self-rank recognition. History separated by season, past seasons viewable |
+| Rank / Rating line chart | PLANNED | **The A→S boundary is not drawn as one continuous rating line** without a justified basis. Separate scale or separate presentation where the two systems are not comparable |
+| Current Rating, Season High / Low, selected-period delta | PLANNED | Sample-size and sparse-data honesty from §43/§44 applies |
+| Rank transition markers | PLANNED | |
+| `S RANK REACHED` achievement | PLANNED | An **Achievement**, not a feature unlock. Ranks below A are in scope too — the climb is the point |
 
 ### Phase 7C — Rank-relative performance
 
@@ -383,7 +392,7 @@ logic, #17 opponent build capture, #10/#11/#12 opponent statistics.
 | UI-1A | Player Overlay polish — value over label, telemetry framing, thin background, DPI/aspect/safe-zone, minimal animation. Low-risk visual changes only | PLANNED | low |
 | UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance sizing | PLANNED | low |
 | UI-2 | Dashboard / History / Settings shell — top navigation (`OVERVIEW / HISTORY / STATISTICS / SETTINGS`), WIN RATE as primary KPI, surface and spacing hierarchy, explicit status vocabulary, date-grouped history with filters | PLANNED | medium |
-| UI-3 | Statistics presentation, added incrementally as 7A/7B and 8A–8C deliver real data. No large empty page beforehand | PLANNED | medium |
+| UI-3 | Statistics presentation, added incrementally as 7A/7B and 8A–8C deliver real data. No large empty page beforehand. Includes the **season selector** and the Rank / Rating chart presentation for [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28), with a separate scale or separate presentation where below-A and S cannot be compared directly | PLANNED | medium |
 | UI-4 | Tray / Launcher modernization — [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26). Separate issue, separate PR, last | BACKLOG | **high** |
 
 ### Constraints on this phase

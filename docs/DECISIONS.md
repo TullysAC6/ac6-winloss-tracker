@@ -471,3 +471,25 @@ The user selects a current build; matches recorded while it is active carry that
 Why record it now: a self × opponent cross-analysis is the only thing that separates "the player improved" from "the player changed build" from "the matchup changed". Losing that reasoning to chat history would mean re-deriving it later.
 
 Why not schedule it: it depends on match metadata ([#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)) and is only useful once opponent build data exists ([#17](https://github.com/TullysAC6/ac6-winloss-tracker/issues/17)).
+
+---
+
+## Seasonal rank progression, and the A/S discontinuity
+
+**Decision (2026-09-12): the user's own rank/rating progression is charted per season, and the below-A and S rating systems are never assumed to be one scale.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §64. Issue: [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28).
+
+The game presents rating and progression differently below A than at S. So a single continuous line across the A→S boundary is not drawn without a justified basis, and where the two cannot be compared directly they get separate scales or separate presentations. `rating_mode` (name decided at implementation time) is the field that carries the distinction.
+
+Why this is a decision and not an implementation detail: one continuous line is the obvious-looking chart, it is what a future session will reach for, and it asserts a comparison the game does not support. The failure is silent — the chart looks right and misstates the progression.
+
+Three supporting rules:
+
+- **Seasons are separate.** Rating is never carried forward into the next season; past seasons stay viewable.
+- **No continuous OCR.** Rank and Rating are read only at the events where the game displays them.
+- **Recognition failure is isolated.** It never affects WIN/LOSE, ResultGate, streak or match persistence. A failed read is recorded as a failed read, never as a rating change — otherwise a recognition gap appears to the user as a rating drop.
+
+Gated on self-rank recognition being reliable first ([#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)). A progression chart on unreliable recognition is worse than no chart.
+
+Reaching S is an achievement, **not a feature unlock**: no Tracker capability depends on the user's rank. Ranks below A are in scope, because motivation is the purpose and the lower ladder is where it matters most.

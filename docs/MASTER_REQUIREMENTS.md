@@ -8,7 +8,7 @@ Scope: AC6 Win/Loss Tracker / AC6tool
 |---|---|---|
 | Revision 1 | before 2026-09-09 | Superseded by Revision 2; not reproduced separately |
 | Revision 2 | 2026-09-09 | Development-acceleration track (§38–§42), match-metadata foundation (§10–§15), full opponent-build programme (§16–§29), growth analytics (§43–§51) |
-| **Revision 3** | **2026-09-12** | Runtime isolation / app-local Python environment (§56); UI/UX design identity and the Player/Broadcast overlay split (§57–§63); self-build linkage promoted from a sketch to a recorded requirement with its own issue (§52) |
+| **Revision 3** | **2026-09-12** | Runtime isolation / app-local Python environment (§56); UI/UX design identity and the Player/Broadcast overlay split (§57–§63); self-build linkage promoted from a sketch to a recorded requirement with its own issue (§52); seasonal rank / rating progression, including the A/S discontinuity rule (§64) |
 
 Revision 3 **adds to** Revision 2. Nothing in Revision 2 is deleted or rewritten by it. Where
 Revision 3 changes a status, the earlier statement and the reason for the change stay visible.
@@ -430,6 +430,9 @@ For TEAM:
 - opponent team member ranks are deferred
 
 Missing rank information must be represented as unknown, not guessed.
+
+The user's own rank over time is a separate requirement: see §64, which also fixes the rule that the
+below-A and S rating systems are not assumed to share one scale.
 
 ---
 
@@ -1457,6 +1460,9 @@ When comparing periods, show:
 
 Do not describe tiny samples as a stable trend.
 
+The user's own seasonal rank and rating progression is specified separately in §64, and is gated on
+self-rank recognition being reliable.
+
 ---
 
 # 45. Rank-relative performance
@@ -1835,6 +1841,9 @@ A previous build may be shown only as a user-facing comparison/hint in a future 
 9. Next Goal
 10. Future self-build cross analysis (§52)
 
+Seasonal rank / rating progression (§64) sits with items 2–4: it needs the same rank metadata, and
+is scheduled once self-rank recognition is reliable.
+
 ## Presentation and runtime (added in Revision 3)
 
 These are cross-cutting; they are not a third feature track competing with the two above.
@@ -2107,6 +2116,11 @@ Statistics are not crammed into History. The Statistics page eventually shows wi
 daily / weekly / monthly, rolling win rate, rank-relative performance, opponent weapon / legs /
 full build, and improved matchup — following §44–§47.
 
+It also hosts the seasonal rank / rating progression from §64: a **season selector**, the
+Rank / Rating chart, and — where the below-A and S rating systems cannot be compared directly — a
+**separate scale or separate presentation** rather than one continuous line across the A→S
+boundary.
+
 Charts only where something changes over time. A plain win rate does not need a pie chart (§51).
 
 ## Scope boundary
@@ -2234,3 +2248,91 @@ runtime files removed, DB flushed, no child or grandchild process left.
 
 **If that safety cannot be demonstrated, it is not implemented.** "It seems to work" is not
 evidence; the T2 lifecycle gate is.
+---
+
+# 64. Seasonal rank / rating progression
+
+Status: **ADOPTED / PLANNED.** Tracked as
+[#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28). Gated on self-rank recognition
+becoming reliable (§13, §10, [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)).
+
+This is the **user's own** progression over time, not opponent statistics. §45 already covers
+rank-relative performance against opponents; this section is the player's own climb.
+
+## Why it is gated
+
+A progression chart built on unreliable recognition is worse than no chart: a recognition gap reads
+to the user as a rating drop. So this waits until self-rank acquisition is dependable, and then
+shows only what was actually observed.
+
+## The ladder
+
+```text
+unranked → … → A4 → S
+```
+
+**Everything below A is in scope**, not only the top of the ladder. The purpose of the feature is
+motivation, and the lower ranks are where motivation matters most.
+
+Reaching S is an **Achievement** (§50), **not a feature unlock.** No Tracker capability becomes
+available or unavailable because of the user's rank.
+
+## The A/S discontinuity
+
+The game presents rating and progression **differently below A than at S**. This constraint shapes
+the whole feature:
+
+- **Do not treat the two as one scale with one meaning.** A value below A and a value at S are not
+  interchangeable merely because both are called a rating.
+- **Do not connect the A→S boundary as a single continuous rating line** without a justified basis.
+  Drawing one line across that boundary asserts a comparison the game does not support.
+- Where the two cannot be compared directly, they get **separate scales or separate
+  presentations** (§60, §64 presentation notes below).
+
+This is the same discipline as §52 and §53: a value that was not observed, or that cannot be
+compared, stays that way instead of being smoothed into something that looks tidier.
+
+## Seasons
+
+- History is **separated by season**, and the UI can switch season.
+- **Rating is never carried forward** from one season into the next.
+- Past seasons remain **viewable**.
+
+## Recognition policy
+
+- **No continuous OCR.** Rank and Rating are acquired only at the appropriate events where the game
+  actually displays them.
+- **Recognition failure is isolated.** It must not affect WIN / LOSE determination, ResultGate,
+  streak, or match persistence (§8, §16). A failed read is recorded as a failed read, never as a
+  rating change.
+
+## Conceptual data
+
+Field names are decided at implementation time. This is the shape, not the schema.
+
+```text
+season_id
+observed_at
+self_rank
+rating_mode          -- must distinguish the below-A and S presentation systems
+rating_value
+recognition_status
+recognition_version
+source
+match_id             -- optional
+```
+
+`rating_mode` is the field that carries the A/S distinction. Without it the two systems collapse
+into one column and any chart drawn from it silently misstates the progression.
+
+## Work split
+
+This section is the requirement; the implementation lands in the issues that own each layer.
+
+| Layer | Issue | Items |
+|---|---|---|
+| Metadata foundation | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Season / Rating acquisition; persistence; distinguishing the below-A and S recognition systems |
+| Growth analytics | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Per-season Rank / Rating progression; line chart; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement |
+| Presentation | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where below-A and S cannot be compared directly |
+
+Sample-size and sparse-data honesty from §43 and §44 applies to every number this feature shows.
