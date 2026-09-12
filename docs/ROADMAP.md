@@ -12,7 +12,7 @@ Status vocabulary:
 |---|---|
 | **DONE** | Shipped in the current public stable release and in use |
 | **IN PROGRESS** | Being worked on right now |
-| **ACCEPTED** | Automated/review/required real-session acceptance complete; release publication pending |
+| **ACCEPTED** | Automated/review/required real-session acceptance complete. Published in the v1.1.0 Release, but formal release acceptance is still blocked — see the status note below |
 | **ACCEPTANCE PENDING** | Code exists, CI green, **not released and not confirmed in a real session** |
 | **PLANNED** | Agreed direction, scheduled after the current phases |
 | **BACKLOG** | Agreed direction, not scheduled, no design yet |
@@ -20,6 +20,24 @@ Status vocabulary:
 | **FUTURE / EXPERIMENTAL** | Agreed as a direction, but a design bar must be met before it may be built |
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
+
+## v1.1.0 status note — 2026-09-12
+
+The v1.1.0 GitHub Release is **published**, and `main` is at `f2f72a5`. Release acceptance is
+nevertheless **BLOCKED**: the immutable `v1.1.0` tag (`7a5959f`) carries a README bootstrap hash
+taken from a CRLF archive checkout rather than the public Git blob bytes, so the tagged install
+command fails closed with `bootstrap SHA-256 mismatch`. PR #23 corrected `main`, but a tag is
+immutable and a published Release cannot be returned to draft.
+
+Therefore, in the tables below:
+
+- `ACCEPTED` items shipped in the v1.1.0 Release. Their code is public and in use.
+- **`DONE` is still reserved for v1.0.1 plus anything a corrected, fully accepted release covers.**
+  No item is promoted to `DONE` on the strength of v1.1.0 alone.
+- [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
+  [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) stay open until a corrected
+  immutable version (recommended `v1.1.1`) is published and verified. The `v1.1.0` tag is never
+  moved.
 
 ---
 
@@ -38,6 +56,8 @@ every existing reference, the old phases were **folded in place**:
 | Phase 10 — Opponent build analysis ([#12](https://github.com/TullysAC6/ac6-winloss-tracker/issues/12)) | **Phase 8A–8C** | The superset; it is now the whole capture programme |
 | Phase 11 — UX / distribution | unchanged | Number kept |
 | — | **Phase D** (new) | Development acceleration; cross-cutting, runs first |
+| — | **Phase R** (new, 2026-09-12) | Runtime isolation. Cross-cutting; after Phase D's harness |
+| — | **Phase UI** (new, 2026-09-12) | UI/UX polish. Cross-cutting presentation layer; it does not own any feature it displays |
 
 No phase number was reused for a different subject, and no item was dropped.
 
@@ -67,7 +87,19 @@ expensive every later phase is to verify.
 7. Recently improved matchup
 8. Session / post-loss tendencies
 9. Next Goal
-10. Future self-build cross analysis
+10. Future self-build cross analysis ([#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27))
+
+**Cross-cutting (added 2026-09-12)**
+
+Neither a third feature track nor a competitor to the two above. Requirements:
+[MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-63.
+
+1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), after the fixture/replay harness
+2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - documentation only, human review before any UI code
+3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
+4. UI-2 Dashboard / History / Settings shell
+5. UI-3 Statistics presentation, following the analytics track's real data
+6. UI-4 Tray / Launcher modernization ([#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26)), last
 
 Prerequisite foundations may be implemented before the visible feature that depends on them.
 
@@ -127,7 +159,7 @@ shipped application feature.
 | Dashboard | DONE | |
 | Game overlay | DONE | |
 | OBS browser-source overlay | DONE | `http://127.0.0.1:8765/` |
-| Dashboard history 10 → 50 rows, scrolling, no redundant repaint | ACCEPTED | Accepted on RC `93d5a57`; v1.1.0 publication pending |
+| Dashboard history 10 → 50 rows, scrolling, no redundant repaint | ACCEPTED | Accepted on RC `93d5a57`; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
 
 ## Phase 3 — Distribution / release safety
 
@@ -141,8 +173,8 @@ shipped application feature.
 | Abnormal-termination recovery | DONE | Overlay exits by itself when the server dies; a stale `.runtime.json` neither blocks nor hijacks the next start |
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
-| Isolated install / update / rollback / uninstall flow test | ACCEPTED | Accepted on the RC; runs in CI; v1.1.0 publication pending |
-| Dedicated venv isolation | DEFERRED | v1.1.0 installs into the user's Python environment. Recorded in README as a future version |
+| Isolated install / update / rollback / uninstall flow test | ACCEPTED | Accepted on the RC; runs in CI; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
+| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Scheduled after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). v1.1.0 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -150,7 +182,7 @@ Everything in this phase is the current RC. See [#7](https://github.com/TullysAC
 
 | Item | Status | Notes |
 |---|---|---|
-| Windows Graphics Capture path | ACCEPTED | Detection continues while AC6 is not foreground; v1.1.0 publication pending |
+| Windows Graphics Capture path | ACCEPTED | Detection continues while AC6 is not foreground; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
 | Guarded desktop-capture fallback (MSS) | ACCEPTED | Only with AC6 foreground, identical identity/geometry before and after, and nothing overlapping the ROI |
 | Alt+Tab continuity | ACCEPTED | Existing real recovery evidence plus targeted automation |
 | Stale-frame safety | ACCEPTED | Unique native presentation times; a repeated or old frame cannot confirm |
@@ -159,7 +191,7 @@ Everything in this phase is the current RC. See [#7](https://github.com/TullysAC
 | Milestone effects 5 / 10 / 15 / 20 | DONE | Released in v1.0.1 |
 | Milestone effects 30 / 35 / 40 / 45 | DONE | Released in v1.0.1 |
 | Milestone effect 50 | DONE | Released in v1.0.1 |
-| SSE effect replay / recent effect | ACCEPTED | Fix for [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4); v1.1.0 publication pending |
+| SSE effect replay / recent effect | ACCEPTED | Fix for [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4); shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
 | Effect screenshot | ACCEPTED | Focused real-AC6 T3 PASS on RC `93d5a57`; visible user overlays are part of the captured composition |
 
 ## Phase 5 — Settings
@@ -168,8 +200,8 @@ Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8).
 
 | Item | Status | Notes |
 |---|---|---|
-| Screenshot ON / OFF (`effect_screenshot_enabled`) | ACCEPTED | Config key and launcher settings entry accepted on the RC; v1.1.0 publication pending |
-| Check for a new version | ACCEPTED | Metadata-only check introduced on the RC; v1.1.0 publication pending. Draft PR #5 extensions are not included |
+| Screenshot ON / OFF (`effect_screenshot_enabled`) | ACCEPTED | Config key and launcher settings entry accepted on the RC; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
+| Check for a new version | ACCEPTED | Metadata-only check introduced on the RC; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version. Draft PR #5 extensions are not included |
 | Milestone effect ON / OFF (`effect_enabled`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Session / lifetime display switch (`overlay_stats_scope`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Reset all win/loss history | ACCEPTANCE PENDING | Draft PR #5 |
@@ -314,13 +346,65 @@ Replaces the former Phases 8 / 9 / 10 as slices of one dataset.
 
 ---
 
+## Phase R — Runtime isolation
+
+Added 2026-09-12. Umbrella issue: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §56.
+
+Scheduled **after** [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), so the
+migration has a fixture/replay harness to regress against. Not part of v1.1.x and not part of
+draft PR #5.
+
+| Item | Status | Notes |
+|---|---|---|
+| App-local Python environment owned by AC6tool | PLANNED | Layout decided at implementation time. Conceptually `…\AC6WinLossTracker\{app,venv}` |
+| Dependency isolation from the user's shared Python | PLANNED | The reason for the whole phase: an unrelated `pip upgrade` must not be able to break the Tracker, and vice versa |
+| `requirements.lock`, hash pinning, binary-only policy | **UNCHANGED** | A venv is not a sandbox. This phase must not be used as an argument to relax any supply-chain control |
+| `pythonw` / worker actual-PID ownership through the launcher wrapper | PLANNED — **KNOWN HAZARD** | Already observed here: unmerged `fix/venv-launcher-ownership` (`138fd8f`, `95cc816`) and `release/v1.1.0-venv` (`e4677ce`, `6c88dce`). "It is a venv now" is never evidence that containment lands on the right PID |
+| Migration T2 gate | PLANNED | Clean install, upgrade from shared Python, isolation, `python.exe` and `pythonw.exe` launch, worker PID ownership, duplicate-launch refusal, normal and abnormal shutdown, no orphan worker, update, injected rollback, uninstall, reinstall, user-data retention, port/runtime/mutex cleanup |
+
+---
+
+## Phase UI — UI/UX polish
+
+Added 2026-09-12. Umbrella issue: [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25).
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §57–§63.
+
+Design identity: `Fluent shell × AC6 telemetry × Pachinko celebration`. It blends into the game
+normally, and breaks only at the moment of a win. This is **polish**, not a rebuild.
+
+This phase is the **presentation layer only**. It does not reimplement what it displays: #8 owns
+settings functionality, #9 history and current analytics, #15 match metadata, #16 growth analytics
+logic, #17 opponent build capture, #10/#11/#12 opponent statistics.
+
+| Phase | Item | Status | Risk |
+|---|---|---|---|
+| UI-0 | Design specification — current framework survey, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility; Before → Proposed per item; Low/Medium/High classification; rollback plan; regression-test plan. **No code change. Human review before any implementation** | PLANNED | none |
+| UI-1A | Player Overlay polish — value over label, telemetry framing, thin background, DPI/aspect/safe-zone, minimal animation. Low-risk visual changes only | PLANNED | low |
+| UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance sizing | PLANNED | low |
+| UI-2 | Dashboard / History / Settings shell — top navigation (`OVERVIEW / HISTORY / STATISTICS / SETTINGS`), WIN RATE as primary KPI, surface and spacing hierarchy, explicit status vocabulary, date-grouped history with filters | PLANNED | medium |
+| UI-3 | Statistics presentation, added incrementally as 7A/7B and 8A–8C deliver real data. No large empty page beforehand | PLANNED | medium |
+| UI-4 | Tray / Launcher modernization — [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26). Separate issue, separate PR, last | BACKLOG | **high** |
+
+### Constraints on this phase
+
+| Constraint | |
+|---|---|
+| Performance | A UI change may not cost game performance. Compare Tracker CPU, RAM, process/thread count, AC6 frametime p95/p99 and update frequency before and after. No permanent 60 fps animation. The capture/detection loop never moves onto the UI thread |
+| Framework | No migration to WinUI 3, WPF or anything else as the opening move. Only if a framework limit is a demonstrated blocker, in its own issue |
+| Scope | No unrelated refactoring of Detector, ResultGate, WGC or process lifecycle |
+| Accessibility | DPI scaling, keyboard navigation, focus states, contrast, text scaling, high contrast, dark titlebar, narrow-window layout. **Never colour alone** |
+| Overlays | Player and Broadcast overlays share tokens and components, but font size, opacity, density, animation, duration and layout stay separately configurable |
+
+---
+
 ## Phase 11 — UX / distribution improvements
 
 Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Dedicated venv isolation | DEFERRED | Phase 3 note |
+| Dedicated venv isolation | **PLANNED** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
 | Support for CUSTOM MATCH / RANK MATCH: TEAM | **PLANNED — moved to Phase 7A** | No longer deferred. Revision 2 requires TEAM and CUSTOM to be recorded as normal matches. The README statement stays accurate for the *shipped* release until 7A passes acceptance |
 | Patch / version awareness (`game_version`, `parts_master_version`, `recognition_version`, `analytics_version`) | PLANNED | Leaves room for before/after balance-patch comparison. Existing data is not back-filled with a guessed version |
 | Localisation beyond Japanese | BACKLOG | |
@@ -332,7 +416,7 @@ Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Self-build linkage (`Current Build` selection, self × opponent cross analysis) | FUTURE | Does not require per-match OCR. Must not delay the current roadmap |
+| Self-build linkage (`Current Build` selection, self × opponent cross analysis) | **BACKLOG** | Recorded as a requirement on 2026-09-12: [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27), MASTER_REQUIREMENTS §52. Explicit selection only, never inferred; unset stays `unknown`. Does not require per-match OCR. Must not delay the current roadmap |
 | TEAM three-opponent build recognition | DEFERRED | Request-driven only |
 | Safe automatic historical completion | DEFERRED | Only if justified |
 | Discord login | DEFERRED | Local-first is mandatory: with no login every core function still works, and a Discord outage disables nothing. Internal identity stays separate from external identity |
