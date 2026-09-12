@@ -1064,9 +1064,13 @@ content and the bytes the public actually fetches.
 - UI-0 design specification, no code change, human review before implementation
 - UI-1A Player Overlay polish
 - UI-1B Broadcast / streaming Overlay polish
-- UI-2 Dashboard / History / Settings shell
-- UI-3 Statistics presentation, following the real data from 7A/7B and 8A–8C
+- UI-2 Dashboard / History / Settings shell — after the match-metadata foundation (§10, #15)
+- UI-3A Growth / Rank / Rating presentation, following 7A/7B (#16-A, #28)
+- UI-3B Opponent build statistics presentation, following 8A–8C (#17, #10/#11/#12)
 - UI-4 Tray / Launcher modernization — separate high-risk issue, last
+
+The interleaved order across this phase and the feature phases is recorded under **Sequencing** in
+`docs/ROADMAP.md`.
 
 ## Much later
 - TEAM three-opponent build recognition if user demand exists
