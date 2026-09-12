@@ -16,6 +16,25 @@ from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+# Some tests here write into, and then clean up, the resolved data directory --
+# installed-version.json and startup.log among them. run_all_tests.py gives every
+# test file an isolated LOCALAPPDATA, so that is harmless. Run this file directly
+# and the same cleanup deletes the real files instead, which is exactly how a real
+# installed-version marker and startup log were lost once. Refuse to start unless
+# the data directory is somewhere disposable.
+from app_paths import data_dir as _data_dir  # noqa: E402
+
+_resolved = _data_dir().resolve()
+_temp_root = Path(tempfile.gettempdir()).resolve()
+if _resolved != _temp_root and _temp_root not in _resolved.parents:
+    raise SystemExit(
+        f"refusing to run against a non-temporary data directory: {_resolved}\n"
+        "This file writes to and deletes files there. Run it through\n"
+        "    python tests/run_all_tests.py\n"
+        "which isolates LOCALAPPDATA, or point LOCALAPPDATA at a temporary directory."
+    )
+
 import config_utils
 import history_analytics
 import settings_window as settings
