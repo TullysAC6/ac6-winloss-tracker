@@ -26,7 +26,7 @@ Issue #6
 - T1 remains **N/A / not run** because issue #14's formal fixture/replay harness does not exist. Do not call it PASS.
 - Draft PR #5 is a separate generation and has not been reconciled with the current `main`.
 - PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`. That documentation generation is closed; PR #5 was the only unmerged generation before this Revision 4 docs-only work began.
-- Revision 4 adds §65 Season Catalog / Assignment as a docs-only second generation. It does not implement a manifest, network client, cache, schema, migration or Settings button.
+- Draft [PR #31](https://github.com/TullysAC6/ac6-winloss-tracker/pull/31) adds Revision 4 / §65 Season Catalog / Assignment as the docs-only second generation. It does not implement a manifest, network client, cache, schema, migration or Settings button.
 
 ## The rule that cost a release — do not lose it
 

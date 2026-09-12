@@ -16,7 +16,7 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4 in th
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
 | Documentation generation | PR #13 — **merged**. Master Requirements Revision 3 is canonical on `main` |
-| Season requirement generation | **Documentation / requirement sync only.** Revision 4 records manual-first Season catalog reconciliation and retrospective assignment; no application code or runtime manifest is implemented |
+| Season requirement generation | Draft [PR #31](https://github.com/TullysAC6/ac6-winloss-tracker/pull/31) — **documentation / requirement sync only.** Revision 4 records manual-first Season catalog reconciliation and retrospective assignment; no application code or runtime manifest is implemented |
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 

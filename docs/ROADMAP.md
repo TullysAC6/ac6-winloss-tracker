@@ -114,7 +114,8 @@ section describes *when*. Where the two appear to disagree, this section wins an
 corrected.
 
 Completed: **v1.1.1 released**, and **PR #13 merged**, which made Revision 3 canonical on `main`.
-Revision 4 is the current docs-only Season requirement generation and becomes canonical when merged.
+Revision 4 is the current docs-only Season requirement generation in draft
+[PR #31](https://github.com/TullysAC6/ac6-winloss-tracker/pull/31) and becomes canonical when merged.
 From the current position:
 
 ```text
