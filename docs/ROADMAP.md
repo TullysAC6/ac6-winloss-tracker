@@ -21,7 +21,21 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
----
+## Release status note — 2026-09-12
+
+Public stable is **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d8476`.
+
+**v1.1.0 is superseded.** It was published and its runtime was accepted, including a real-AC6 T3,
+but its formal release acceptance was never completed: the README install one-liner inside the tag
+carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the Git blob
+bytes `raw.githubusercontent.com` serves, so the published command failed closed. The tag was not
+moved and the Release was not edited. v1.1.1 ships the same accepted runtime with corrected
+immutable distribution metadata.
+
+Therefore, in the tables below, `DONE` means shipped in v1.1.1 and in use.
+[#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
+[#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against v1.1.1. Neither
+the `v1.1.0` nor the `v1.1.1` tag is ever moved.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -38,6 +52,8 @@ every existing reference, the old phases were **folded in place**:
 | Phase 10 — Opponent build analysis ([#12](https://github.com/TullysAC6/ac6-winloss-tracker/issues/12)) | **Phase 8A–8C** | The superset; it is now the whole capture programme |
 | Phase 11 — UX / distribution | unchanged | Number kept |
 | — | **Phase D** (new) | Development acceleration; cross-cutting, runs first |
+| — | **Phase R** (new, 2026-09-12) | Runtime isolation. Cross-cutting; after Phase D's harness |
+| — | **Phase UI** (new, 2026-09-12) | UI/UX polish. Cross-cutting presentation layer; it does not own any feature it displays |
 
 No phase number was reused for a different subject, and no item was dropped.
 
@@ -45,8 +61,13 @@ No phase number was reused for a different subject, and no item was dropped.
 
 ## Implementation priority
 
-Two independent tracks. Phase D is not a feature, and it comes first because it changes how
-expensive every later phase is to verify.
+Two independent tracks plus a cross-cutting one. This section records **relative priority within
+each track**; the single interleaved order the project actually follows is
+[Sequencing](#sequencing--dependency-order-corrected-2026-09-12) below, and that section wins on any
+question of *when*.
+
+Phase D is not a feature, and it comes first because it changes how expensive every later phase is
+to verify.
 
 **Development acceleration (Phase D)**
 
@@ -67,9 +88,69 @@ expensive every later phase is to verify.
 7. Recently improved matchup
 8. Session / post-loss tendencies
 9. Next Goal
-10. Future self-build cross analysis
+10. Future self-build cross analysis ([#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27))
+
+**Cross-cutting (added 2026-09-12)**
+
+Not a competitor to the two tracks above; it interleaves with them. Requirements:
+[MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-63.
+
+1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), after the fixture/replay harness
+2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - documentation only, human review before any UI code
+3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
+4. UI-2 Dashboard / History / Settings shell - **after #15**, so the shell is built once against a settled match-metadata contract
+5. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation - each following its own data
+6. UI-4 Tray / Launcher modernization ([#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26)), last
 
 Prerequisite foundations may be implemented before the visible feature that depends on them.
+
+---
+
+## Sequencing — dependency order, corrected 2026-09-12
+
+This is the **authoritative order**. The phase tables below describe *what* each item is; this
+section describes *when*. Where the two appear to disagree, this section wins and the table is
+corrected.
+
+Completed: **v1.1.1 released**, and **PR #13 merged**, which made Revision 3 canonical on `main`.
+From the current position:
+
+```text
+→ PR #5                       (#8 settings, #9 analytics)
+→ #14                         fixture / replay harness
+→ #24                         app-local Python environment
+→ UI-0                        design specification, no code change
+→ UI-1A                       Player Overlay polish
+→ UI-1B                       Broadcast Overlay polish
+→ #15                         match metadata foundation
+→ UI-2                        Dashboard / History / Settings shell
+→ #16-A  /  #28 analytics     growth + seasonal rank/rating data
+→ UI-3A                       Growth / Rank / Rating presentation
+→ #17                         full opponent build recognition
+→ #10 / #11 / #12             opponent statistics
+→ UI-3B                       Opponent build statistics presentation
+→ #16-B                       advanced growth analytics
+→ #18                         manual historical backfill
+→ #27                         self-build linkage
+→ UI-4                        Tray / Launcher modernization
+```
+
+### Why this order, and what changed
+
+| Change | Reason |
+|---|---|
+| **#15 moves ahead of UI-2** | UI-2 rebuilds the Dashboard and History shell. If the match-metadata contract is not fixed first, History and the Dashboard get built twice — once against today's row shape and again against the Ranked/Custom, Single/Team, rank-bearing shape. Settling the contract first is cheaper than building the shell twice |
+| **#16 owns data, #25 owns rendering** | #16 owns the analytics and time-series computation — periods, rolling win rate, per-season rank/rating series, deltas, achievements. The **actual chart rendering is UI-3A / UI-3B, owned by #25.** Neither issue implements the other's half |
+| **UI-3 splits into UI-3A and UI-3B** | A logical split along the data that feeds it. **UI-3A** presents growth, rank and rating (#16-A, #28). **UI-3B** presents opponent build statistics (#17, #10/#11/#12). UI-3A can ship as soon as its data exists, without waiting for the whole opponent-recognition programme |
+| **#16-B moves ahead of #18** | Advanced growth analytics work on the data the user has actually accumulated. #18 manual historical backfill is a data-entry programme whose value is retroactive; it does not gate the analytics, so it does not precede them |
+| **#14 must carry the later fixture families** | See Phase D. The harness is built once and then extended, so its layout has to accommodate season, pre-S and S rating fixtures rather than being retrofitted for them |
+
+Unchanged and not negotiable: at most **two unmerged generations** at a time
+(MASTER_REQUIREMENTS §4), and every item follows the §3 gate order
+T0 → T1 → T2 → PR handoff → review → fixes → affected-gate rerun → T3 → `main`.
+
+An item appearing in this list is **not** authorisation to start it now. The current position is in
+[PROJECT_STATE.md](PROJECT_STATE.md).
 
 ---
 
@@ -95,7 +176,7 @@ Implementation
 
 | Item | Status | Notes |
 |---|---|---|
-| Fixture / replay harness | **PLANNED — HIGH PRIORITY** | `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md) |
+| Fixture / replay harness | **PLANNED — HIGH PRIORITY** | `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md). **Its layout must be able to carry the later fixture families without being retrofitted**: season boundaries, and pre-S (UNRANKED through A4) and S rating presentations as distinct cases — see [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) and MASTER_REQUIREMENTS §64. The harness is built once and then extended |
 | Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
 | T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the **PR goes to review**; the affected gates are re-run after review fixes; T3 last |
 | Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
@@ -142,7 +223,7 @@ shipped application feature.
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
 | Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
-| Dedicated venv isolation | DEFERRED | v1.1.1 installs into the user's Python environment. Recorded in README as a future version |
+| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Scheduled after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). v1.1.1 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -211,13 +292,27 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | Match-history row shows mode / format / ranks | PLANNED | `RANKED · SINGLE`, `自分 A / 相手 S`. Unknown shown honestly |
 | Win-rate breakdown by Ranked / Custom / Single / Team | PLANNED | Top-level UI may stay Overall / Single / Team, with the detail elsewhere |
 | `相手機体: TEAMのため対象外` distinct from `未取得` | PLANNED | |
+| Rank / Season / Rating acquisition | PLANNED | Added 2026-09-12 for [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28). Event-driven only — **no continuous OCR** |
+| Rank / Season / Rating persistence | PLANNED | Conceptual shape in MASTER_REQUIREMENTS §64. Rating is never carried forward across seasons |
+| Distinguish the pre-S (through A4) and the S recognition system | PLANNED | The `rating_mode` distinction — conceptually `pre_s` and `s_rank`. **A4 is on the pre-S side.** Without it the two systems collapse into one column and every later chart misstates the progression |
 
 Not negotiable in this phase: metadata failure never discards a result; `unknown` is never
-inferred into a specific category; existing historical rows stay `unknown`.
+inferred into a specific category; existing historical rows stay `unknown`. Rank/Rating recognition
+failure never affects WIN/LOSE, ResultGate, streak or match persistence.
 
 ### Phase 7B — Growth trend analytics
 
 Absorbs the former Phase 7 (daily / weekly / monthly series). Priority **HIGH**.
+
+[#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) is delivered in two slices:
+**#16-A** is the core growth and seasonal rank/rating data, scheduled after #15 and presented by
+UI-3A; **#16-B** is the advanced analytics (rank-relative depth, matchup and improved-matchup,
+session tendencies, Next Goal), scheduled after the opponent-statistics work and **before**
+[#18](https://github.com/TullysAC6/ac6-winloss-tracker/issues/18) — backfill is retroactive data
+entry and does not gate the analytics.
+
+**#16 owns the data; the charts are UI-3A / UI-3B, owned by
+[#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25).**
 
 | Item | Status | Notes |
 |---|---|---|
@@ -229,6 +324,11 @@ Absorbs the former Phase 7 (daily / weekly / monthly series). Priority **HIGH**.
 | 30-match rolling win rate | PLANNED | The recommended primary trend |
 | Period-vs-period comparison | PLANNED | Shows both sample sizes, the difference in percentage points and a sparse-data marker. `最近30戦 57% / 前30戦 51% / +6pt` |
 | Statistics UI (charts / trends) | PLANNED | Needs a home in the dashboard |
+| Per-season Rank / Rating progression | PLANNED | Added 2026-09-12 for [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28), MASTER_REQUIREMENTS §64. Gated on reliable self-rank recognition. History separated by season, past seasons viewable |
+| Rank / Rating line chart | PLANNED | **The pre-S → S boundary (A4 → S) is not drawn as one continuous rating line** without a justified basis. Separate scale or separate presentation where the two systems are not comparable |
+| Current Rating, Season High / Low, selected-period delta | PLANNED | Sample-size and sparse-data honesty from §43/§44 applies |
+| Rank transition markers | PLANNED | |
+| `S RANK REACHED` achievement | PLANNED | An **Achievement**, not a feature unlock. Every pre-S rank (UNRANKED through A4) is in scope too — the climb is the point |
 
 ### Phase 7C — Rank-relative performance
 
@@ -314,13 +414,74 @@ Replaces the former Phases 8 / 9 / 10 as slices of one dataset.
 
 ---
 
+## Phase R — Runtime isolation
+
+Added 2026-09-12. Umbrella issue: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §56.
+
+Scheduled **after** [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), so the
+migration has a fixture/replay harness to regress against. Not part of v1.1.x and not part of
+draft PR #5.
+
+| Item | Status | Notes |
+|---|---|---|
+| App-local Python environment owned by AC6tool | PLANNED | Layout decided at implementation time. Conceptually `…\AC6WinLossTracker\{app,venv}` |
+| Dependency isolation from the user's shared Python | PLANNED | The reason for the whole phase: an unrelated `pip upgrade` must not be able to break the Tracker, and vice versa |
+| `requirements.lock`, hash pinning, binary-only policy | **UNCHANGED** | A venv is not a sandbox. This phase must not be used as an argument to relax any supply-chain control |
+| `pythonw` / worker actual-PID ownership through the launcher wrapper | PLANNED — **KNOWN HAZARD** | Already observed here: unmerged `fix/venv-launcher-ownership` (`138fd8f`, `95cc816`) and `release/v1.1.0-venv` (`e4677ce`, `6c88dce`). "It is a venv now" is never evidence that containment lands on the right PID |
+| Migration T2 gate | PLANNED | Clean install, upgrade from shared Python, isolation, `python.exe` and `pythonw.exe` launch, worker PID ownership, duplicate-launch refusal, normal and abnormal shutdown, no orphan worker, update, injected rollback, uninstall, reinstall, user-data retention, port/runtime/mutex cleanup |
+
+---
+
+## Phase UI — UI/UX polish
+
+Added 2026-09-12. Umbrella issue: [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25).
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §57–§63.
+
+Design identity: `Fluent shell × AC6 telemetry × Pachinko celebration`. It blends into the game
+normally, and breaks only at the moment of a win. This is **polish**, not a rebuild.
+
+This phase is the **presentation layer only**. It does not reimplement what it displays: #8 owns
+settings functionality, #9 history and current analytics, #15 match metadata, #16 growth analytics
+logic, #17 opponent build capture, #10/#11/#12 opponent statistics.
+
+The division of labour that matters most here: **#16 owns the analytics and time-series data;
+[#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) owns the actual chart
+rendering.** Neither implements the other's half.
+
+Order within this phase is set by [Sequencing](#sequencing--dependency-order-corrected-2026-09-12)
+above, not by the row order in the table. In particular **#15 lands before UI-2**, so the Dashboard
+and History shell is built once against a settled match-metadata contract instead of twice.
+
+| Phase | Item | Status | Risk |
+|---|---|---|---|
+| UI-0 | Design specification — current framework survey, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility; Before → Proposed per item; Low/Medium/High classification; rollback plan; regression-test plan. **No code change. Human review before any implementation** | PLANNED | none |
+| UI-1A | Player Overlay polish — value over label, telemetry framing, thin background, DPI/aspect/safe-zone, minimal animation. Low-risk visual changes only | PLANNED | low |
+| UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance sizing | PLANNED | low |
+| UI-2 | Dashboard / History / Settings shell — top navigation (`OVERVIEW / HISTORY / STATISTICS / SETTINGS`), WIN RATE as primary KPI, surface and spacing hierarchy, explicit status vocabulary, date-grouped history with filters | PLANNED | medium |
+| UI-3A | **Growth / Rank / Rating presentation.** Statistics page for the data from #16-A and [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28): win-rate trend, rolling win rate, the **season selector**, and the Rank / Rating chart — with a separate scale or separate presentation where pre-S (UNRANKED through A4) and S cannot be compared directly. Ships as soon as its data exists; does not wait for the opponent-recognition programme | PLANNED | medium |
+| UI-3B | **Opponent build statistics presentation.** Weapon / leg-type / full-build views for #17 and #10/#11/#12. Follows its data | PLANNED | medium |
+| UI-4 | Tray / Launcher modernization — [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26). Separate issue, separate PR, last | BACKLOG | **high** |
+
+### Constraints on this phase
+
+| Constraint | |
+|---|---|
+| Performance | A UI change may not cost game performance. Compare Tracker CPU, RAM, process/thread count, AC6 frametime p95/p99 and update frequency before and after. No permanent 60 fps animation. The capture/detection loop never moves onto the UI thread |
+| Framework | No migration to WinUI 3, WPF or anything else as the opening move. Only if a framework limit is a demonstrated blocker, in its own issue |
+| Scope | No unrelated refactoring of Detector, ResultGate, WGC or process lifecycle |
+| Accessibility | DPI scaling, keyboard navigation, focus states, contrast, text scaling, high contrast, dark titlebar, narrow-window layout. **Never colour alone** |
+| Overlays | Player and Broadcast overlays share tokens and components, but font size, opacity, density, animation, duration and layout stay separately configurable |
+
+---
+
 ## Phase 11 — UX / distribution improvements
 
 Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Dedicated venv isolation | DEFERRED | Phase 3 note |
+| Dedicated venv isolation | **PLANNED** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
 | Support for CUSTOM MATCH / RANK MATCH: TEAM | **PLANNED — moved to Phase 7A** | No longer deferred. Revision 2 requires TEAM and CUSTOM to be recorded as normal matches. The README statement stays accurate for the *shipped* release until 7A passes acceptance |
 | Patch / version awareness (`game_version`, `parts_master_version`, `recognition_version`, `analytics_version`) | PLANNED | Leaves room for before/after balance-patch comparison. Existing data is not back-filled with a guessed version |
 | Localisation beyond Japanese | BACKLOG | |
@@ -332,7 +493,7 @@ Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Self-build linkage (`Current Build` selection, self × opponent cross analysis) | FUTURE | Does not require per-match OCR. Must not delay the current roadmap |
+| Self-build linkage (`Current Build` selection, self × opponent cross analysis) | **BACKLOG** | Recorded as a requirement on 2026-09-12: [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27), MASTER_REQUIREMENTS §52. Explicit selection only, never inferred; unset stays `unknown`. Does not require per-match OCR. Must not delay the current roadmap |
 | TEAM three-opponent build recognition | DEFERRED | Request-driven only |
 | Safe automatic historical completion | DEFERRED | Only if justified |
 | Discord login | DEFERRED | Local-first is mandatory: with no login every core function still works, and a Discord outage disables nothing. Internal identity stays separate from external identity |

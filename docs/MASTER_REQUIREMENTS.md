@@ -1,8 +1,17 @@
 # AC6 Win/Loss Tracker — Master Requirements & Development Policy
 
-Last consolidated: 2026-09-09 (Revision 2)
+Last consolidated: 2026-09-12 (Revision 3)
 Status: **CANONICAL PROJECT REQUIREMENTS**
 Scope: AC6 Win/Loss Tracker / AC6tool
+
+| Revision | Date | What it added |
+|---|---|---|
+| Revision 1 | before 2026-09-09 | Superseded by Revision 2; not reproduced separately |
+| Revision 2 | 2026-09-09 | Development-acceleration track (§38–§42), match-metadata foundation (§10–§15), full opponent-build programme (§16–§29), growth analytics (§43–§51) |
+| **Revision 3** | **2026-09-12** | Runtime isolation / app-local Python environment (§56); UI/UX design identity and the Player/Broadcast overlay split (§57–§63); self-build linkage promoted from a sketch to a recorded requirement with its own issue (§52); seasonal rank / rating progression, including the A/S discontinuity rule (§64) |
+
+Revision 3 **adds to** Revision 2. Nothing in Revision 2 is deleted or rewritten by it. Where
+Revision 3 changes a status, the earlier statement and the reason for the change stay visible.
 
 > This document is the consolidated source of truth for requirements and development policy agreed with the user.
 > If an older chat, issue, PR comment, README note, branch document, or AI-generated plan conflicts with this document, do not silently follow the older material. Reconcile the conflict explicitly.
@@ -421,6 +430,9 @@ For TEAM:
 - opponent team member ranks are deferred
 
 Missing rank information must be represented as unknown, not guessed.
+
+The user's own rank over time is a separate requirement: see §64, which also fixes the rule that the
+pre-S (UNRANKED through A4) and S rating systems are not assumed to share one scale.
 
 ---
 
@@ -968,23 +980,40 @@ Destructive history actions:
 
 ## Current near-term release flow
 
-This is §3 applied to the two units currently in flight. Runtime RC `93d5a57` has completed its
-required real-AC6 T3; v1.1.0 release metadata and distribution checks remain before publication.
+Updated 2026-09-12. This is §3 applied to the unit currently in flight.
 
-1. Complete v1.1.0 release preparation and re-run affected T0/T2 gates; T1 remains N/A until #14 exists
-2. Independently review the release-preparation diff
-3. Merge the accepted RC to `main`, verify CI, then tag and publish v1.1.0 only if every release safety check passes
-4. Reconcile the Claude settings/analytics branch with the new `main`, and confirm **T0-T2** are
-   green on the reconciled branch
-5. PR handoff (§40) - take PR #5 out of draft
-6. Codex/Astra independent review and required fixes
-7. **Re-run the T0-T2 gates the fixes affect**
-8. **T3** real-AC6 acceptance
-9. Merge to `main`
-10. During review, Claude may implement only the next generation in a separate branch/worktree
+**Public stable is v1.1.1 — RELEASED.** Tag `v1.1.1` → `e0d8476`, runtime `93d5a57`.
+[#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
+[#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against it. The live
+position is [`docs/PROJECT_STATE.md`](PROJECT_STATE.md); check GitHub before trusting any SHA here.
+
+The next product generation is **draft PR #5**:
+
+1. Reconcile the Claude settings/analytics branch (draft PR #5) with the current `main` — merge
+   only, no reset, rebase or force-push — and confirm **T0-T2** are green on the reconciled branch
+2. PR handoff (§40) - take PR #5 out of draft
+3. Codex/Astra independent review and required fixes
+4. **Re-run the T0-T2 gates the fixes affect**
+5. **T3** real-AC6 acceptance
+6. Merge to `main`
+7. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and
+   worktree cut from the new `main`, and from there the dependency order recorded under
+   **Sequencing** in `docs/ROADMAP.md`: #14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 →
+   #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
+8. During review, Claude may implement only the next generation in a separate branch/worktree
 
 The release-diff review and the post-fix gate rerun must not be skipped: gate evidence produced
 before a rebase or before a review fix does not describe the code that would actually be merged.
+
+**The v1.1.0 hash defect is the worked example, and it is history, not a current blocker.** v1.1.0
+was published and its runtime was accepted, but the README install one-liner inside the tag carried
+a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the Git blob bytes
+`raw.githubusercontent.com` serves, so the published command failed closed. A published tag and
+Release are treated as immutable here, so the tag was never moved; v1.1.1 superseded it with the
+same runtime and corrected distribution metadata. The lesson stands: the mismatch was introduced
+between the reviewed content and the bytes the public actually fetches, so a SHA-256 published in
+the README is computed from the committed Git blob and confirmed against the real public raw URL
+before it is written down. `tests/test_readme_bootstrap_hash.py` now enforces it.
 
 ## Phase 7A — Match Metadata Foundation
 - Ranked / Custom recognition
@@ -1027,6 +1056,25 @@ before a rebase or before a review fix does not describe the code that would act
 - soft evidence matching
 - ambiguous → user confirmation
 - clear mismatch → no write
+
+## Phase R — Runtime isolation (§56)
+- app-local Python environment, owned by AC6tool
+- dependency isolation from the user's shared Python
+- `pythonw` / worker actual-PID ownership preserved through the launcher wrapper
+- `requirements.lock`, hash pinning and binary-only policy unchanged
+- after #14; migration gate in §56
+
+## Phase UI — UI/UX polish (§57–§63)
+- UI-0 design specification, no code change, human review before implementation
+- UI-1A Player Overlay polish
+- UI-1B Broadcast / streaming Overlay polish
+- UI-2 Dashboard / History / Settings shell — after the match-metadata foundation (§10, #15)
+- UI-3A Growth / Rank / Rating presentation, following 7A/7B (#16-A, #28)
+- UI-3B Opponent build statistics presentation, following 8A–8C (#17, #10/#11/#12)
+- UI-4 Tray / Launcher modernization — separate high-risk issue, last
+
+The interleaved order across this phase and the feature phases is recorded under **Sequencing** in
+`docs/ROADMAP.md`.
 
 ## Much later
 - TEAM three-opponent build recognition if user demand exists
@@ -1074,7 +1122,9 @@ As of 2026-09-09:
 - PR #5 remains Draft and must not be merged before acceptance
 - Current RC remains pending real-AC6 acceptance
 
-These are a dated snapshot, not permanent product requirements.
+These are a dated snapshot, not permanent product requirements. Most of them are now closed:
+the coordination docs are canonical on `main`, the Project board exists, and the RC was accepted
+and released as v1.1.0 then v1.1.1. Draft PR #5 is the one item still open.
 
 The live version of this snapshot is [`docs/PROJECT_STATE.md`](PROJECT_STATE.md). When the two
 disagree, `PROJECT_STATE.md` is the newer one — this section records the position as of
@@ -1125,6 +1175,12 @@ tests/fixtures/
 └─ opponent_builds/
 ```
 
+**The layout must be able to carry the later fixture families without being retrofitted.** The
+harness is built once and then extended, so leave room for what §64 will need — season boundaries,
+and **pre-S (UNRANKED through A4) and S rating presentations as distinct cases**, since those are two
+different presentation systems and a single family would flatten them. Adding those families later
+is expected; having to restructure `ranks/` to accommodate them is not.
+
 Each fixture should have expected structured truth, for example:
 
 ```json
@@ -1146,7 +1202,7 @@ Goals:
 - catch result-recognition regressions
 - catch Ranked/Custom regressions
 - catch Single/Team regressions
-- catch rank-recognition regressions
+- catch rank-recognition regressions, including the pre-S / S presentation split
 - catch opponent-build/parts-normalization regressions
 - reduce repeated manual navigation through AC6
 - make Codex/Astra review faster and evidence-based
@@ -1422,6 +1478,9 @@ When comparing periods, show:
 
 Do not describe tiny samples as a stable trend.
 
+The user's own seasonal rank and rating progression is specified separately in §64, and is gated on
+self-rank recognition being reliable.
+
 ---
 
 # 45. Rank-relative performance
@@ -1684,9 +1743,14 @@ Use minimum samples, sparse-data labels and careful language.
 
 ---
 
-# 52. Future self-build linkage
+# 52. Self-build linkage
 
-Status: **FUTURE / NOT REQUIRED NOW**
+Status (Revision 3): **RECORDED REQUIREMENT / BACKLOG.** Tracked as
+[#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27).
+
+Revision 2 recorded this as *FUTURE / NOT REQUIRED NOW*. Revision 3 neither schedules it nor
+authorises implementation. It records the agreed shape so a later session does not have to
+re-derive it, and gives it an issue so it stops living only in chat.
 
 A future high-value feature is linking the user's own build to each match.
 
@@ -1699,7 +1763,12 @@ Current Build:
 Nacht Build A
 ```
 
-The selected self-build ID remains active until the user changes it.
+The selected self-build ID (`self_build_id`) remains active until the user changes it, and every
+match recorded while it is active carries it.
+
+**If nothing is selected, the match records `unknown` / `unset`. The user's own build is never
+inferred.** This is the same rule §53 applies to opponent builds: an unobserved value stays
+unobserved rather than being guessed from a neighbouring match.
 
 This enables:
 
@@ -1717,7 +1786,12 @@ This can help separate:
 - self-build change
 - opponent-matchup effect
 
-Design later.
+Design later. It depends on the match-metadata foundation (§10,
+[#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)) and is only useful once
+opponent build data exists ([#17](https://github.com/TullysAC6/ac6-winloss-tracker/issues/17),
+[#10](https://github.com/TullysAC6/ac6-winloss-tracker/issues/10) /
+[#11](https://github.com/TullysAC6/ac6-winloss-tracker/issues/11) /
+[#12](https://github.com/TullysAC6/ac6-winloss-tracker/issues/12)).
 
 Do not delay the current roadmap for this feature.
 
@@ -1783,7 +1857,25 @@ A previous build may be shown only as a user-facing comparison/hint in a future 
 7. Recently improved matchup
 8. Session/post-loss tendencies
 9. Next Goal
-10. Future self-build cross analysis
+10. Future self-build cross analysis (§52)
+
+Seasonal rank / rating progression (§64) sits with items 2–4: it needs the same rank metadata, and
+is scheduled once self-rank recognition is reliable.
+
+## Presentation and runtime (added in Revision 3)
+
+These are cross-cutting; they are not a third feature track competing with the two above.
+
+1. Runtime isolation — app-local Python environment (§56). After the fixture/replay harness
+2. UI-0 design specification (§63). Documentation only; human review before any UI code
+3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
+4. UI-2 Dashboard / History / Settings shell — **after the match-metadata foundation (#15)**, so the
+   shell is built once against a settled contract
+5. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation,
+   each following its own data. #16 owns the data; UI-3A/UI-3B own the rendering
+6. UI-4 Tray / Launcher modernization, last, and only if its lifecycle safety can be demonstrated
+
+The full interleaved order is recorded under **Sequencing** in `docs/ROADMAP.md`.
 
 The roadmap may implement prerequisite foundations before the visible feature that depends on them.
 
@@ -1802,3 +1894,489 @@ Codex/Astra review should specifically verify:
 - analytics language does not overclaim weak samples
 - opponent build is not carried across matches by inference
 - new dependencies are justified
+---
+
+# 56. Runtime isolation — app-local Python environment
+
+Status: **ADOPTED DIRECTION / PLANNED.** Tracked as
+[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24). Scheduled after
+[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). Not part of v1.1.x and not part
+of draft PR #5.
+
+## The problem
+
+The installer currently places the Tracker's dependencies in the user's **shared Python
+user-site**. An unrelated `pip install` or `pip upgrade` can therefore break the Tracker, the
+Tracker can break unrelated Python tooling, update and rollback cannot restore a dependency set
+that something else has moved since, and uninstall cannot cleanly remove what it installed because
+it does not own the environment.
+
+`docs/ROADMAP.md` has carried this as *Dedicated venv isolation — DEFERRED* since v1.0.x. Revision 3
+records it as an adopted direction. That is not authorisation to implement it now (§37).
+
+## Adopted direction
+
+AC6tool gains a Python environment it owns. Conceptual shape only — the real layout is decided at
+implementation time:
+
+```text
+%LOCALAPPDATA%\Programs\AC6WinLossTracker\
+├─ app\
+└─ venv\
+   └─ Scripts\
+      ├─ python.exe
+      └─ pythonw.exe
+```
+
+Purpose: dependency isolation, reproducibility, safe update and rollback, clean uninstall, and no
+breakage caused by an unrelated package update.
+
+## A venv is not a security boundary
+
+**This must not be used as an argument to relax supply-chain controls.** A virtual environment
+isolates dependency *resolution*. It is not a sandbox and provides no privilege separation.
+
+Unchanged and still mandatory:
+
+- `requirements.lock`
+- hash pinning
+- binary-only dependency policy (§6.2)
+
+## Known hazard — `pythonw` and worker PID ownership
+
+This has already been observed on this repository. Earlier portable-venv work hit process-ownership
+problems in which the PID the launcher believed it owned was not the PID doing the work, so Win32
+job-object containment could be installed on the wrong process.
+
+Historical evidence, unmerged and in no release:
+
+| Branch | Commits |
+|---|---|
+| `fix/venv-launcher-ownership` | `138fd8f` fix Windows venv launcher process ownership and authenticated readiness; `95cc816` exercise `pythonw` shortcut lifetime and reject malformed runtime tokens |
+| `release/v1.1.0-venv` | `e4677ce` decouple runtime ownership from the venv wrapper PID; `6c88dce` cover venv launcher process topology |
+
+**Therefore "we moved to a venv" is never on its own evidence that process ownership is safe.**
+
+A *design candidate*, not a fixed implementation, is an actual-PID handshake:
+
+```text
+parent
+→ spawn worker
+→ worker reports its own os.getpid() to the parent
+→ parent confirms the actual PID
+→ Job Object containment installed on that PID
+→ ready signal
+→ worker begins native work
+```
+
+The existing invariant stands either way: **a worker does no native work until the parent has
+installed containment.** A launcher wrapper must keep that true.
+
+## Migration gate
+
+Normal §3 order applies. T2 must cover at minimum: clean install; upgrade from an existing
+shared-Python installation; dependency isolation; launch via `python.exe`; launch via
+`pythonw.exe`; worker PID ownership; duplicate launch refused; normal shutdown; abnormal shutdown;
+no orphan worker on any exit path; update; injected rollback; uninstall; reinstall; user
+history/config/stats retained throughout; port released; runtime files cleaned up; mutex and lock
+cleaned up.
+
+---
+
+# 57. UI/UX design identity
+
+Status: **ADOPTED.** Programme tracked as
+[#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25).
+
+```text
+Fluent shell  ×  AC6 telemetry  ×  Pachinko celebration
+```
+
+Brand principle:
+
+> **It blends into the game normally, and breaks only at the moment of a win.**
+
+This is a **polish** programme. The existing UI is not discarded and rebuilt. Sections §57–§63
+describe presentation only; they never redefine what the underlying feature does.
+
+---
+
+# 58. Player Overlay — gameplay UI
+
+Status: **ADOPTED (presentation requirement).**
+
+Audience: the player, over the running game.
+
+| Priority | |
+|---|---|
+| 1 | Readable at a glance |
+| 2 | Does not disturb play |
+| 3 | Minimum cost |
+| 4 | Sits naturally against the AC6 HUD |
+
+Scope: WIN / LOSE / RATE / STREAK.
+
+- The **value** is emphasised over the label.
+- `BEST STREAK` is a candidate for removal from the always-on surface.
+- Technical telemetry framing; thin, subtle background.
+- DPI scaling: 1080p / 1440p / 4K, 16:9 and 21:9, 100 / 125 / 150 %, safe zone.
+- Animation minimal. A ~100–200 ms update acknowledgement is the only candidate.
+
+Not on the Player Overlay: blur, heavy transparency, continuous animation, GPU-heavy effects.
+
+---
+
+# 59. Broadcast Overlay — streaming UI
+
+Status: **ADOPTED (presentation requirement).**
+
+Audience: OBS and the stream's viewers. Served at `http://127.0.0.1:8765/`.
+
+**The Player Overlay and the Broadcast Overlay are different products with different requirements.**
+They share a design system; they are not forced into one configuration.
+
+| Priority | |
+|---|---|
+| 1 | A viewer understands the situation within a few seconds |
+| 2 | Legible at streaming resolution and viewing distance |
+| 3 | Brand identity |
+| 4 | Milestone excitement |
+
+Scope: session stats, WIN / LOSS, current streak, milestone, achievement.
+
+- Stream-safe typography and viewer-distance font sizes.
+- Transparent background, OBS safe area, scene composition.
+- Must not collide with the game HUD or a chat overlay.
+- Presentation may be stronger than the Player Overlay — but nothing that costs game performance.
+
+## Shared design language
+
+```text
+Cyan / Teal  = Tracker / system / primary
+Red          = loss / error / danger
+Gold         = achievement / celebration
+Dark         = base
+```
+
+Intensity:
+
+```text
+Player Overlay     → quiet
+Broadcast Overlay  → more legible, somewhat stronger presentation
+Milestone          → deliberately loud
+```
+
+Components and colour tokens may be shared. **Font size, opacity, information density, animation,
+duration and layout must remain separately configurable.** Do not force one overlay's configuration
+onto the other.
+
+## Milestone presentation
+
+The existing escalation is kept: 5 / 10 / 15 / 20 / 30 / 35 / 40 / 45 / 50. The pachinko identity
+(`激アツ`, `超激アツ`) is kept **for milestones**; the ordinary UI does not become pachinko-styled.
+50 stays in a class of its own.
+
+Review: display duration, transition, easing, cleanup, how long the screen is obstructed, and
+FPS / frametime impact.
+
+---
+
+# 60. Dashboard, History, Statistics and Settings presentation
+
+Status: **ADOPTED (presentation requirement).**
+
+## Dashboard
+
+The largest improvement target. The `CURRENT SESSION` / `LIFETIME` information structure is kept.
+
+- WIN RATE is the primary KPI
+- WIN / LOSS secondary
+- STREAK / BEST tertiary
+- Hierarchy comes from spacing, surface and typography — not from more borders
+- Session may lean slightly primary
+- Stacks on a narrow window
+
+Status is explicit and **never communicated by colour alone**:
+
+```text
+RUNNING · PAUSED · AC6 DETECTED · WAITING FOR AC6 · CAPTURE ERROR
+```
+
+## Navigation
+
+Top navigation is the first candidate. There are too few pages to justify a left `NavigationView`
+from the start.
+
+```text
+OVERVIEW   HISTORY   STATISTICS   SETTINGS
+```
+
+`STATISTICS` is not built as a large empty page before §10 and §44 (#15, #16) supply real data.
+
+## History
+
+WIN / LOSS visual distinction with subtle badges; grouped by date; All / Wins / Losses and
+Today / 7D / 30D / All filters; hover highlight; better scanability.
+
+```text
+SEP 04
+
+00:11   WIN    STREAK 3
+00:06   WIN    STREAK 2
+00:02   WIN    STREAK 1
+
+SEP 03
+
+23:56   LOSS
+```
+
+Search waits until there is metadata worth searching (#15).
+
+## Statistics
+
+Statistics are not crammed into History. The Statistics page eventually shows win-rate trend,
+daily / weekly / monthly, rolling win rate, rank-relative performance, opponent weapon / legs /
+full build, and improved matchup — following §44–§47.
+
+It also hosts the seasonal rank / rating progression from §64 (delivered in UI-3A): a
+**season selector**, the
+Rank / Rating chart, and — where the pre-S (through A4) and S rating systems cannot be compared
+directly — a **separate scale or separate presentation** rather than one continuous line across the
+pre-S → S boundary.
+
+Charts only where something changes over time. A plain win rate does not need a pie chart (§51).
+
+## Scope boundary
+
+The UI programme is the **presentation layer** and does not reimplement what it displays:
+#8 owns settings functionality, #9 history and current analytics, #15 match metadata, #16 growth
+analytics logic, #17 opponent build capture, #10 / #11 / #12 opponent statistics.
+
+---
+
+# 61. UI design system — typography, tokens, material, and what to avoid
+
+Status: **ADOPTED (presentation requirement).**
+
+## Typography
+
+Dashboard and Windows shell: `Segoe UI Variable` is the first candidate. Overlay: a technical or
+condensed face may be considered. Do not accumulate typefaces.
+
+ALL CAPS stays for brand headings — `AC6 WIN/LOSS TRACKER`, `CURRENT SESSION`, `LIFETIME`. Ordinary
+Windows UI prose is not set in ALL CAPS.
+
+## Design tokens
+
+Spacing tokens and colour tokens (color tokens) are defined once. Ad-hoc values are not scattered
+through the code.
+
+```text
+spacing: 4 / 8 / 12 / 16 / 24 / 32
+```
+
+```text
+bg-primary · bg-secondary · surface · border-subtle
+text-primary · text-secondary · text-muted
+accent · success · danger · warning · achievement
+```
+
+The structure must remain changeable later.
+
+## Fluent material
+
+- **Mica** — candidate for the Dashboard window base and titlebar.
+- **Acrylic** — candidate for transient surfaces: dropdown, flyout, context menu.
+
+Not allowed: full-window glass on the Dashboard, excessive blur, heavy material on either overlay.
+**Using material is not by itself modernisation.**
+
+## Explicitly avoided
+
+gradients everywhere · glassmorphism everywhere · neon glow everywhere · rounded cards everywhere ·
+emoji · oversized icons · continuous animation · excessive blur · unnecessary shadows · chart
+proliferation · gamer-RGB aesthetic · cyberpunk cliché · a literal copy of the AC6 UI
+
+---
+
+# 62. UI accessibility, responsiveness and performance constraints
+
+Status: **ADOPTED (constraint).**
+
+## Accessibility and responsiveness
+
+In scope for the UI-0 specification: DPI scaling · keyboard navigation · focus states · contrast ·
+**never colour alone** · text scaling · high contrast · dark titlebar · narrow-window responsive
+layout.
+
+## Performance — the governing constraint
+
+**A UI change may not cost game performance.** Where practical, compare before and after:
+
+- Tracker CPU
+- RAM
+- process and thread count
+- AC6 frametime p95 / p99
+- render and update frequency
+
+The overlay is essentially static in normal operation. No continuous 60 fps animation runs
+permanently. **The capture / detection loop never moves onto the UI thread.** This extends §7 and
+§8; presentation work is subject to them, not exempt from them.
+
+---
+
+# 63. UI implementation phases and boundaries
+
+Status: **ADOPTED (process).** Tracked as
+[#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25), with
+[#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) for UI-4.
+
+The UI phases interleave with the feature phases rather than running as a block. The authoritative
+interleaved order lives in `docs/ROADMAP.md` under **Sequencing**. Two dependencies in it are
+requirements, not scheduling preferences:
+
+- **UI-2 lands after the match-metadata foundation (§10, #15).** UI-2 rebuilds the Dashboard and
+  History shell; building it before the metadata contract is settled means building it twice.
+- **#16 owns the analytics and time-series data; UI-3A / UI-3B own the chart rendering.** Neither
+  implements the other's half.
+
+| Phase | Content | Risk |
+|---|---|---|
+| **UI-0** | Design specification. **No code change.** Survey the current framework, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility. Before → Proposed per item. Classify every change Low / Medium / High. Rollback plan. Regression-test plan. **Human review before any implementation.** | none |
+| **UI-1A** | Player Overlay polish — low-risk visual changes only | low |
+| **UI-1B** | Broadcast / streaming Overlay polish | low |
+| **UI-2** | Dashboard / History / Settings shell — top navigation, surfaces, KPI hierarchy. **Scheduled after §10 / #15**, so the shell is built once against a settled match-metadata contract rather than twice | medium |
+| **UI-3A** | **Growth / Rank / Rating presentation** — win-rate trend, rolling win rate, season selector, Rank / Rating chart. Follows #16-A and #28. Ships without waiting for the opponent-recognition programme | medium |
+| **UI-3B** | **Opponent build statistics presentation** — weapon / leg-type / full-build views. Follows #17 and #10/#11/#12 | medium |
+| **UI-4** | Tray / Launcher modernization — separate issue, separate PR, last | high |
+
+## No framework migration as the opening move
+
+Visual modernisation does not begin with a port to WinUI 3, WPF or any other framework. Polish
+within the current framework first. Migration is considered only if a framework limit becomes a
+demonstrated blocker, and then in its own issue with its own justification.
+
+## No unrelated refactoring
+
+UI polish is not a licence to touch Detector, ResultGate, WGC or process lifecycle. §8 result-path
+integrity is unchanged by anything in §57–§63.
+
+## Tray / Launcher is a lifecycle change, not a visual change
+
+UI-4 is isolated deliberately. A tray application changes process architecture: single-instance
+enforcement, launcher, server, overlay, process ownership, shutdown, DB flush, instance lock,
+duplicate overlay prevention, orphan prevention.
+
+Intended behaviour if it is built:
+
+```text
+Dashboard [×]   → closes the Dashboard only
+Tracker         → continues in the tray
+
+Tray → Exit     → full cleanup
+```
+
+Tray `Exit` performs the complete teardown: server stopped, port released, overlay mutex released,
+runtime files removed, DB flushed, no child or grandchild process left.
+
+**If that safety cannot be demonstrated, it is not implemented.** "It seems to work" is not
+evidence; the T2 lifecycle gate is.
+---
+
+# 64. Seasonal rank / rating progression
+
+Status: **ADOPTED / PLANNED.** Tracked as
+[#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28). Gated on self-rank recognition
+becoming reliable (§13, §10, [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)).
+
+This is the **user's own** progression over time, not opponent statistics. §45 already covers
+rank-relative performance against opponents; this section is the player's own climb.
+
+## Why it is gated
+
+A progression chart built on unreliable recognition is worse than no chart: a recognition gap reads
+to the user as a rating drop. So this waits until self-rank acquisition is dependable, and then
+shows only what was actually observed.
+
+## The ladder and the terminology
+
+```text
+UNRANKED → … → A4 → S
+```
+
+The boundary that matters is **pre-S / non-S (UNRANKED through A4) vs S**. **A4 is on the pre-S
+side**, together with every rank beneath it.
+
+**Do not write "below A" for the pre-S side.** It reads as excluding the A band, which is wrong —
+A1 through A4 are pre-S. Use `pre-S (through A4)`, `non-S progression`, or in Japanese
+`S未満（A4まで）`.
+
+**Every pre-S rank is in scope**, not only the top of the ladder. The purpose of the feature is
+motivation, and the lower ranks are where motivation matters most.
+
+Reaching S is an **Achievement** (§50), **not a feature unlock.** No Tracker capability becomes
+available or unavailable because of the user's rank.
+
+## The pre-S / S discontinuity
+
+The game presents rating and progression **differently on the pre-S side (through A4) than at S**.
+This constraint shapes the whole feature:
+
+- **Do not treat the two as one scale with one meaning.** A pre-S value and an S value are not
+  interchangeable merely because both are called a rating.
+- **Do not connect the pre-S → S boundary (A4 → S) as a single continuous rating line** without a
+  justified basis. Drawing one line across that boundary asserts a comparison the game does not
+  support.
+- Where the two cannot be compared directly, they get **separate scales or separate
+  presentations** (§60, §64 presentation notes below).
+
+This is the same discipline as §52 and §53: a value that was not observed, or that cannot be
+compared, stays that way instead of being smoothed into something that looks tidier.
+
+## Seasons
+
+- History is **separated by season**, and the UI can switch season.
+- **Rating is never carried forward** from one season into the next.
+- Past seasons remain **viewable**.
+
+## Recognition policy
+
+- **No continuous OCR.** Rank and Rating are acquired only at the appropriate events where the game
+  actually displays them.
+- **Recognition failure is isolated.** It must not affect WIN / LOSE determination, ResultGate,
+  streak, or match persistence (§8, §16). A failed read is recorded as a failed read, never as a
+  rating change.
+
+## Conceptual data
+
+Field names are decided at implementation time. This is the shape, not the schema.
+
+```text
+season_id
+observed_at
+self_rank
+rating_mode          -- must distinguish the pre-S and S presentation systems,
+                     -- e.g. pre_s (UNRANKED through A4) and s_rank
+rating_value
+recognition_status
+recognition_version
+source
+match_id             -- optional
+```
+
+`rating_mode` is the field that carries the pre-S / S distinction — conceptually `pre_s` for
+UNRANKED through A4 and `s_rank` for S, with the actual spelling decided at implementation time.
+Without it the two systems collapse into one column and any chart drawn from it silently misstates
+the progression.
+
+## Work split
+
+This section is the requirement; the implementation lands in the issues that own each layer.
+
+| Layer | Issue | Items |
+|---|---|---|
+| Metadata foundation | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Season / Rating acquisition; persistence; distinguishing the pre-S (through A4) and S recognition systems |
+| Growth analytics (#16-A) | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Per-season Rank / Rating progression **data**; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement. The chart itself is rendered by UI-3A |
+| Presentation (UI-3A) | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where pre-S and S cannot be compared directly |
+
+Sample-size and sparse-data honesty from §43 and §44 applies to every number this feature shows.

@@ -2,7 +2,7 @@
 
 Last updated: 2026-09-12 JST
 
-Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
@@ -15,7 +15,7 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) · roadmap: [ROAD
 | Accepted runtime | `codex/wgc-rc-validation-20260908` at `93d5a57b88a86ec4b8846a3082089ed97f13a818`, shipped unchanged in v1.1.0 and v1.1.1 |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
-| Documentation generation | draft PR #13 on `coordination/project-management-20260909`; documentation only |
+| Documentation generation | PR #13 — **merged**. Master Requirements Revision 3 is canonical on `main` |
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 
@@ -80,11 +80,41 @@ Residual non-blocking risk: rare GPU/compositor/window-manager timing may behave
 
 Supported mode in v1.1.1 remains **RANK MATCH: SINGLE only**. The broader TEAM/CUSTOM requirements in the master requirements are future requirements, not implemented or released behavior.
 
+## Requirements added on 2026-09-12 — Revision 3
+
+Adopted by the user, recorded here so they are recoverable from GitHub alone. All are **planned or backlog**; none is authorisation to implement now.
+
+| Area | Requirement | Issue | Status |
+|---|---|---|---|
+| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is a known hazard with unmerged historical evidence on `fix/venv-launcher-ownership` and `release/v1.1.0-venv` | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | PLANNED, after #14 |
+| UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | PLANNED, UI-0 is documentation only |
+| Tray / Launcher | A process-architecture change, not visual polish. Last phase, own issue and own PR. Not implemented unless its lifecycle safety can be demonstrated | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | BACKLOG |
+| Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
+| Seasonal rank / rating progression | The user's own rank and rating over time, separated by season and never carried forward. **The pre-S and S rating systems are not one scale** — the boundary is pre-S / non-S (UNRANKED through A4) vs S, with **A4 on the pre-S side** — and the pre-S → S boundary is not drawn as one continuous line without a justified basis. Event-driven recognition only; recognition failure never touches WIN/LOSE, ResultGate, streak or match persistence. Work lands in #15 (acquisition, persistence, `rating_mode`), #16 (progression, chart, Season High/Low, delta, transition markers, `S RANK REACHED`) and #25 (season selector, chart presentation) | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | PLANNED, gated on reliable self-rank recognition |
+
+Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISIONS.md](DECISIONS.md). Order: **Sequencing** in [ROADMAP.md](ROADMAP.md).
+
 ## Next actions
 
-1. Merge documentation PR #13, which carries Master Requirements Revision 3.
-2. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
-3. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+1. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
+2. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+3. Then #24, and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+
+**PR #5 is the only unmerged generation.** No new feature branch starts until it lands (§4).
+
+
+### Order after PR #5
+
+The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
+
+```text
+#14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 → #16-A / #28 → UI-3A
+   → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
+```
+
+**#15 precedes UI-2** so the Dashboard and History shell is built once against a settled
+match-metadata contract, and **#16 owns the analytics data while UI-3A / UI-3B own the chart
+rendering**.
 
 Never move the `v1.1.0` or `v1.1.1` tag.
 

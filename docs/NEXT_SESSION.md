@@ -4,15 +4,28 @@ Last updated: 2026-09-12 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
+## Reading order
+
+```text
+Issue #6
+→ docs/MASTER_REQUIREMENTS.md   (canonical requirement, Revision 3)
+→ docs/PROJECT_STATE.md         (where the project actually is)
+→ docs/NEXT_SESSION.md          (this file)
+→ docs/ROADMAP.md
+→ docs/DECISIONS.md
+→ GitHub Project "AC6 Win/Loss Tracker Development"
+→ the target issue / PR
+```
+
 ## Current handoff
 
-- Public stable is **v1.1.1 — RELEASED**. Tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33`; `main` is `e0d8476`.
+- Public stable is **v1.1.1 — RELEASED**. Tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33`. `main` was `e032499` when this was written and advanced again when PR #13 merged; run `git rev-parse origin/main` rather than trusting that.
 - **v1.1.0 is superseded.** Its runtime was accepted and it was published, but its formal release acceptance was never completed: the README one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the published Git blob bytes, so the command failed closed. The tag was not moved and the Release was not edited.
 - v1.1.1 ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
 - T1 remains **N/A / not run** because issue #14's formal fixture/replay harness does not exist. Do not call it PASS.
 - Draft PR #5 is a separate generation and has not been reconciled with the current `main`.
-- Draft PR #13 carries Master Requirements Revision 3 and is documentation only.
+- PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`. The documentation generation is closed, so only one unmerged generation remains.
 
 ## The rule that cost a release — do not lose it
 
@@ -36,11 +49,49 @@ Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE
 
 ## Required order from here
 
-1. Merge documentation PR #13 so Revision 3 is canonical on `main`.
-2. Reconcile draft PR #5 with the current `main`. **Merge only — no reset, no rebase, no force-push.** Then T0 → T1 (N/A) → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
-3. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+1. Reconcile draft PR #5 with the current `main`. **Merge only — no reset, no rebase, no force-push.** Then T0 → T1 (N/A) → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
+2. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+3. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-At most two unmerged generations exist at a time. Today those are PR #5 and PR #13.
+At most two unmerged generations exist at a time. PR #13 merging freed a slot, so **PR #5 is the only unmerged generation**. Do not open a new feature branch until it lands.
+
+## Order after that — dependency, not preference
+
+The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
+
+v1.1.1 and PR #13 are done. From here:
+
+```text
+PR #5 → #14 → #24 → UI-0 → UI-1A → UI-1B
+→ #15 → UI-2 → #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B
+→ #16-B → #18 → #27 → UI-4
+```
+
+Four placements in it are load-bearing and will look wrong to anyone reading only the phase tables:
+
+- **#15 before UI-2.** UI-2 rebuilds the Dashboard and History shell. Doing it before the match-metadata contract is fixed means building that shell twice — once for today's row shape, once for the Ranked/Custom, Single/Team, rank-bearing shape.
+- **#16 owns the data, #25 owns the charts.** #16 computes periods, rolling win rate, per-season rank/rating series, deltas and achievements. UI-3A / UI-3B render them. Neither implements the other's half.
+- **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
+- **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
+
+At most two unmerged generations exist at a time (§4). PR #13 has merged, so **PR #5 is the only unmerged generation** — and nothing new starts until it lands.
+
+## What is newly recorded and must not be lost
+
+| | Issue | Requirement |
+|---|---|---|
+| App-local Python environment / dependency isolation | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | §56 |
+| UI/UX polish — `Fluent shell × AC6 telemetry × Pachinko celebration`, Player vs Broadcast overlays | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | §57–§63 |
+| Tray / Launcher modernization — lifecycle change, last, own PR | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | §63 |
+| Self-build linkage — `self_build_id`, explicit selection, never inferred | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | §52 |
+| Seasonal rank / rating progression — per season, never carried forward, A/S not one scale | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §64 |
+
+Four things in there are easy to erode and are the reason they are written down:
+
+- **A venv is not a sandbox.** `requirements.lock`, hash pinning and binary-only policy survive the runtime-isolation migration untouched, and `pythonw` worker PID ownership must be re-proved, not assumed.
+- **A UI change may not cost game performance**, and UI polish is never a reason to touch Detector, ResultGate, WGC or process lifecycle.
+- **No framework migration as the opening move** of visual modernisation.
+- **The pre-S → S rating boundary is not one continuous line.** The ladder is `UNRANKED → … → A4 → S`, and the boundary is **pre-S / non-S (through A4) vs S** — A4 is on the pre-S side, so never write "below A" for it. The game presents rating differently on each side, so the obvious-looking single-line chart asserts a comparison the game does not support, and it fails silently. Rank/Rating recognition is event-driven, never a continuous OCR loop, and a failed read is recorded as a failed read — never as a rating change.
 
 ## STOP conditions
 

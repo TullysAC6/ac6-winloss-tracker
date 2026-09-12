@@ -376,3 +376,122 @@ worse than no number, because the user will act on it.
   `internal_user_id` linked to `external_identity(provider, provider_user_id)`.
 - OAuth scopes are minimal when implemented. Secrets and tokens are never committed or logged.
 - Discord/cloud is not designed into the core data model now, beyond avoiding identity lock-in.
+---
+
+## Runtime isolation — an app-local Python environment, but not a sandbox
+
+**Decision (2026-09-12): AC6tool will move to a Python environment it owns, and that move does not relax a single supply-chain control.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §56. Issue: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
+
+Today the installer puts dependencies in the user's shared Python user-site, so an unrelated `pip upgrade` can break the Tracker and the Tracker can break unrelated tooling. An owned environment fixes ownership: isolation, reproducibility, safe update and rollback, clean uninstall.
+
+Why the second half of the decision matters more than the first: **a virtual environment is not a security boundary.** It isolates dependency resolution. It is not a sandbox, it grants no privilege separation, and it is not a reason to drop `requirements.lock`, hash pinning or the binary-only dependency policy. Those stay exactly as they are.
+
+And it is not a reason to assume process ownership became safe. This repository already has the counter-example: `fix/venv-launcher-ownership` and `release/v1.1.0-venv` exist precisely because a `pythonw` wrapper broke the assumption that the PID the launcher spawned is the PID doing the work — which is the assumption Win32 job-object containment rests on. Neither branch is merged or released. Any venv launcher must re-establish, by evidence, that a worker does no native work until the parent has installed containment on the *actual* worker PID.
+
+Rejected alternative: shipping a frozen executable instead. It would solve the same isolation problem but replaces the hash-verified, immutable-commit install path with a binary the user cannot inspect, and that path is load-bearing for this project's trust model.
+
+Sequenced after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) so the migration has a fixture/replay harness to regress against.
+
+---
+
+## UI design identity
+
+**Decision (2026-09-12): `Fluent shell × AC6 telemetry × Pachinko celebration`, and the brand rule is that it blends into the game normally and breaks only at the moment of a win.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §57. Issue: [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25).
+
+The pachinko escalation is the product's identity and is kept at the milestone moments. It is deliberately *not* extended to the ordinary UI: a dashboard that behaves like a pachinko machine all the time is noise, and the celebration only reads as a celebration because the surrounding surface is quiet.
+
+This is a polish programme, not a rebuild. Rejected alternative: discarding the current UI and starting again — it throws away working, accepted behaviour to buy visual consistency that incremental work can also reach.
+
+---
+
+## Two overlay audiences
+
+**Decision (2026-09-12): the Player Overlay and the Broadcast Overlay are separate products that share a design system.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §58, §59.
+
+They have genuinely different requirements. The Player Overlay is read mid-fight by someone who must not be distracted, so it is quiet, cheap and minimal. The Broadcast Overlay is read by a viewer on a stream who has no other context, so it is denser, larger and may be more expressive.
+
+Components and colour tokens are shared. Font size, opacity, information density, animation, duration and layout are **not** forced to a single configuration.
+
+Rejected alternative: one overlay with one settings surface. It looked simpler, but every setting then has to compromise between "must not distract the player" and "must read at streaming distance", and both audiences get a worse result.
+
+---
+
+## UI safety boundary
+
+**Decision (2026-09-12): UI polish never becomes a reason to refactor the result path.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §62, §63.
+
+Detector, ResultGate, WGC and process lifecycle are out of scope for the UI programme. A presentation change does not get to touch them "while we are in there".
+
+Performance is a hard constraint, not an aspiration: a UI change may not cost game performance. The overlay stays essentially static in normal operation, no continuous 60 fps animation runs permanently, and the capture/detection loop never moves onto the UI thread. Where practical, Tracker CPU, RAM, process and thread count, AC6 frametime p95/p99 and update frequency are compared before and after.
+
+Why: the result path is the one thing this product cannot get wrong (§8). Visual work is optional; correct WIN/LOSE counting is not.
+
+---
+
+## No framework migration as the first step
+
+**Decision (2026-09-12): visual modernisation does not open with a port to WinUI 3, WPF or any other framework.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §63.
+
+Polish within the current framework first. Migration is considered only when a framework limit is a demonstrated blocker for a specific agreed improvement, and then in its own issue with its own justification and its own gates.
+
+Why: a migration rewrites every window in the application, including the overlay and the launcher, and would put the accepted lifecycle behaviour back into an unverified state — to buy visual changes that mostly do not need it. "Modern framework" is not itself a user-visible improvement.
+
+---
+
+## Tray / Launcher modernization is a lifecycle change
+
+**Decision (2026-09-12): a tray application is treated as a process-architecture change, not a visual one, and it is the last phase of the UI programme.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §63. Issue: [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26).
+
+Closing the Dashboard while the Tracker keeps running touches single-instance enforcement, launcher, server, overlay, process ownership, shutdown, DB flush, instance lock, duplicate overlay prevention and orphan prevention — every mechanism the Process safety decision above depends on. Tray `Exit` must perform the complete teardown.
+
+It is kept in its own issue and its own PR so it cannot be folded into a batch of visual changes. **If the safety cannot be demonstrated through the T2 lifecycle gate, it is not implemented.** A tray icon is not worth a class of orphan-process bug.
+
+---
+
+## Self-build linkage is recorded, not scheduled
+
+**Decision (2026-09-12): the user's own build is linked to a match by explicit selection, never by inference, and this does not move ahead of the current roadmap.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §52. Issue: [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27).
+
+The user selects a current build; matches recorded while it is active carry that `self_build_id`. If nothing is selected the match records `unknown` / `unset`. This mirrors the existing opponent-build rule (§53): an unobserved value stays unobserved.
+
+Why record it now: a self × opponent cross-analysis is the only thing that separates "the player improved" from "the player changed build" from "the matchup changed". Losing that reasoning to chat history would mean re-deriving it later.
+
+Why not schedule it: it depends on match metadata ([#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)) and is only useful once opponent build data exists ([#17](https://github.com/TullysAC6/ac6-winloss-tracker/issues/17)).
+
+---
+
+## Seasonal rank progression, and the pre-S / S discontinuity
+
+**Decision (2026-09-12): the user's own rank/rating progression is charted per season, and the pre-S and S rating systems are never assumed to be one scale.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §64. Issue: [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28).
+
+The ladder is `UNRANKED → … → A4 → S`, and the boundary that matters is **pre-S / non-S (UNRANKED through A4) vs S** — **A4 sits on the pre-S side.** Do not write "below A" for that side; it reads as excluding the A band, which is wrong. Use `pre-S (through A4)` or `non-S progression`.
+
+The game presents rating and progression differently on the pre-S side than at S. So a single continuous line across the pre-S → S boundary (A4 → S) is not drawn without a justified basis, and where the two cannot be compared directly they get separate scales or separate presentations. `rating_mode` is the field that carries the distinction — conceptually `pre_s` and `s_rank`, with the actual spelling decided at implementation time.
+
+Why this is a decision and not an implementation detail: one continuous line is the obvious-looking chart, it is what a future session will reach for, and it asserts a comparison the game does not support. The failure is silent — the chart looks right and misstates the progression.
+
+Three supporting rules:
+
+- **Seasons are separate.** Rating is never carried forward into the next season; past seasons stay viewable.
+- **No continuous OCR.** Rank and Rating are read only at the events where the game displays them.
+- **Recognition failure is isolated.** It never affects WIN/LOSE, ResultGate, streak or match persistence. A failed read is recorded as a failed read, never as a rating change — otherwise a recognition gap appears to the user as a rating drop.
+
+Gated on self-rank recognition being reliable first ([#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)). A progression chart on unreliable recognition is worse than no chart.
+
+Reaching S is an achievement, **not a feature unlock**: no Tracker capability depends on the user's rank. Every pre-S rank is in scope, because motivation is the purpose and the lower ladder is where it matters most.
