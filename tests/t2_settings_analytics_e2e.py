@@ -17,7 +17,6 @@ import json
 import os
 import shutil
 import socket
-import subprocess
 import sqlite3
 import sys
 import tempfile
@@ -53,29 +52,56 @@ def free_port() -> int:
         return reservation.getsockname()[1]
 
 
+# Captured once. Every calendar value in this suite derives from this single
+# instant, so a run that crosses local midnight cannot seed the fixture against
+# one day and then evaluate cutoffs against the next.
+DAY_ANCHOR = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 def local_midnight(days_ago: int = 0) -> float:
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    return (today - timedelta(days=days_ago)).timestamp()
+    return (DAY_ANCHOR - timedelta(days=days_ago)).timestamp()
+
+
+def analytics_reference() -> float:
+    """The single instant every analytics expectation here is evaluated at.
+
+    Independent review ran this suite just after 00:00 JST and it failed 91/93:
+    the fixture placed "today" rows at `now - 30/60/120 minutes`, which lands on
+    the previous day near midnight. Rows are now anchored to calendar positions
+    and the analytics clock is pinned to this reference, so the expected values
+    do not depend on what time the suite happens to run.
+    """
+    return local_midnight(0) + 12 * 3600  # today, local noon
 
 
 def seed_history(data_dir: Path) -> int:
-    """history.db with results at known local-time offsets, inserted unsorted."""
+    """history.db at calendar positions whose period membership is fixed.
+
+    Three groups, chosen so that no date of the month, day of the week or month
+    length can move a row between buckets:
+
+    * today      -- local midnight + 1h/2h/3h, always today, this week, this month
+    * 45 days    -- always an earlier month, and always before this week
+    * 100 days   -- likewise, and always older than the 60-day purge cutoff
+
+    2 WIN / 1 LOSE today; 5 WIN / 3 LOSE / 1 DRAW overall.
+    """
     import history_store
 
     store = history_store.HistoryStore(data_dir)
     store.start_session()
-    now = time.time()
-    today_noon = min(local_midnight(0) + 12 * 3600, now - 60)
+    today = local_midnight(0)
     plan = [
-        (local_midnight(40) + 3600, "win"),
-        (local_midnight(40) + 3700, "loss"),
-        (local_midnight(40) + 3800, "draw"),
-        (today_noon - 1800, "win"),      # deliberately out of order
-        (local_midnight(9) + 3600, "win"),
-        (local_midnight(9) + 3700, "win"),
-        (local_midnight(9) + 3800, "loss"),
-        (today_noon - 7200, "win"),
-        (today_noon - 3600, "loss"),
+        # deliberately unsorted, so the CSV ordering assertion means something
+        (local_midnight(100) + 3600, "win"),
+        (local_midnight(45) + 3600, "win"),
+        (today + 2 * 3600, "win"),
+        (local_midnight(100) + 3700, "loss"),
+        (today + 1 * 3600, "win"),
+        (local_midnight(45) + 3700, "loss"),
+        (local_midnight(100) + 3800, "win"),
+        (today + 3 * 3600, "loss"),
+        (local_midnight(45) + 3800, "draw"),
     ]
     connection = sqlite3.connect(data_dir / "history.db")
     try:
@@ -102,6 +128,29 @@ def seed_history(data_dir: Path) -> int:
     return len(plan)
 
 
+def seed_at(data_dir: Path, moments) -> None:
+    """A history.db holding one WIN at each supplied epoch instant."""
+    import history_store
+
+    store = history_store.HistoryStore(data_dir)
+    store.start_session()
+    connection = sqlite3.connect(data_dir / "history.db")
+    try:
+        session_id = connection.execute(
+            "SELECT id FROM sessions ORDER BY id DESC LIMIT 1").fetchone()[0]
+        for index, created_at in enumerate(moments):
+            connection.execute(
+                "INSERT INTO matches (event_id,session_id,created_at,result,source,"
+                "streak_after,wins_after,losses_after,metadata_json) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (f"at-{index}", session_id, float(created_at), "win", "manual",
+                 0, 0, 0, None),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def by_period(summary: dict) -> dict:
     return {entry["period"]: entry for entry in summary["periods"]}
 
@@ -119,7 +168,12 @@ def main() -> int:
     port = free_port()
     server = None
     thread = None
-    children_before = owned_python_pids()
+    try:
+        children_before = owned_descendants()
+    except ProcessScanError as error:
+        # Without a working scanner the lifecycle gate cannot be honoured.
+        print(f"cannot inspect the process table: {error}")
+        children_before = None
 
     try:
         # ------------------------------------------------------ B. migration
@@ -158,7 +212,11 @@ def main() -> int:
         print("\nF. analytics periods against a known fixture")
         seeded = seed_history(data)
         import history_analytics
-        summary = history_analytics.summarize(data)
+        reference = analytics_reference()
+        check("F", "analytics clock is pinned, not wall-clock",
+              abs(reference - (local_midnight(0) + 12 * 3600)) < 1,
+              history_analytics.format_local(reference))
+        summary = history_analytics.summarize(data, now=reference)
         periods, recents = by_period(summary), by_size(summary)
         check("F", "total matches counted", summary["total_matches"] == seeded,
               str(summary["total_matches"]))
@@ -177,19 +235,94 @@ def main() -> int:
         check("F", "all-time win rate = 5/8, not 5/9",
               abs(periods["all"]["win_rate"] - round(5 / 8 * 100, 1)) < 0.05,
               str(periods["all"]["win_rate"]))
-        check("F", "month excludes the 40-day-old block",
-              periods["month"]["matches"] == 6, str(periods["month"]["matches"]))
-        check("F", "week is a subset of month",
-              periods["week"]["matches"] <= periods["month"]["matches"],
-              f"week={periods['week']['matches']} month={periods['month']['matches']}")
+        check("F", "month holds only today's rows; 45 and 100 days are earlier months",
+              periods["month"]["matches"] == 3, str(periods["month"]["matches"]))
+        check("F", "week holds only today's rows",
+              periods["week"]["matches"] == 3, str(periods["week"]["matches"]))
+        check("F", "today <= week <= month <= all",
+              periods["today"]["matches"] <= periods["week"]["matches"]
+              <= periods["month"]["matches"] <= periods["all"]["matches"],
+              f"{periods['today']['matches']}/{periods['week']['matches']}/"
+              f"{periods['month']['matches']}/{periods['all']['matches']}")
         check("F", "week boundary is Monday",
-              datetime.fromtimestamp(history_analytics.period_start("week")).weekday() == 0)
+              datetime.fromtimestamp(
+                  history_analytics.period_start("week", reference)).weekday() == 0)
         check("F", "month boundary is the 1st",
-              datetime.fromtimestamp(history_analytics.period_start("month")).day == 1)
+              datetime.fromtimestamp(
+                  history_analytics.period_start("month", reference)).day == 1)
+        clock_stable = all(
+            by_period(history_analytics.summarize(
+                data, now=local_midnight(0) + offset))["today"]["matches"] == 3
+            for offset in (1, 30, 60, 3600, 6 * 3600, 12 * 3600,
+                           18 * 3600, 23 * 3600 + 3599))
+        check("F", "today stays 3 from 00:00:01 to 23:59:59",
+              clock_stable,
+              "the reviewer ran this just after local midnight and saw 0")
         check("F", "recent 10 sees all 9 rows", recents[10]["available"] == 9,
               str(recents[10]["available"]))
         check("F", "recent 100 sees all 9 rows", recents[100]["available"] == 9,
               str(recents[100]["available"]))
+
+        # ------------------------------------------- F2. calendar boundaries
+        print("\nF2. calendar boundaries evaluated at a pinned clock")
+        boundaries = [
+            ("just after local midnight", datetime(2026, 6, 17, 0, 0, 1)),
+            ("one second before midnight", datetime(2026, 6, 16, 23, 59, 59)),
+            ("Monday 00:00:01 (week starts today)", datetime(2026, 6, 15, 0, 0, 1)),
+            ("Sunday 23:59 (week started 6 days ago)", datetime(2026, 6, 21, 23, 59, 0)),
+            ("1st of the month 00:00:01", datetime(2026, 7, 1, 0, 0, 1)),
+            ("last day of the month", datetime(2026, 7, 31, 23, 0, 0)),
+            ("1 January 00:00:01 (year boundary)", datetime(2027, 1, 1, 0, 0, 1)),
+            ("31 December 23:00", datetime(2026, 12, 31, 23, 0, 0)),
+            ("29 February on a leap year", datetime(2028, 2, 29, 12, 0, 0)),
+        ]
+        for label, moment in boundaries:
+            pinned = moment.timestamp()
+            midnight = moment.replace(hour=0, minute=0, second=0,
+                                      microsecond=0).timestamp()
+            week_start = history_analytics.period_start("week", pinned)
+            month_start = history_analytics.period_start("month", pinned)
+
+            # First: the boundaries themselves must be calendar-correct. This is
+            # the part actually under test; the counts below then only have to
+            # agree with a plain timestamp comparison.
+            week_at = datetime.fromtimestamp(week_start)
+            month_at = datetime.fromtimestamp(month_start)
+            check("F2", f"{label}: week starts Monday 00:00:00",
+                  week_at.weekday() == 0 and (week_at.hour, week_at.minute,
+                                              week_at.second) == (0, 0, 0),
+                  week_at.strftime("%Y-%m-%d %a %H:%M:%S"))
+            check("F2", f"{label}: month starts on the 1st at 00:00:00",
+                  month_at.day == 1 and (month_at.hour, month_at.minute,
+                                         month_at.second) == (0, 0, 0),
+                  month_at.strftime("%Y-%m-%d %H:%M:%S"))
+            check("F2", f"{label}: today starts at the pinned day's midnight",
+                  abs(history_analytics.period_start("today", pinned) - midnight) < 1,
+                  datetime.fromtimestamp(midnight).strftime("%Y-%m-%d %H:%M:%S"))
+            check("F2", f"{label}: month start <= week start <= today",
+                  month_start <= midnight and week_start <= midnight,
+                  f"month={month_at:%Y-%m-%d} week={week_at:%Y-%m-%d}")
+
+            # One row just inside today, and one just before each boundary, so
+            # every period has something to exclude.
+            moments = sorted({midnight + 1, midnight - 1,
+                              week_start - 1, month_start - 1})
+            calendar = Path(temporary) / ("calendar-" + moment.strftime("%Y%m%d%H%M%S"))
+            calendar.mkdir()
+            seed_at(calendar, moments)
+            got = by_period(history_analytics.summarize(calendar, now=pinned))
+
+            for period, boundary in (("today", midnight), ("week", week_start),
+                                     ("month", month_start)):
+                expected = sum(1 for stamp in moments if stamp >= boundary)
+                check("F2", f"{label}: {period} = {expected} row(s)",
+                      got[period]["matches"] == expected,
+                      f"got {got[period]['matches']}")
+            check("F2", f"{label}: all time sees every row",
+                  got["all"]["matches"] == len(moments), str(got["all"]["matches"]))
+            check("F2", f"{label}: at least one row is excluded from today",
+                  got["today"]["matches"] < len(moments),
+                  f"{got['today']['matches']} of {len(moments)}")
 
         # ------------------------------------------------------ G. CSV
         print("\nG. CSV export")
@@ -438,19 +571,21 @@ def main() -> int:
 
         # ------------------------------------------------------ I. purge
         print("\nI. history purge")
-        surviving = history_analytics.summarize(data)["total_matches"]
-        status, body = post("/api/history/purge",
-                            {"mode": "before", "cutoff": local_midnight(30)})
+        # The cutoff sits between the 100-day and 45-day groups, so exactly the
+        # oldest group is removed whatever today's date happens to be.
+        cutoff = local_midnight(60)
+        surviving = history_analytics.summarize(data, now=reference)["total_matches"]
+        status, body = post("/api/history/purge", {"mode": "before", "cutoff": cutoff})
         check("I", "purge_before accepted", status == 200, f"status={status} {body}")
-        check("I", "removed exactly the 40-day-old block",
+        check("I", "removed exactly the 100-day-old group",
               body.get("removed_matches") == 3, str(body.get("removed_matches")))
-        remaining = history_analytics.summarize(data)["total_matches"]
+        remaining = history_analytics.summarize(data, now=reference)["total_matches"]
         check("I", "boundary keeps rows at or after the cutoff",
               remaining == surviving - 3, f"rows before={surviving} after={remaining}")
-        oldest = history_analytics.summarize(data)["first_match_at"]
+        oldest = history_analytics.summarize(data, now=reference)["first_match_at"]
         check("I", "no surviving row is older than the cutoff",
-              oldest is not None and oldest >= local_midnight(30),
-              f"oldest={oldest} cutoff={local_midnight(30)}")
+              oldest is not None and oldest >= cutoff,
+              f"oldest={oldest} cutoff={cutoff}")
 
         for label, request_body in (
             ("future cutoff", {"mode": "before", "cutoff": time.time() + 86400}),
@@ -537,17 +672,116 @@ def main() -> int:
     return 0 if all(ok for _, _, ok in RESULTS) else 1
 
 
-def owned_python_pids():
-    """Child processes this harness could have spawned (capture workers)."""
-    if os.name != "nt":
-        return set()
+class ProcessScanError(RuntimeError):
+    """The process table could not be read.
+
+    This is raised rather than returning an empty set on purpose. Independent
+    review found the previous implementation shelled out to wmic, swallowed a
+    missing or failing scanner, and reported "no children" -- so a machine
+    without a callable wmic passed the lifecycle gate while a real child was
+    still running. Inability to inspect must fail the gate, never mean zero.
+    """
+
+
+def process_parents():
+    """Map every visible pid to its parent pid, using the OS directly.
+
+    Windows uses the Tool Help snapshot API through ctypes; there is no external
+    command and no new dependency. Any failure raises.
+    """
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        TH32CS_SNAPPROCESS = 0x00000002
+        INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+        class PROCESSENTRY32W(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_wchar * 260),
+            ]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+        kernel32.Process32FirstW.argtypes = [wintypes.HANDLE,
+                                             ctypes.POINTER(PROCESSENTRY32W)]
+        kernel32.Process32NextW.argtypes = [wintypes.HANDLE,
+                                            ctypes.POINTER(PROCESSENTRY32W)]
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == INVALID_HANDLE_VALUE or not snapshot:
+            raise ProcessScanError(
+                f"CreateToolhelp32Snapshot failed: {ctypes.get_last_error()}")
+        parents = {}
+        try:
+            entry = PROCESSENTRY32W()
+            entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+            if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+                raise ProcessScanError(
+                    f"Process32FirstW failed: {ctypes.get_last_error()}")
+            while True:
+                parents[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
+                if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                    break
+        finally:
+            kernel32.CloseHandle(snapshot)
+        if not parents:
+            raise ProcessScanError("process table came back empty")
+        return parents
+
+    parents = {}
     try:
-        out = subprocess.run(
-            ["wmic", "process", "where", "name='python.exe' or name='pythonw.exe'",
-             "get", "ProcessId"], capture_output=True, text=True, timeout=20).stdout
-    except Exception:
-        return set()
-    return {int(t) for t in out.split() if t.isdigit()}
+        for name in os.listdir("/proc"):
+            if not name.isdigit():
+                continue
+            try:
+                with open(f"/proc/{name}/stat", "r", encoding="utf-8") as handle:
+                    fields = handle.read().rsplit(")", 1)[-1].split()
+                parents[int(name)] = int(fields[1])
+            except (OSError, IndexError, ValueError):
+                continue
+    except OSError as error:
+        raise ProcessScanError(f"/proc could not be read: {error}") from error
+    if not parents:
+        raise ProcessScanError("process table came back empty")
+    return parents
+
+
+def owned_descendants(root_pid=None):
+    """Live descendants of this process, at any depth.
+
+    This is ownership, not a name match: unrelated python.exe processes on the
+    machine are irrelevant, and a non-Python grandchild is still caught.
+    """
+    root_pid = os.getpid() if root_pid is None else int(root_pid)
+    parents = process_parents()
+    if root_pid not in parents:
+        # A table that cannot see this very process is not trustworthy enough
+        # to conclude "no children" from.
+        raise ProcessScanError(
+            f"process table does not contain this process ({root_pid})")
+    children = {}
+    for pid, parent in parents.items():
+        children.setdefault(parent, []).append(pid)
+    found, pending = set(), list(children.get(root_pid, ()))
+    while pending:
+        pid = pending.pop()
+        if pid in found or pid == root_pid:
+            continue
+        found.add(pid)
+        pending.extend(children.get(pid, ()))
+    return found
 
 
 def port_is_free(port):
@@ -609,13 +843,27 @@ def teardown(state):
         exceptions.append(f"port probe: {type(error).__name__}: {error}")
     check("Z", "isolated port released", released, f"port {port}")
 
-    leaked = set()
+    baseline = state.get("children_before")
+    scanned, leaked, scan_error = False, set(), None
     try:
-        leaked = owned_python_pids() - set(state.get("children_before") or ())
+        if baseline is None:
+            raise ProcessScanError("no usable baseline process scan was taken")
+        leaked = owned_descendants() - set(baseline)
+        scanned = True
     except Exception as error:
-        exceptions.append(f"process scan: {type(error).__name__}: {error}")
-    check("Z", "no owned child or grandchild process left", not leaked,
-          f"leaked PIDs {sorted(leaked)}" if leaked else "")
+        scan_error = f"{type(error).__name__}: {error}"
+        exceptions.append(f"process scan: {scan_error}")
+    # Two separate checks: being unable to look is a failure in its own right,
+    # and must never be reported as "no children".
+    check("Z", "process table inspected successfully", scanned, scan_error or "")
+    if scanned and not leaked:
+        detail = ""
+    elif leaked:
+        detail = f"leaked PIDs {sorted(leaked)}"
+    else:
+        detail = "not established: the process table could not be inspected"
+    check("Z", "no owned child or grandchild process left",
+          scanned and not leaked, detail)
 
     runtime_left = []
     try:
@@ -625,9 +873,13 @@ def teardown(state):
         exceptions.append(f"runtime scan: {type(error).__name__}: {error}")
     check("Z", "runtime files removed", not runtime_left, str(runtime_left))
 
-    # The overlay is never started here, so its named mutex is never created.
-    check("Z", "no overlay mutex owned by this harness", server is None or True,
-          "overlay not started")
+    # The overlay is a separate process, so the named mutex can only be held if
+    # this harness spawned one. That is the descendant check above rather than a
+    # separate assertion, so state the scope instead of counting a tautology.
+    check("Z", "overlay mutex scope is N/A, proven by the no-spawn invariant",
+          scanned and not leaked,
+          "no overlay process was spawned" if scanned and not leaked
+          else "cannot claim N/A while process ownership is unproven")
 
     try:
         baseline_local = state.get("baseline_local")

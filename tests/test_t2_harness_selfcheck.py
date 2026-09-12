@@ -12,6 +12,7 @@ thread, socket, handle or directory behind.
 import importlib.util
 import os
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -58,9 +59,13 @@ class TeardownGateTests(unittest.TestCase):
         base = {
             "server": None, "thread": None, "port": t2.free_port(),
             "temporary": self.directory, "baseline_local": os.environ.get("LOCALAPPDATA"),
-            "children_before": t2.owned_python_pids(),
         }
         base.update(overrides)
+        # Only scan when the caller did not supply a baseline: these tests
+        # deliberately patch the scanner to fail, and setdefault would still
+        # evaluate the scan.
+        if "children_before" not in base:
+            base["children_before"] = t2.owned_descendants()
         return base
 
     def failing_checks(self):
@@ -142,11 +147,120 @@ class TeardownGateTests(unittest.TestCase):
             t2.teardown(self.state())
         self.assert_gate_failed("no exception during cleanup")
 
-    def test_a_leaked_child_process_fails_the_gate(self):
-        # A PID that was not present before teardown looks like a leaked worker.
-        with patch.object(t2, "owned_python_pids", return_value={999999}):
-            t2.teardown(self.state(children_before=set()))
+    # ------------------------------------------------- real process ownership
+    def spawn_bounded(self, code, extra=()):
+        """A real child that exits on its own, and is reaped whatever happens."""
+        child = subprocess.Popen([sys.executable, "-c", code, *extra])
+        self.addCleanup(self.reap, child)
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if child.pid in t2.owned_descendants():
+                return child
+            time.sleep(0.1)
+        self.fail("the spawned child never appeared as a descendant")
+
+    def reap(self, child):
+        if child.poll() is None:
+            child.terminate()
+            try:
+                child.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait(timeout=10)
+
+    def test_a_real_leaked_child_fails_the_gate(self):
+        child = self.spawn_bounded("import time; time.sleep(30)")
+        t2.teardown(self.state(children_before=set()))
         self.assert_gate_failed("no owned child or grandchild process left")
+        failures = " ".join(self.failing_checks())
+        self.assertNotIn("process table inspected successfully", failures,
+                         "the scan itself succeeded; only the leak should fail")
+        self.reap(child)
+        self.assertNotIn(child.pid, t2.owned_descendants())
+
+    def test_a_real_leaked_grandchild_fails_the_gate(self):
+        """Depth matters: a worker's worker is still this harness's problem."""
+        code = ("import subprocess, sys, time\n"
+                "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
+                "time.sleep(30)\n")
+        child = self.spawn_bounded(code)
+        deadline = time.monotonic() + 10
+        grandchildren = set()
+        while time.monotonic() < deadline:
+            grandchildren = t2.owned_descendants() - {child.pid}
+            if grandchildren:
+                break
+            time.sleep(0.1)
+        self.assertTrue(grandchildren, "no grandchild appeared to test with")
+
+        owned = {child.pid} | grandchildren
+        t2.teardown(self.state(children_before=set()))
+        self.assert_gate_failed("no owned child or grandchild process left")
+        detected = t2.owned_descendants()
+        self.assertTrue(grandchildren & detected,
+                        f"the grandchild must be detected, saw {sorted(detected)}")
+
+        # Reclaim only what this test owns, grandchild first. Windows does not
+        # re-parent an orphan, so killing the child first would make the
+        # grandchild stop resolving as a descendant while still running.
+        for pid in sorted(grandchildren):
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+        self.reap(child)
+
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and (t2.owned_descendants() & owned):
+            time.sleep(0.1)
+        self.assertEqual(t2.owned_descendants() & owned, set(),
+                         "the fault test must leave no owned process behind")
+        self.assertFalse(any(self.pid_is_alive(pid) for pid in owned),
+                         "every process this test started must be reaped")
+
+    @staticmethod
+    def pid_is_alive(pid):
+        """Direct liveness, independent of the descendant relation."""
+        return pid in t2.process_parents()
+
+    def test_an_unreadable_process_table_fails_the_gate(self):
+        """Inability to inspect must never be reported as zero children."""
+        with patch.object(t2, "process_parents",
+                          side_effect=t2.ProcessScanError("scanner unavailable")):
+            t2.teardown(self.state(children_before=set()))
+        self.assert_gate_failed("process table inspected successfully")
+        self.assert_gate_failed("no owned child or grandchild process left")
+
+    def test_a_malformed_process_table_fails_the_gate(self):
+        """A table that cannot see this process is not evidence of anything."""
+        with patch.object(t2, "process_parents", return_value={1: 0, 2: 1}):
+            t2.teardown(self.state(children_before=set()))
+        self.assert_gate_failed("process table inspected successfully")
+
+    def test_a_missing_baseline_scan_fails_the_gate(self):
+        """If the pre-run scan failed, the post-run comparison is meaningless."""
+        t2.teardown(self.state(children_before=None))
+        self.assert_gate_failed("process table inspected successfully")
+        self.assert_gate_failed("no owned child or grandchild process left")
+
+    def test_the_overlay_mutex_claim_requires_proven_ownership(self):
+        """The old check was `server is None or True`; it must mean something."""
+        with patch.object(t2, "process_parents",
+                          side_effect=t2.ProcessScanError("scanner unavailable")):
+            t2.teardown(self.state(children_before=set()))
+        self.assert_gate_failed("overlay mutex scope is N/A")
+
+    def test_process_enumeration_uses_no_external_command(self):
+        source = (ROOT / "tests" / "t2_settings_analytics_e2e.py").read_text(encoding="utf-8")
+        code = "\n".join(line for line in source.splitlines()
+                         if not line.strip().startswith("#"))
+        # The word may appear in prose explaining why it was removed; what must
+        # not exist is an invocation or the import that would enable one.
+        self.assertNotIn("import subprocess", code, "the scanner must not shell out")
+        self.assertNotIn("subprocess.run", code)
+        self.assertNotIn('"wmic"', code)
+        self.assertIn("CreateToolhelp32Snapshot", code)
+        self.assertIn("class ProcessScanError", code)
 
 
 class HarnessStructureTests(unittest.TestCase):
@@ -154,7 +268,7 @@ class HarnessStructureTests(unittest.TestCase):
 
     def test_exit_status_is_computed_after_teardown(self):
         source = (ROOT / "tests" / "t2_settings_analytics_e2e.py").read_text(encoding="utf-8")
-        main_body = source[source.index("def main() -> int:"):source.index("def owned_python_pids")]
+        main_body = source[source.index("def main() -> int:"):source.index("class ProcessScanError")]
         finally_at = main_body.rindex("finally:")
         return_at = main_body.rindex("return 0 if all(")
         self.assertLess(finally_at, return_at,
