@@ -1,8 +1,8 @@
 # Project state
 
-Last updated: 2026-09-12 JST
+Last updated: 2026-09-13 JST
 
-Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4 in this docs-only generation; canonical when merged) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
@@ -11,11 +11,12 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · r
 | Item | State |
 |---|---|
 | Public stable | **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33` |
-| `main` | `e0d8476` |
+| `main` | `59e370b` (PR #13 merge; verify GitHub before relying on this snapshot) |
 | Accepted runtime | `codex/wgc-rc-validation-20260908` at `93d5a57b88a86ec4b8846a3082089ed97f13a818`, shipped unchanged in v1.1.0 and v1.1.1 |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
 | Documentation generation | PR #13 — **merged**. Master Requirements Revision 3 is canonical on `main` |
+| Season requirement generation | **Documentation / requirement sync only.** Revision 4 records manual-first Season catalog reconciliation and retrospective assignment; no application code or runtime manifest is implemented |
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 
@@ -94,13 +95,26 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 
 Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISIONS.md](DECISIONS.md). Order: **Sequencing** in [ROADMAP.md](ROADMAP.md).
 
+## Requirements added on 2026-09-13 — Revision 4
+
+| Area | Requirement | Issue | Status |
+|---|---|---|---|
+| Season Catalog / Assignment | Manual-first GitHub catalog refresh, local cache, fixed-schema validation, retrospective assignment, multi-season reconciliation, idempotency, transition / unresolved handling, and offline fallback. Season assignment is derived metadata and never alters authoritative result or Rating observation fields | [#28-A](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | PLANNED after #15, before UI-2 |
+| Seasonal analytics | #16-A / #28-B consumes resolved Season data only and recomputes after reconciliation; unresolved records are never placed in the current Season by guess | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16), [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | PLANNED after UI-2 |
+
+Known seed: Season 16 starts `2026-07-24 18:00 JST`; reset / transition starts
+`2026-09-25 16:00 JST`; Season 17 starts only after reset completion and its exact timestamp is
+not yet confirmed. The approximate two-month / Friday cadence is never authoritative.
+
 ## Next actions
 
 1. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
 2. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
 3. Then #24, and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-**PR #5 is the only unmerged generation.** No new feature branch starts until it lands (§4).
+At the start of this work, **PR #5 was the only unmerged product generation**. The Revision 4
+docs-only Season sync is the permitted second generation. No third generation or new feature
+branch starts until one lands (§4).
 
 
 ### Order after PR #5
@@ -108,12 +122,12 @@ Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISI
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
 ```text
-#14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 → #16-A / #28 → UI-3A
+#14 → #24 → UI-0 → UI-1A → UI-1B → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
    → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 
-**#15 precedes UI-2** so the Dashboard and History shell is built once against a settled
-match-metadata contract, and **#16 owns the analytics data while UI-3A / UI-3B own the chart
+**#15 precedes #28-A**, which settles Season catalog / assignment before UI-2 builds manual refresh
+and History state. **#16 owns the analytics data while UI-3A / UI-3B own the chart
 rendering**.
 
 Never move the `v1.1.0` or `v1.1.1` tag.

@@ -1,6 +1,6 @@
 # AC6 Win/Loss Tracker — Master Requirements & Development Policy
 
-Last consolidated: 2026-09-12 (Revision 3)
+Last consolidated: 2026-09-13 (Revision 4)
 Status: **CANONICAL PROJECT REQUIREMENTS**
 Scope: AC6 Win/Loss Tracker / AC6tool
 
@@ -9,9 +9,11 @@ Scope: AC6 Win/Loss Tracker / AC6tool
 | Revision 1 | before 2026-09-09 | Superseded by Revision 2; not reproduced separately |
 | Revision 2 | 2026-09-09 | Development-acceleration track (§38–§42), match-metadata foundation (§10–§15), full opponent-build programme (§16–§29), growth analytics (§43–§51) |
 | **Revision 3** | **2026-09-12** | Runtime isolation / app-local Python environment (§56); UI/UX design identity and the Player/Broadcast overlay split (§57–§63); self-build linkage promoted from a sketch to a recorded requirement with its own issue (§52); seasonal rank / rating progression, including the A/S discontinuity rule (§64) |
+| **Revision 4** | **2026-09-13** | Season catalog / manifest, manual-first synchronization, retrospective assignment, transition handling, and multi-season reconciliation (§65) |
 
-Revision 3 **adds to** Revision 2. Nothing in Revision 2 is deleted or rewritten by it. Where
-Revision 3 changes a status, the earlier statement and the reason for the change stay visible.
+Revision 4 **adds to** Revisions 2 and 3. Nothing in an earlier revision is silently deleted or
+rewritten. Where a later revision changes a status or sequencing rule, the earlier statement and
+the reason for the change stay visible.
 
 > This document is the consolidated source of truth for requirements and development policy agreed with the user.
 > If an older chat, issue, PR comment, README note, branch document, or AI-generated plan conflicts with this document, do not silently follow the older material. Reconcile the conflict explicitly.
@@ -998,8 +1000,8 @@ The next product generation is **draft PR #5**:
 6. Merge to `main`
 7. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and
    worktree cut from the new `main`, and from there the dependency order recorded under
-   **Sequencing** in `docs/ROADMAP.md`: #14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 →
-   #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
+   **Sequencing** in `docs/ROADMAP.md`: #14 → #24 → UI-0 → UI-1A → UI-1B → #15 → #28-A →
+   UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 8. During review, Claude may implement only the next generation in a separate branch/worktree
 
 The release-diff review and the post-fix gate rerun must not be skipped: gate evidence produced
@@ -1020,6 +1022,8 @@ before it is written down. `tests/test_readme_bootstrap_hash.py` now enforces it
 - Single / Team recognition
 - self rank
 - opponent rank for Single
+- authoritative match / observation timestamps that remain usable for later Season assignment
+- result and observation persistence even while Season assignment is unresolved
 - history display
 - mode/format-specific win-rate breakdowns
 
@@ -1172,14 +1176,22 @@ tests/fixtures/
 │  ├─ custom_single/
 │  └─ custom_team/
 ├─ ranks/
+├─ season/
+│  ├─ pre_reset/
+│  ├─ transition/
+│  ├─ post_reset/
+│  └─ multi_season/
+├─ rating/
+│  ├─ pre_s/
+│  └─ s_rank/
 └─ opponent_builds/
 ```
 
 **The layout must be able to carry the later fixture families without being retrofitted.** The
-harness is built once and then extended, so leave room for what §64 will need — season boundaries,
-and **pre-S (UNRANKED through A4) and S rating presentations as distinct cases**, since those are two
-different presentation systems and a single family would flatten them. Adding those families later
-is expected; having to restructure `ranks/` to accommodate them is not.
+harness is built once and then extended, so leave room for what §64 and §65 will need: pre-reset,
+transition, post-reset, missing-Season and multi-season-gap cases, plus **pre-S (UNRANKED through
+A4) and S rating presentations as distinct cases**. The exact paths are not fixed here; the
+capability to replay all of those boundaries is.
 
 Each fixture should have expected structured truth, for example:
 
@@ -1859,8 +1871,8 @@ A previous build may be shown only as a user-facing comparison/hint in a future 
 9. Next Goal
 10. Future self-build cross analysis (§52)
 
-Seasonal rank / rating progression (§64) sits with items 2–4: it needs the same rank metadata, and
-is scheduled once self-rank recognition is reliable.
+Seasonal rank / rating progression (§64) sits with items 2–4. Its Season assignment foundation is
+§65 / #28-A, scheduled after #15 and before UI-2; analytics are #16-A / #28-B after UI-2.
 
 ## Presentation and runtime (added in Revision 3)
 
@@ -1869,11 +1881,11 @@ These are cross-cutting; they are not a third feature track competing with the t
 1. Runtime isolation — app-local Python environment (§56). After the fixture/replay harness
 2. UI-0 design specification (§63). Documentation only; human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
-4. UI-2 Dashboard / History / Settings shell — **after the match-metadata foundation (#15)**, so the
-   shell is built once against a settled contract
-5. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation,
+4. #28-A Season Catalog / Assignment Foundation — after #15 and before UI-2
+5. UI-2 Dashboard / History / Settings shell — after #15 and #28-A; Settings includes manual Season refresh
+6. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation,
    each following its own data. #16 owns the data; UI-3A/UI-3B own the rendering
-6. UI-4 Tray / Launcher modernization, last, and only if its lifecycle safety can be demonstrated
+7. UI-4 Tray / Launcher modernization, last, and only if its lifecycle safety can be demonstrated
 
 The full interleaved order is recorded under **Sequencing** in `docs/ROADMAP.md`.
 
@@ -2132,6 +2144,20 @@ SEP 03
 
 Search waits until there is metadata worth searching (#15).
 
+## Settings — Season information
+
+UI-2 includes a quiet, user-initiated Season information surface supplied by §65 / #28-A:
+
+```text
+SEASON INFORMATION
+Current cached season
+Last checked
+[ シーズン情報を更新 ]
+```
+
+States include `最新です`, `更新しました`, `確認できませんでした — cached dataを使用`, and
+`Season未解決`. Refresh is manual-first. It must not show a gameplay modal or steal AC6 focus.
+
 ## Statistics
 
 Statistics are not crammed into History. The Statistics page eventually shows win-rate trend,
@@ -2235,8 +2261,9 @@ The UI phases interleave with the feature phases rather than running as a block.
 interleaved order lives in `docs/ROADMAP.md` under **Sequencing**. Two dependencies in it are
 requirements, not scheduling preferences:
 
-- **UI-2 lands after the match-metadata foundation (§10, #15).** UI-2 rebuilds the Dashboard and
-  History shell; building it before the metadata contract is settled means building it twice.
+- **UI-2 lands after the match-metadata foundation (§10, #15) and Season assignment foundation
+  (§65, #28-A).** UI-2 rebuilds Dashboard / History / Settings and includes manual Season refresh;
+  both data contracts must be settled first.
 - **#16 owns the analytics and time-series data; UI-3A / UI-3B own the chart rendering.** Neither
   implements the other's half.
 
@@ -2245,8 +2272,8 @@ requirements, not scheduling preferences:
 | **UI-0** | Design specification. **No code change.** Survey the current framework, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility. Before → Proposed per item. Classify every change Low / Medium / High. Rollback plan. Regression-test plan. **Human review before any implementation.** | none |
 | **UI-1A** | Player Overlay polish — low-risk visual changes only | low |
 | **UI-1B** | Broadcast / streaming Overlay polish | low |
-| **UI-2** | Dashboard / History / Settings shell — top navigation, surfaces, KPI hierarchy. **Scheduled after §10 / #15**, so the shell is built once against a settled match-metadata contract rather than twice | medium |
-| **UI-3A** | **Growth / Rank / Rating presentation** — win-rate trend, rolling win rate, season selector, Rank / Rating chart. Follows #16-A and #28. Ships without waiting for the opponent-recognition programme | medium |
+| **UI-2** | Dashboard / History / Settings shell — top navigation, surfaces, KPI hierarchy, and §65 manual Season information / refresh. **Scheduled after §10 / #15 and #28-A** | medium |
+| **UI-3A** | **Growth / Rank / Rating presentation** — win-rate trend, rolling win rate, season selector, Rank / Rating chart. Follows #16-A and #28-B. Ships without waiting for the opponent-recognition programme | medium |
 | **UI-3B** | **Opponent build statistics presentation** — weapon / leg-type / full-build views. Follows #17 and #10/#11/#12 | medium |
 | **UI-4** | Tray / Launcher modernization — separate issue, separate PR, last | high |
 
@@ -2338,6 +2365,8 @@ compared, stays that way instead of being smoothed into something that looks tid
 - History is **separated by season**, and the UI can switch season.
 - **Rating is never carried forward** from one season into the next.
 - Past seasons remain **viewable**.
+- Season boundaries and retrospective assignment are governed by §65. A cadence guess is never a
+  source of truth, and unresolved or transition observations remain unassigned until confirmed.
 
 ## Recognition policy
 
@@ -2375,8 +2404,116 @@ This section is the requirement; the implementation lands in the issues that own
 
 | Layer | Issue | Items |
 |---|---|---|
-| Metadata foundation | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Season / Rating acquisition; persistence; distinguishing the pre-S (through A4) and S recognition systems |
-| Growth analytics (#16-A) | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Per-season Rank / Rating progression **data**; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement. The chart itself is rendered by UI-3A |
+| Match / observation metadata | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Rating acquisition and persistence; authoritative timestamps; unresolved Season allowed; distinguishing the pre-S (through A4) and S recognition systems |
+| Season assignment foundation (#28-A) | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | Catalog / manifest, manual refresh, local cache, validation, retrospective assignment, transitions, multi-season reconciliation, idempotency and offline fallback (§65) |
+| Growth analytics (#16-A / #28-B) | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Resolved per-season Rank / Rating progression **data**; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement. The chart itself is rendered by UI-3A |
 | Presentation (UI-3A) | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where pre-S and S cannot be compared directly |
 
 Sample-size and sparse-data honesty from §43 and §44 applies to every number this feature shows.
+
+---
+
+# 65. Season catalog and retrospective assignment
+
+Status: **ADOPTED / PLANNED.** Tracked as **#28-A** in
+[#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28). This section records the
+requirement only; it does not introduce a runtime manifest, schema, network client, cache, UI, or
+database migration.
+
+## Source of truth and known seed
+
+Formal Season boundaries come from a small AC6tool-managed **Season Catalog / Manifest** obtained
+from a fixed HTTPS GitHub source. The final filename, schema and fields are decided during
+implementation review. The catalog is data, never executable code.
+
+Known initial reference:
+
+```text
+Season 16 starts:       2026-07-24T18:00:00+09:00
+Reset / transition starts: 2026-09-25T16:00:00+09:00
+Season 17 starts:       unknown until reset completion is confirmed
+```
+
+`2026-09-25 16:00 JST` is **not** the Season 17 start. The valid state flow is:
+
+```text
+Season 16 active → reset / transition starts → transition/resetting
+→ reset completion confirmed → Season 17 starts
+```
+
+The observed cadence — approximately every two months, usually Friday — is planning context only.
+Holiday movement may be earlier or later. Never derive an authoritative boundary from
+`last season + 2 months`, `next Friday`, `season_id + 1`, or similar inference.
+
+## Manual-first catalog reconciliation
+
+The first implementation is:
+
+```text
+manual refresh + local cache + retrospective season assignment
+```
+
+The user explicitly refreshes Season information from Settings. Refresh downloads and validates
+the catalog, atomically retains or updates the local cache, obtains **all missing Season
+definitions**, and re-evaluates unresolved historical records. It is catalog reconciliation, not
+merely a current-season lookup.
+
+A user returning after several months must receive every missing definition (for example Seasons
+17 and 18). The implementation must not synthesize only `cached season + 1`, nor infer intermediate
+boundaries from the difference between old and current IDs.
+
+A weekly startup refresh is an optional future enhancement, not an initial requirement. If later
+adopted, it must be transparent in UI, must not show a gameplay modal, steal AC6 focus, delay
+Tracker startup, or block result recording when the network fails.
+
+## Retrospective and derived assignment
+
+Matches and Rating observations remain storable when Season is unknown:
+
+```text
+timestamp / observed_at = saved
+season_id = unresolved
+```
+
+After catalog refresh, confirmed intervals may retrospectively assign or reassign only the derived
+Season metadata. Season reconciliation must never change WIN / LOSE / DRAW, `event_id`, match
+identity, match timestamp, ResultGate outcome, streak, authoritative result persistence, or the
+Rank / Rating observation itself. Lack of live Season information is not data loss and never
+justifies dropping a result or observation.
+
+If reset start and the next confirmed Season start leave a gap, observations in that interval stay
+`unresolved` or receive an explicit transition assignment status. They are never forced into the
+previous or next Season merely to make the data look complete.
+
+Synchronization and reassignment are idempotent. Stable `season_id` identifies a Season; applying
+the same catalog or reconciling the same record repeatedly produces the same final state and no
+duplicate Seasons.
+
+## Rating observations and analytics boundary
+
+`observed_at`, `self_rank`, `rating_mode` and `rating_value` may be saved with unresolved Season and
+resolved later. #16-A / #28-B computes per-season analytics from **resolved Season data only** and
+may recompute after reconciliation. It must not silently place unresolved records into the current
+Season. #16 owns analytics data; #25 UI-3A owns chart rendering.
+
+## Security, offline and failure behavior
+
+The catalog is parsed with a fixed versioned schema, bounded download size and bounded parsing.
+Unknown or invalid fields are rejected or ignored only by an explicit policy. `eval`, `exec`,
+`Invoke-Expression`, dynamic import/execution and manifest-derived commands are forbidden. No
+secret, match history or personal data is uploaded when refreshing.
+
+On GitHub unavailability, timeout, DNS failure, 404, malformed JSON, unsupported `schema_version`,
+missing Season or transition ambiguity, the last valid cache is retained and normal Tracker
+operation continues. Refresh failure may never cause Tracker startup failure, WIN/LOSE failure,
+history failure, Rating observation loss, or any change to the authoritative result path.
+
+## Required sequencing
+
+```text
+#15 Match Metadata Foundation
+→ #28-A Season Catalog / Assignment Foundation
+→ UI-2 Dashboard / History / Settings (manual Season refresh)
+→ #16-A / #28-B Seasonal Analytics
+→ UI-3A Growth / Rank / Rating presentation
+```
