@@ -661,7 +661,8 @@ def _purge_all_coordinated():
     try:
         s = stats.reset()
     except Exception as error:
-        # Nothing was deleted: the database has not been touched yet.
+        # Nothing was deleted: the database has not been touched yet, and the
+        # session was not reset, so no convergence is owed.
         raise PurgeFailed("session reset", error, history_cleared=False) from error
 
     try:
@@ -672,21 +673,28 @@ def _purge_all_coordinated():
             restored = True
         except Exception:
             restored = False
+        if restored:
+            # The session is back at its pre-operation value and the history
+            # rows it refers to still exist, so the undo identities stay valid.
+            # Republish so a connected client cannot be left showing the zero
+            # this operation briefly wrote.
+            _publish_session(stats.snapshot())
+        else:
+            # The session is reset while lifetime history survives. That is the
+            # ordinary "reset session" state, but only once the rest of that
+            # contract is applied -- above all the undo identities, which would
+            # otherwise let an empty session delete the history this error says
+            # was retained.
+            converge_session_reset(s)
         raise PurgeFailed(
             "history purge", error, history_cleared=False, stats_restored=restored
         ) from error
 
-    # Both stores are now cleared and agree. What follows is in-memory
-    # convergence; it cannot reintroduce a disagreement, but a failure is still
-    # reported rather than swallowed, because the gate and detector would not
-    # have been told about the mutation.
-    history_event_ids.clear()
+    # Both stores are now cleared and agree. What follows is the rest of the
+    # session-reset contract; a failure in it is reported rather than swallowed,
+    # but the state is still converged first so no client keeps a stale session.
     try:
-        result_gate.lock_now()
-        with detector_lock:
-            current = detector
-        if current:
-            current.external_mutation()
+        converge_session_reset(s)
     except Exception as error:
         raise PurgeFailed(
             "post-purge synchronization", error, history_cleared=True
@@ -694,8 +702,66 @@ def _purge_all_coordinated():
 
     outcome["session_reset"] = True
     outcome["stats"] = status_payload(s)
-    publish_stats_active(s)
     return outcome
+
+
+def _publish_session(s):
+    """Emit the session stats event, so connected overlays converge."""
+    publish_stats_active(s)
+
+
+def converge_session_reset(s):
+    """Apply the rest of ``reset_stats``'s contract to an already-reset session.
+
+    ``stats.reset()`` alone only rewrites stats.json. The supported session
+    reset also drops the undo identities, advances the history session, locks
+    the gate, tells the detector, and publishes the new session to connected
+    clients. A purge that ends with the session reset owes every one of those.
+
+    The undo identities are dropped first and cannot fail. That ordering is the
+    safety-critical part: ``undo_result`` pops an identity and deletes that
+    history row even when the reset session has nothing to undo, so a stale
+    identity would let an empty session destroy retained history.
+    """
+    history_event_ids.clear()
+
+    # Every remaining step is attempted even if an earlier one fails, so a
+    # broken gate cannot stop connected clients from being told the session is
+    # now zero. The first failure is re-raised once the rest has been applied.
+    failure = None
+
+    def attempt(step):
+        nonlocal failure
+        try:
+            step()
+        except Exception as error:  # noqa: BLE001 - recorded, then re-raised
+            failure = failure or error
+
+    attempt(invalidate_dashboard_summary)
+
+    def synchronize():
+        result_gate.lock_now()
+        with detector_lock:
+            current = detector
+        if current:
+            current.external_mutation()
+
+    attempt(synchronize)
+    attempt(lambda: _publish_session(s))
+
+    # Advancing the history session is tolerant here exactly as it is in
+    # reset_stats: it must not mask the failure that brought us here.
+    with history_lock:
+        store = history
+    if store is not None:
+        try:
+            store.reset_session()
+            set_history_health("active")
+        except Exception as e:
+            history_failure("reset_session", e)
+
+    if failure is not None:
+        raise failure
 
 
 def store_purge_all():

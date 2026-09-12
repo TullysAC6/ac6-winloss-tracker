@@ -20,7 +20,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -70,6 +70,7 @@ class PurgeAtomicityTests(unittest.TestCase):
         self.stats.add("win", "manual")
         self.history.record_result("seed-1", "win", "manual",
                                    {"streak": 1, "wins": 1, "losses": 0})
+        server.history_event_ids.append("seed-1")
         self.assertEqual(self.stats.snapshot()["wins"], 1)
         self.assertEqual(self.history.lifetime_summary()["wins"], 1)
 
@@ -220,6 +221,151 @@ class PurgeAtomicityTests(unittest.TestCase):
         self.assertEqual(outcome["removed_matches"], 0, "cutoff 0 removes nothing")
         self.assert_consistent(self.observed(), "purge_before")
 
+
+class PurgeRecoveryContractTests(PurgeAtomicityTests):
+    """Review 5186945882: a failed purge must complete the session-reset contract.
+
+    The reviewer drove the real handler and found that after case C -- purge and
+    restore both failing -- ``history_event_ids`` still held the old match ID and
+    no session event was published. A following ``/api/stats/undo`` returned
+    ``removed=None`` (the reset session had nothing to undo) yet still deleted
+    the retained history row, destroying the history the error said was kept.
+    """
+
+    def published(self):
+        """Capture what a connected client would receive."""
+        seen = []
+        original = self.server.publish
+
+        def spy(kind, payload, remember=True):
+            seen.append((kind, payload))
+            return original(kind, payload, remember=remember)
+
+        return seen, spy
+
+    # ---------------------------------------------------------------- case C
+    def test_empty_session_undo_after_failed_purge_keeps_retained_history(self):
+        """The reviewer's reproduction, as a regression test."""
+        self.assertEqual(len(self.server.history_event_ids), 1,
+                         "the seeded result must own an undo identity")
+        with patch.object(self.history, "purge_all", side_effect=OSError("commit failed")), \
+             patch.object(self.stats, "restore", side_effect=OSError("restore failed")):
+            with self.assertRaises(self.server.PurgeFailed):
+                self.server.purge_history("all")
+
+        state = self.observed()
+        self.assertEqual(state["stats_wins"], 0, "session was reset")
+        self.assertEqual(state["lifetime_wins"], 1, "history was retained")
+        self.assertEqual(list(self.server.history_event_ids), [],
+                         "stale undo identities would let an empty session "
+                         "delete the retained history")
+
+        # The destructive step itself: undo from the reset session.
+        _, removed = self.server.undo_result()
+        self.assertIsNone(removed, "an empty session has nothing to undo")
+        after = self.observed()
+        self.assertEqual(after["lifetime_wins"], 1,
+                         "undo after a failed purge must not delete retained history")
+        self.assertEqual(self.reloaded_state(), {"stats_wins": 0, "lifetime_wins": 1})
+
+    def test_case_c_publishes_the_reset_session_to_connected_clients(self):
+        seen, spy = self.published()
+        with patch.object(self.server, "publish", spy), \
+             patch.object(self.history, "purge_all", side_effect=OSError("commit failed")), \
+             patch.object(self.stats, "restore", side_effect=OSError("restore failed")):
+            with self.assertRaises(self.server.PurgeFailed):
+                self.server.purge_history("all")
+        kinds = [kind for kind, _ in seen]
+        self.assertIn("stats", kinds, "a reset session must be published")
+        self.assertIn("lifetime", kinds)
+        stats_payload = [p for k, p in seen if k == "stats"][-1]
+        self.assertEqual(stats_payload["wins"], 0)
+        self.assertEqual(stats_payload["streak"], 0)
+
+    def test_case_c_locks_the_gate_and_notifies_the_detector(self):
+        detector = Mock()
+        self.server.detector = detector
+        self.addCleanup(setattr, self.server, "detector", None)
+        with patch.object(self.server.result_gate, "lock_now") as lock, \
+             patch.object(self.history, "purge_all", side_effect=OSError("commit failed")), \
+             patch.object(self.stats, "restore", side_effect=OSError("restore failed")):
+            with self.assertRaises(self.server.PurgeFailed):
+                self.server.purge_history("all")
+        lock.assert_called_once()
+        detector.external_mutation.assert_called_once()
+
+    def test_recording_resumes_and_undo_is_scoped_to_it_after_case_c(self):
+        with patch.object(self.history, "purge_all", side_effect=OSError("commit failed")), \
+             patch.object(self.stats, "restore", side_effect=OSError("restore failed")):
+            with self.assertRaises(self.server.PurgeFailed):
+                self.server.purge_history("all")
+
+        self.stats.add("win", "manual")
+        self.history.record_result("after-failure", "win", "manual",
+                                   {"streak": 1, "wins": 1, "losses": 0})
+        self.server.history_event_ids.append("after-failure")
+        self.assertEqual(self.observed()["lifetime_wins"], 2)
+
+        # Undo now removes only the new result, never the retained one.
+        self.server.undo_result()
+        final = self.observed()
+        self.assertEqual(final["lifetime_wins"], 1, "only the new result is undone")
+        self.assertEqual(self.reloaded_state()["lifetime_wins"], 1)
+
+    # ---------------------------------------------------------------- case D
+    def test_case_d_publishes_the_reset_session_even_though_the_gate_failed(self):
+        seen, spy = self.published()
+        with patch.object(self.server, "publish", spy), \
+             patch.object(self.server.result_gate, "lock_now",
+                          side_effect=RuntimeError("gate failed")):
+            with self.assertRaises(self.server.PurgeFailed) as caught:
+                self.server.purge_history("all")
+        self.assertTrue(caught.exception.history_cleared)
+        kinds = [kind for kind, _ in seen]
+        self.assertIn("stats", kinds,
+                      "a connected overlay must not keep the old session value")
+        stats_payload = [p for k, p in seen if k == "stats"][-1]
+        self.assertEqual(stats_payload["wins"], 0)
+        self.assertEqual(list(self.server.history_event_ids), [])
+        self.assertEqual(self.reloaded_state(), {"stats_wins": 0, "lifetime_wins": 0})
+
+    def test_case_d_undo_cannot_touch_history(self):
+        with patch.object(self.server.result_gate, "lock_now",
+                          side_effect=RuntimeError("gate failed")):
+            with self.assertRaises(self.server.PurgeFailed):
+                self.server.purge_history("all")
+        _, removed = self.server.undo_result()
+        self.assertIsNone(removed)
+        self.assertEqual(self.observed()["lifetime_wins"], 0)
+
+    # ---------------------------------------------------------------- case B
+    def test_case_b_keeps_undo_identities_and_republishes_the_restored_session(self):
+        seen, spy = self.published()
+        with patch.object(self.server, "publish", spy), \
+             patch.object(self.history, "purge_all", side_effect=OSError("commit failed")):
+            with self.assertRaises(self.server.PurgeFailed) as caught:
+                self.server.purge_history("all")
+        self.assertTrue(caught.exception.stats_restored)
+        self.assertEqual(list(self.server.history_event_ids), ["seed-1"],
+                         "the restored session still owns its history row")
+        stats_payload = [p for k, p in seen if k == "stats"][-1]
+        self.assertEqual(stats_payload["wins"], 1,
+                         "clients must see the restored value, not the brief zero")
+
+        # Undo is the supported operation again, and removes exactly one row.
+        _, removed = self.server.undo_result()
+        self.assertIsNotNone(removed)
+        self.assertEqual(self.observed()["lifetime_wins"], 0)
+
+    # ---------------------------------------------------------------- case A
+    def test_case_a_leaves_undo_ownership_untouched(self):
+        with patch.object(self.stats, "reset", side_effect=OSError("stats reset failed")):
+            with self.assertRaises(self.server.PurgeFailed):
+                self.server.purge_history("all")
+        self.assertEqual(list(self.server.history_event_ids), ["seed-1"])
+        _, removed = self.server.undo_result()
+        self.assertIsNotNone(removed, "the untouched session can still undo")
+        self.assertEqual(self.observed()["lifetime_wins"], 0)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
