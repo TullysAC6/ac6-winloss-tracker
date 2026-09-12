@@ -31,10 +31,28 @@ Issue #6
 
 1. Prepare and publish a corrected immutable version (recommended `v1.1.1`) whose tagged README hash matches the public bootstrap blob. Re-run the public-distribution smoke test against isolated roots and ports.
 2. After that passes: record `Released`, close #7 and #4, and make the docs-only state update. Never move `v1.1.0`.
-3. Reconcile draft PR #5 with the current `main`. **Merge only — no reset, no rebase, no force-push.** Then T0 → T1 (N/A) → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
-4. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness, on a fresh branch and worktree from the new `main`.
-5. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), runtime isolation, with the full migration gate in MASTER_REQUIREMENTS §56.
-6. Then [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) **UI-0 only** — a design specification with no code change, reviewed by the user before any UI code is written.
+3. Merge documentation PR #13, so Revision 3 is canonical on `main` instead of on a branch. Documentation only — nothing in the release path waits on it, but merging it early frees a generation slot.
+4. Reconcile draft PR #5 with the current `main`. **Merge only — no reset, no rebase, no force-push.** Then T0 → T1 (N/A) → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
+5. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness, on a fresh branch and worktree from the new `main`. Its layout must leave room for the later fixture families — season boundaries, and pre-S (UNRANKED through A4) and S rating presentations as distinct cases — because the harness is built once and then extended.
+6. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), runtime isolation, with the full migration gate in MASTER_REQUIREMENTS §56.
+7. Then [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) **UI-0 only** — a design specification with no code change, reviewed by the user before any UI code is written.
+
+## Order after that — dependency, not preference
+
+The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
+
+```text
+v1.1.1 → PR #13 → PR #5 → #14 → #24 → UI-0 → UI-1A → UI-1B
+→ #15 → UI-2 → #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B
+→ #16-B → #18 → #27 → UI-4
+```
+
+Four placements in it are load-bearing and will look wrong to anyone reading only the phase tables:
+
+- **#15 before UI-2.** UI-2 rebuilds the Dashboard and History shell. Doing it before the match-metadata contract is fixed means building that shell twice — once for today's row shape, once for the Ranked/Custom, Single/Team, rank-bearing shape.
+- **#16 owns the data, #25 owns the charts.** #16 computes periods, rolling win rate, per-season rank/rating series, deltas and achievements. UI-3A / UI-3B render them. Neither implements the other's half.
+- **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
+- **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
 At most two unmerged generations exist at a time (§4). Today those are PR #5 and PR #13, so nothing new starts until one of them lands.
 

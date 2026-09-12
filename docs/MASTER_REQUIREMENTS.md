@@ -1001,7 +1001,9 @@ corrected immutable version exists, **`Released` is not claimed, and #7 and #4 s
 7. **T3** real-AC6 acceptance
 8. Merge to `main`
 9. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and
-   worktree cut from the new `main`
+   worktree cut from the new `main`, and from there the dependency order recorded under
+   **Sequencing** in `docs/ROADMAP.md`: #14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 →
+   #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 10. During review, Claude may implement only the next generation in a separate branch/worktree
 
 The release-diff review and the post-fix gate rerun must not be skipped: gate evidence produced
@@ -1163,6 +1165,12 @@ tests/fixtures/
 └─ opponent_builds/
 ```
 
+**The layout must be able to carry the later fixture families without being retrofitted.** The
+harness is built once and then extended, so leave room for what §64 will need — season boundaries,
+and **pre-S (UNRANKED through A4) and S rating presentations as distinct cases**, since those are two
+different presentation systems and a single family would flatten them. Adding those families later
+is expected; having to restructure `ranks/` to accommodate them is not.
+
 Each fixture should have expected structured truth, for example:
 
 ```json
@@ -1184,7 +1192,7 @@ Goals:
 - catch result-recognition regressions
 - catch Ranked/Custom regressions
 - catch Single/Team regressions
-- catch rank-recognition regressions
+- catch rank-recognition regressions, including the pre-S / S presentation split
 - catch opponent-build/parts-normalization regressions
 - reduce repeated manual navigation through AC6
 - make Codex/Astra review faster and evidence-based
@@ -1851,9 +1859,13 @@ These are cross-cutting; they are not a third feature track competing with the t
 1. Runtime isolation — app-local Python environment (§56). After the fixture/replay harness
 2. UI-0 design specification (§63). Documentation only; human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
-4. UI-2 Dashboard / History / Settings shell
-5. UI-3 Statistics presentation, added as the analytics above deliver real data
+4. UI-2 Dashboard / History / Settings shell — **after the match-metadata foundation (#15)**, so the
+   shell is built once against a settled contract
+5. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation,
+   each following its own data. #16 owns the data; UI-3A/UI-3B own the rendering
 6. UI-4 Tray / Launcher modernization, last, and only if its lifecycle safety can be demonstrated
+
+The full interleaved order is recorded under **Sequencing** in `docs/ROADMAP.md`.
 
 The roadmap may implement prerequisite foundations before the visible feature that depends on them.
 
@@ -2116,7 +2128,8 @@ Statistics are not crammed into History. The Statistics page eventually shows wi
 daily / weekly / monthly, rolling win rate, rank-relative performance, opponent weapon / legs /
 full build, and improved matchup — following §44–§47.
 
-It also hosts the seasonal rank / rating progression from §64: a **season selector**, the
+It also hosts the seasonal rank / rating progression from §64 (delivered in UI-3A): a
+**season selector**, the
 Rank / Rating chart, and — where the pre-S (through A4) and S rating systems cannot be compared
 directly — a **separate scale or separate presentation** rather than one continuous line across the
 pre-S → S boundary.
@@ -2208,13 +2221,23 @@ Status: **ADOPTED (process).** Tracked as
 [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25), with
 [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) for UI-4.
 
+The UI phases interleave with the feature phases rather than running as a block. The authoritative
+interleaved order lives in `docs/ROADMAP.md` under **Sequencing**. Two dependencies in it are
+requirements, not scheduling preferences:
+
+- **UI-2 lands after the match-metadata foundation (§10, #15).** UI-2 rebuilds the Dashboard and
+  History shell; building it before the metadata contract is settled means building it twice.
+- **#16 owns the analytics and time-series data; UI-3A / UI-3B own the chart rendering.** Neither
+  implements the other's half.
+
 | Phase | Content | Risk |
 |---|---|---|
 | **UI-0** | Design specification. **No code change.** Survey the current framework, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility. Before → Proposed per item. Classify every change Low / Medium / High. Rollback plan. Regression-test plan. **Human review before any implementation.** | none |
 | **UI-1A** | Player Overlay polish — low-risk visual changes only | low |
 | **UI-1B** | Broadcast / streaming Overlay polish | low |
-| **UI-2** | Dashboard / History / Settings shell — top navigation, surfaces, KPI hierarchy | medium |
-| **UI-3** | Statistics presentation, added as #15 / #16 / #17 / #10–#12 deliver real data | medium |
+| **UI-2** | Dashboard / History / Settings shell — top navigation, surfaces, KPI hierarchy. **Scheduled after §10 / #15**, so the shell is built once against a settled match-metadata contract rather than twice | medium |
+| **UI-3A** | **Growth / Rank / Rating presentation** — win-rate trend, rolling win rate, season selector, Rank / Rating chart. Follows #16-A and #28. Ships without waiting for the opponent-recognition programme | medium |
+| **UI-3B** | **Opponent build statistics presentation** — weapon / leg-type / full-build views. Follows #17 and #10/#11/#12 | medium |
 | **UI-4** | Tray / Launcher modernization — separate issue, separate PR, last | high |
 
 ## No framework migration as the opening move
@@ -2343,7 +2366,7 @@ This section is the requirement; the implementation lands in the issues that own
 | Layer | Issue | Items |
 |---|---|---|
 | Metadata foundation | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Season / Rating acquisition; persistence; distinguishing the pre-S (through A4) and S recognition systems |
-| Growth analytics | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Per-season Rank / Rating progression; line chart; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement |
-| Presentation | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where pre-S and S cannot be compared directly |
+| Growth analytics (#16-A) | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Per-season Rank / Rating progression **data**; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement. The chart itself is rendered by UI-3A |
+| Presentation (UI-3A) | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where pre-S and S cannot be compared directly |
 
 Sample-size and sparse-data honesty from §43 and §44 applies to every number this feature shows.

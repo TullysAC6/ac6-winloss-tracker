@@ -84,10 +84,17 @@ Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISI
 
 1. Publish a corrected immutable version (recommended `v1.1.1`) so the tagged tree and the published README agree, then re-run the public-distribution smoke test in isolation.
 2. Only then record `Released`, and close [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) in a docs-only commit. Never move the `v1.1.0` tag.
-3. Reconcile draft PR #5 with the current `main` — **merge only; no reset, rebase or force-push** — then T0 → T1 (N/A until #14) → T2 → PR handoff and review → required fixes → re-run the affected gates → T3 → `main`.
-4. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and worktree cut from the new `main`.
-5. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) runtime isolation, and [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) UI-0 as a reviewed design specification.
-6. Merge documentation PR #13 when the user is ready; it is documentation only.
+3. Merge documentation PR #13, so Revision 3 is canonical on `main` rather than on a branch. Documentation only.
+4. Reconcile draft PR #5 with the current `main` — **merge only; no reset, rebase or force-push** — then T0 → T1 (N/A until #14) → T2 → PR handoff and review → required fixes → re-run the affected gates → T3 → `main`.
+5. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and worktree cut from the new `main`.
+6. From there, the dependency order recorded under **Sequencing** in [ROADMAP.md](ROADMAP.md):
+
+```text
+#24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 → #16-A / #28 → UI-3A
+   → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
+```
+
+Two of those placements are dependencies rather than preferences: **#15 precedes UI-2** so the Dashboard and History shell is built once against a settled match-metadata contract, and **#16 owns the analytics data while UI-3A / UI-3B own the chart rendering**.
 
 At most **two unmerged generations** at a time (MASTER_REQUIREMENTS §4). Today those are PR #5 and PR #13.
 
