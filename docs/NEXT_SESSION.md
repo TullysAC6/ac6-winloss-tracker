@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-12 JST
+Last updated: 2026-09-13 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -8,7 +8,7 @@ Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE
 
 ```text
 Issue #6
-→ docs/MASTER_REQUIREMENTS.md   (canonical requirement, Revision 3)
+→ docs/MASTER_REQUIREMENTS.md   (Revision 4 in the Season docs-only generation; canonical when merged)
 → docs/PROJECT_STATE.md         (where the project actually is)
 → docs/NEXT_SESSION.md          (this file)
 → docs/ROADMAP.md
@@ -25,7 +25,8 @@ Issue #6
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
 - T1 remains **N/A / not run** because issue #14's formal fixture/replay harness does not exist. Do not call it PASS.
 - Draft PR #5 is a separate generation and has not been reconciled with the current `main`.
-- PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`. The documentation generation is closed, so only one unmerged generation remains.
+- PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`. That documentation generation is closed; PR #5 was the only unmerged generation before this Revision 4 docs-only work began.
+- Draft [PR #31](https://github.com/TullysAC6/ac6-winloss-tracker/pull/31) adds Revision 4 / §65 Season Catalog / Assignment as the docs-only second generation. It does not implement a manifest, network client, cache, schema, migration or Settings button.
 
 ## The rule that cost a release — do not lose it
 
@@ -53,7 +54,9 @@ Issue #6
 2. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness, on a fresh branch and worktree from the new `main`.
 3. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-At most two unmerged generations exist at a time. PR #13 merging freed a slot, so **PR #5 is the only unmerged generation**. Do not open a new feature branch until it lands.
+At most two unmerged generations exist at a time. PR #5 is the product generation and the Revision
+4 Season requirements PR is the permitted docs-only second generation. Do not open a third or a
+new feature branch until one lands.
 
 ## Order after that — dependency, not preference
 
@@ -63,18 +66,19 @@ v1.1.1 and PR #13 are done. From here:
 
 ```text
 PR #5 → #14 → #24 → UI-0 → UI-1A → UI-1B
-→ #15 → UI-2 → #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B
+→ #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12 → UI-3B
 → #16-B → #18 → #27 → UI-4
 ```
 
 Four placements in it are load-bearing and will look wrong to anyone reading only the phase tables:
 
-- **#15 before UI-2.** UI-2 rebuilds the Dashboard and History shell. Doing it before the match-metadata contract is fixed means building that shell twice — once for today's row shape, once for the Ranked/Custom, Single/Team, rank-bearing shape.
+- **#15 → #28-A → UI-2.** #15 supplies match / observation timestamps; #28-A settles catalog reconciliation and derived Season assignment; only then does UI-2 add Settings manual refresh and History Season state.
 - **#16 owns the data, #25 owns the charts.** #16 computes periods, rolling win rate, per-season rank/rating series, deltas and achievements. UI-3A / UI-3B render them. Neither implements the other's half.
-- **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
+- **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #13 has merged, so **PR #5 is the only unmerged generation** — and nothing new starts until it lands.
+At most two unmerged generations exist at a time (§4). PR #5 plus this docs-only Revision 4 work
+use both slots; nothing else starts until one lands.
 
 ## What is newly recorded and must not be lost
 
@@ -84,7 +88,8 @@ At most two unmerged generations exist at a time (§4). PR #13 has merged, so **
 | UI/UX polish — `Fluent shell × AC6 telemetry × Pachinko celebration`, Player vs Broadcast overlays | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | §57–§63 |
 | Tray / Launcher modernization — lifecycle change, last, own PR | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | §63 |
 | Self-build linkage — `self_build_id`, explicit selection, never inferred | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | §52 |
-| Seasonal rank / rating progression — per season, never carried forward, A/S not one scale | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §64 |
+| Seasonal rank / rating progression — per season, never carried forward, A/S not one scale | [#28-B](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §64 |
+| Season Catalog / Assignment — manual-first, retrospective, multi-season and transition-safe | [#28-A](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §65 |
 
 Four things in there are easy to erode and are the reason they are written down:
 
@@ -92,6 +97,7 @@ Four things in there are easy to erode and are the reason they are written down:
 - **A UI change may not cost game performance**, and UI polish is never a reason to touch Detector, ResultGate, WGC or process lifecycle.
 - **No framework migration as the opening move** of visual modernisation.
 - **The pre-S → S rating boundary is not one continuous line.** The ladder is `UNRANKED → … → A4 → S`, and the boundary is **pre-S / non-S (through A4) vs S** — A4 is on the pre-S side, so never write "below A" for it. The game presents rating differently on each side, so the obvious-looking single-line chart asserts a comparison the game does not support, and it fails silently. Rank/Rating recognition is event-driven, never a continuous OCR loop, and a failed read is recorded as a failed read — never as a rating change.
+- **Season synchronization is manual-first catalog reconciliation, not cadence inference.** Unknown and transition records stay unresolved; a long absence fetches every missing Season definition; failure keeps cached data and never affects result persistence.
 
 ## STOP conditions
 
