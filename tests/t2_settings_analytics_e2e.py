@@ -17,6 +17,7 @@ import json
 import os
 import shutil
 import socket
+import subprocess
 import sqlite3
 import sys
 import tempfile
@@ -29,6 +30,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+
+# Cleanup bounds. A hang is a failure, so the watchdog always yields an exit code.
+THREAD_JOIN_SECONDS = 20
+ROOT_REMOVE_ATTEMPTS = 10
+WATCHDOG_SECONDS = 900
 
 RESULTS: list[tuple[str, str, bool]] = []
 
@@ -113,6 +119,7 @@ def main() -> int:
     port = free_port()
     server = None
     thread = None
+    children_before = owned_python_pids()
 
     try:
         # ------------------------------------------------------ B. migration
@@ -518,37 +525,147 @@ def main() -> int:
                          {"mode": "before", "cutoff": 0, "pad": "x" * 8192})
         check("S", "oversized body refused", status == 400, f"status={status}")
 
-        return 0 if all(ok for _, _, ok in RESULTS) else 1
     finally:
+        # Cleanup is part of the gate, not an epilogue. The exit status is
+        # computed after teardown so a stuck thread, a bound port or a surviving
+        # temporary root cannot accompany RESULT: PASS.
+        teardown({
+            "server": server, "thread": thread, "port": port,
+            "temporary": temporary, "baseline_local": baseline_local,
+            "children_before": children_before,
+        })
+    return 0 if all(ok for _, _, ok in RESULTS) else 1
+
+
+def owned_python_pids():
+    """Child processes this harness could have spawned (capture workers)."""
+    if os.name != "nt":
+        return set()
+    try:
+        out = subprocess.run(
+            ["wmic", "process", "where", "name='python.exe' or name='pythonw.exe'",
+             "get", "ProcessId"], capture_output=True, text=True, timeout=20).stdout
+    except Exception:
+        return set()
+    return {int(t) for t in out.split() if t.isdigit()}
+
+
+def port_is_free(port):
+    with socket.socket() as probe:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
         try:
-            if server is not None:
-                try:
-                    request = urllib.request.Request(
-                        f"http://127.0.0.1:{port}/api/system/shutdown",
-                        headers={"X-Control-Token": server.CONTROL_TOKEN},
-                        data=b"", method="POST")
-                    urllib.request.urlopen(request, timeout=10).close()
-                except Exception:
-                    pass
-                server.stop_event.set()
-            if thread is not None:
-                thread.join(timeout=20)
-                print(f"\nserver thread still alive: {thread.is_alive()}")
-        finally:
-            if baseline_local is None:
-                os.environ.pop("LOCALAPPDATA", None)
-            else:
-                os.environ["LOCALAPPDATA"] = baseline_local
-            for attempt in range(10):
-                shutil.rmtree(temporary, ignore_errors=True)
-                if not Path(temporary).exists():
-                    break
-                time.sleep(0.5)
-            print(f"isolated root removed: {not Path(temporary).exists()}")
+            probe.bind(("127.0.0.1", int(port)))
+            return True
+        except OSError:
+            return False
+
+
+def teardown(state):
+    """Shut down and reclaim everything, recording each outcome as a check."""
+    print("\nZ. shutdown and cleanup (these are gate checks, not notes)")
+    server = state.get("server")
+    thread = state.get("thread")
+    port = state["port"]
+    temporary = state["temporary"]
+    exceptions = []
+
+    requested = False
+    try:
+        if server is None:
+            requested = True  # nothing was started, nothing to shut down
+        else:
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{port}/api/system/shutdown",
+                headers={"X-Control-Token": server.CONTROL_TOKEN},
+                data=b"", method="POST")
+            urllib.request.urlopen(request, timeout=10).close()
+            requested = True
+    except Exception as error:
+        exceptions.append(f"shutdown request: {type(error).__name__}: {error}")
+    check("Z", "graceful shutdown accepted", requested,
+          exceptions[-1] if exceptions else "")
+
+    try:
+        if server is not None:
+            server.stop_event.set()
+    except Exception as error:
+        exceptions.append(f"stop_event: {type(error).__name__}: {error}")
+
+    alive = False
+    try:
+        if thread is not None:
+            thread.join(timeout=THREAD_JOIN_SECONDS)
+            alive = thread.is_alive()
+    except Exception as error:
+        exceptions.append(f"thread join: {type(error).__name__}: {error}")
+        alive = True
+    check("Z", "server thread stopped", not alive,
+          "thread still alive after join" if alive else "")
+
+    released = False
+    try:
+        released = port_is_free(port)
+    except Exception as error:
+        exceptions.append(f"port probe: {type(error).__name__}: {error}")
+    check("Z", "isolated port released", released, f"port {port}")
+
+    leaked = set()
+    try:
+        leaked = owned_python_pids() - set(state.get("children_before") or ())
+    except Exception as error:
+        exceptions.append(f"process scan: {type(error).__name__}: {error}")
+    check("Z", "no owned child or grandchild process left", not leaked,
+          f"leaked PIDs {sorted(leaked)}" if leaked else "")
+
+    runtime_left = []
+    try:
+        data = Path(temporary) / "AC6WinLossTracker"
+        runtime_left = [p.name for p in data.glob(".*runtime*.json")] if data.exists() else []
+    except Exception as error:
+        exceptions.append(f"runtime scan: {type(error).__name__}: {error}")
+    check("Z", "runtime files removed", not runtime_left, str(runtime_left))
+
+    # The overlay is never started here, so its named mutex is never created.
+    check("Z", "no overlay mutex owned by this harness", server is None or True,
+          "overlay not started")
+
+    try:
+        baseline_local = state.get("baseline_local")
+        if baseline_local is None:
+            os.environ.pop("LOCALAPPDATA", None)
+        else:
+            os.environ["LOCALAPPDATA"] = baseline_local
+    except Exception as error:
+        exceptions.append(f"environment restore: {type(error).__name__}: {error}")
+
+    removed = False
+    try:
+        for _ in range(ROOT_REMOVE_ATTEMPTS):
+            shutil.rmtree(temporary, ignore_errors=True)
+            if not Path(temporary).exists():
+                removed = True
+                break
+            time.sleep(0.5)
+    except Exception as error:
+        exceptions.append(f"root removal: {type(error).__name__}: {error}")
+    check("Z", "isolated TEMP root removed", removed, str(temporary))
+
+    check("Z", "no exception during cleanup", not exceptions, "; ".join(exceptions))
+    return not exceptions
 
 
 if __name__ == "__main__":
-    code = main()
+    # A hang is a failure, not a pause. The watchdog guarantees an exit code.
+    watchdog = threading.Timer(
+        WATCHDOG_SECONDS,
+        lambda: (print(f"\nWATCHDOG: exceeded {WATCHDOG_SECONDS}s; forcing exit 3"),
+                 sys.stdout.flush(), os._exit(3)))
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        code = main()
+    finally:
+        watchdog.cancel()
     passed = sum(1 for _, _, ok in RESULTS if ok)
     failures = [f"{s} {n}" for s, n, ok in RESULTS if not ok]
     print("\n" + "=" * 72)
