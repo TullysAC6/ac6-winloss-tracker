@@ -78,7 +78,7 @@ exit 0
         try {
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
             $processResult = Invoke-InstallerChildProcess -Path $fakeInstallerPath -Mode Install `
-                -VerifiedReleaseTag 'v1.0.1'
+                -VerifiedReleaseTag 'v1.1.1'
             $stopwatch.Stop()
             if ($processResult -ne 0) { throw 'fake installer exit code was not propagated' }
             if (-not (Test-Path -LiteralPath $descendantPidPath -PathType Leaf)) {

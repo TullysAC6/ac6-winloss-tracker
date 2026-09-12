@@ -39,37 +39,6 @@ def _record(effect, status, **details):
         pass
 
 
-def _blocking_window(api, game_hwnd, client, allowed):
-    """Explain an already rejected capture; never changes the safety decision."""
-    from result_detector import RECT
-    found = {}
-    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-    def inspect(hwnd, _):
-        try:
-            if int(hwnd) == game_hwnd:
-                return False
-            if int(hwnd) in allowed or not api.user32.IsWindowVisible(hwnd) or api.user32.IsIconic(hwnd):
-                return True
-            rect = RECT()
-            if not api.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
-                return False
-            if (rect.left < client["left"] + client["width"] and rect.right > client["left"]
-                    and rect.top < client["top"] + client["height"] and rect.bottom > client["top"]):
-                process, _ = api.process_and_client(hwnd)
-                found.update(hwnd=int(hwnd), process=process,
-                             rect=[rect.left, rect.top, rect.right, rect.bottom])
-                return False
-            return True
-        except Exception:
-            return False
-    try:
-        api.user32.EnumWindows.argtypes = [callback_type, wintypes.LPARAM]
-        api.user32.EnumWindows(callback_type(inspect), 0)
-    except Exception:
-        pass
-    return found
-
-
 def desktop_directory():
     # Known Folder API follows OneDrive and user-redirected Desktop locations.
     folder_id = (ctypes.c_ubyte * 16).from_buffer_copy(
@@ -168,12 +137,12 @@ def _save_visible_effect(effect, game, allowed, deadline):
             reason = "target_changed"
         elif not all(api.user32.IsWindowVisible(hwnd) for hwnd in allowed):
             reason = "overlay_hidden"
-        elif not api.region_unobscured(target["hwnd"], client, allowed):
-            if int(api.user32.GetForegroundWindow() or 0) != target["hwnd"]:
-                reason = "not_foreground"
-            else:
-                reason = "occluded"
-                details["blocker"] = _blocking_window(api, target["hwnd"], client, allowed)
+        # Effect screenshots intentionally preserve the desktop composition the
+        # user sees over AC6. User-visible overlays and other windows are valid
+        # screenshot content; only foreground ownership remains mandatory here.
+        # Detector MSS fallback keeps its separate conservative occlusion gate.
+        elif int(api.user32.GetForegroundWindow() or 0) != target["hwnd"]:
+            reason = "not_foreground"
         if reason:
             _record(effect, "skipped", reason=reason, phase=phase, **details)
             return False

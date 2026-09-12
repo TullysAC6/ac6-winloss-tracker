@@ -31,6 +31,8 @@ CLEAR_HITS_REQUIRED = 3
 COOLDOWN_SECONDS = 5.0
 # Diagnostics only: bound how often an unchanged capture failure is logged.
 CAPTURE_GAP_LOG_SECONDS = 30.0
+# DwmGetWindowAttribute: a window DWM does not composite cannot cover anything.
+DWMWA_CLOAKED = 14
 
 
 class TemplateError(RuntimeError):
@@ -1024,6 +1026,11 @@ class WinApi:
 
         self.user32 = ctypes.windll.user32
         self.kernel32 = ctypes.windll.kernel32
+        # A private handle: setting argtypes here cannot disturb another caller.
+        self.dwmapi = ctypes.WinDLL("dwmapi")
+        self.dwmapi.DwmGetWindowAttribute.argtypes = [
+            wintypes.HWND, wintypes.DWORD, ctypes.c_void_p, wintypes.DWORD,
+        ]
 
         try:
             # Match the Overlay's physical per-monitor coordinates before MSS
@@ -1149,6 +1156,26 @@ class WinApi:
         # Ambiguous multiple game windows are not a safe capture target.
         return targets[0] if complete and len(targets) == 1 else None
 
+    def is_cloaked(self, hwnd):
+        """True when DWM does not composite this window, so it renders nothing.
+
+        IsWindowVisible() still reports True for cloaked windows - shell
+        helper islands, suspended UWP surfaces and windows on another virtual
+        desktop all keep WS_VISIBLE. Such a window is absent from the desktop
+        composition, so it cannot appear in a capture and cannot occlude the
+        game. Unknown answers fail closed: an un-queryable window is treated
+        as a real, painted one.
+        """
+        if os.name != "nt":
+            return False
+        state = wintypes.DWORD()
+        try:
+            failed = self.dwmapi.DwmGetWindowAttribute(
+                hwnd, DWMWA_CLOAKED, ctypes.byref(state), ctypes.sizeof(state))
+        except Exception:
+            return False
+        return False if failed else state.value != 0
+
     def region_unobscured(self, hwnd, region, allowed=()):
         """Conservative desktop fallback: reject any overlapping window above AC6."""
         if os.name != "nt" or int(self.user32.GetForegroundWindow() or 0) != hwnd:
@@ -1161,7 +1188,8 @@ class WinApi:
             if int(window) == hwnd:
                 clear = True
                 return False
-            if int(window) in allowed or not self.user32.IsWindowVisible(window) or self.user32.IsIconic(window):
+            if (int(window) in allowed or not self.user32.IsWindowVisible(window)
+                    or self.user32.IsIconic(window) or self.is_cloaked(window)):
                 return True
             rect = RECT()
             if not self.user32.GetWindowRect(window, ctypes.byref(rect)):

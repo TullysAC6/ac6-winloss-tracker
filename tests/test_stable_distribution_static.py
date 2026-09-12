@@ -16,9 +16,11 @@ for removed in (
 ):
     assert not (ROOT / removed).exists(), removed
 
-assert re.search(r'^VERSION\s*=\s*["\']1\.0\.1["\']$', version_source, re.MULTILINE)
+assert re.search(r'^VERSION\s*=\s*["\']1\.1\.1["\']$', version_source, re.MULTILINE)
 assert "$channel = 'stable'" in installer
-assert "$version = '1.0.1'" in installer
+assert "$SourceTag = 'v1.1.1'" in installer
+assert "$version = '1.1.1'" in installer
+assert "AC6-WinLoss-Tracker-Installer/1.1.1" in installer
 assert 'https://api.github.com/repos/$repository/commits/$SourceTag' in installer
 assert '^[0-9a-fA-F]{40}$' in installer
 assert 'archive/$resolvedCommit.zip' in installer
@@ -70,9 +72,9 @@ for status in (403, 429):
 assert "現在のTrackerは変更していません" in installer
 
 assert "Invoke-Expression" not in readme
-assert "refs/tags/v1.0.1/bootstrap.ps1" in readme
+assert "refs/tags/v1.1.1/bootstrap.ps1" in readme
 assert "Get-FileHash $p -Algorithm SHA256" in readme
-assert "39E7E8C54239F1FA61666FF4C9199AFF6BF86B5937C7F69C6B14EBBC59D1C9E8" in readme
+assert "C99A08AE973B745407A2FD2C6855F48DD0BCC9B498D34A7CEE84D7DF737F9158" in readme
 assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "install.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "uninstall.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
@@ -105,6 +107,7 @@ assert "name: Windows tests" in workflow
 
 bootstrap = (ROOT / "bootstrap.ps1").read_text(encoding="utf-8")
 assert "Invoke-Expression" not in bootstrap
+assert "AC6-WinLoss-Tracker-Bootstrap/1.1.1" in bootstrap
 assert "releases/latest" in bootstrap
 assert "prerelease" in bootstrap and "draft" in bootstrap
 assert "Get-FileHash" in bootstrap and "sha256:" in bootstrap

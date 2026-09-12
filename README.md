@@ -24,7 +24,7 @@ ARMORED CORE VIの対戦結果を画面から自動認識し、勝敗・勝率�
 3. Enterキーを押します。
 
 ```powershell
-$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.1/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '39E7E8C54239F1FA61666FF4C9199AFF6BF86B5937C7F69C6B14EBBC59D1C9E8'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p;$ec=$LASTEXITCODE;if($ec -ne 0){throw "Installer failed with exit code $ec"}}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}
+$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.1.1/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne 'C99A08AE973B745407A2FD2C6855F48DD0BCC9B498D34A7CEE84D7DF737F9158'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p;$ec=$LASTEXITCODE;if($ec -ne 0){throw "Installer failed with exit code $ec"}}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}
 ```
 
 - 管理者権限は不要です。
@@ -33,7 +33,7 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 - 更新も同じ1行を実行します。
 
 > [!NOTE]
-> 現在のv1.0.1では専用のPython仮想環境（venv）を使用していません。必要なPythonパッケージはユーザーのPython環境へインストールされるため、他のPythonアプリやスクリプトと依存関係が競合する可能性があります。既存のPython本体はインストール時もアンインストール時も削除しません。専用venvによる完全な環境分離は今後のバージョンで対応予定です。
+> 現在のv1.1.1では専用のPython仮想環境（venv）を使用していません。必要なPythonパッケージはユーザーのPython環境へインストールされるため、他のPythonアプリやスクリプトと依存関係が競合する可能性があります。既存のPython本体はインストール時もアンインストール時も削除しません。専用venvによる完全な環境分離は今後のバージョンで対応予定です。
 
 ## 使い方
 
@@ -124,7 +124,7 @@ Tracker起動中にショートカットをもう一度開き、「正常に起�
 - AC6が前面で演出バナーが表示された後、ゲームのクライアント領域に見えているゲーム・HUD・演出をPNGで保存します。50連勝は白／黒フラッシュの後に撮影します。
 - 保存先はWindowsのデスクトップです。OneDriveなどへ移動したデスクトップにも対応します。
 - ファイル名例: `AC6_2026-09-08_21-30-45_05-WIN-STREAK_<イベント識別子>.png`
-- Alt+Tab中、画面の一部が他アプリに覆われている場合、演出が画面キャプチャに映らない場合は保存を見送ります。プレビュー表示は保存対象外です。
+- AC6上でユーザーが実際に見ている合成画面を保存します。SteamP2PScanner、NVIDIA、Steam、Discord等のOverlay/windowが見えていても、重なりだけを理由に保存を拒否しません。ただしAC6が前面であること、対象ウィンドウとクライアント領域が撮影前後で一致すること、Tracker演出が表示され実ピクセルで確認できること等の安全条件を満たさない場合は保存を見送ります。プレビュー表示は保存対象外です。
 - 排他的フルスクリーンでは外部Overlayが表示／取得されない場合があります。その場合も演出を後付け合成せず保存を見送ります。ボーダーレスを使用してください。HDRなどで演出の色が変換される環境でも保存を見送る場合があります。
 - 保存失敗で勝敗カウントやOverlayは停止しません。保存中の強制終了ではデスクトップに`.AC6_...png.pending`が残る場合があります。完成したPNGではなく、削除して構いません。
 
@@ -157,7 +157,7 @@ http://127.0.0.1:8765/
 Windows PowerShellへ次の1行を貼り付けて実行します。
 
 ```powershell
-$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.0.1/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '39E7E8C54239F1FA61666FF4C9199AFF6BF86B5937C7F69C6B14EBBC59D1C9E8'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -Mode Uninstall;$ec=$LASTEXITCODE;if($ec -ne 0){throw "Installer failed with exit code $ec"}}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}
+$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.1.1/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne 'C99A08AE973B745407A2FD2C6855F48DD0BCC9B498D34A7CEE84D7DF737F9158'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -Mode Uninstall;$ec=$LASTEXITCODE;if($ec -ne 0){throw "Installer failed with exit code $ec"}}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}
 ```
 
 通常のアンインストールでは次のように処理します。
