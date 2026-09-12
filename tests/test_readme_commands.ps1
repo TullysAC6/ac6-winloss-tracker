@@ -24,8 +24,8 @@ function Assert-ReadmeCommand {
     if ($Command -match '^(?i)powershell(?:\.exe)?\s') {
         throw 'README command must run directly in the opened PowerShell session'
     }
-    if ($Command -notmatch "refs/tags/v1\.1\.0/bootstrap\.ps1") {
-        throw 'README command does not use the immutable v1.1.0 bootstrap'
+    if ($Command -notmatch "refs/tags/v1\.1\.1/bootstrap\.ps1") {
+        throw 'README command does not use the immutable v1.1.1 bootstrap'
     }
     if ($Command -notmatch [Regex]::Escape($expectedHash)) {
         throw 'README command does not contain the expected bootstrap SHA-256'
