@@ -16,7 +16,7 @@ for removed in (
 ):
     assert not (ROOT / removed).exists(), removed
 
-assert re.search(r'^VERSION\s*=\s*["\']1\.1\.0["\']$', version_source, re.MULTILINE)
+assert re.search(r'^VERSION\s*=\s*["\']1\.1\.1["\']$', version_source, re.MULTILINE)
 assert "$channel = 'stable'" in installer
 assert "$SourceTag = 'v1.1.1'" in installer
 assert "$version = '1.1.1'" in installer
@@ -74,7 +74,7 @@ assert "現在のTrackerは変更していません" in installer
 assert "Invoke-Expression" not in readme
 assert "refs/tags/v1.1.1/bootstrap.ps1" in readme
 assert "Get-FileHash $p -Algorithm SHA256" in readme
-assert "2FDE252FA841430C845681BB23860E2D365F8A575CB2ED39515AC5F9F2CB41B7" in readme
+assert "C99A08AE973B745407A2FD2C6855F48DD0BCC9B498D34A7CEE84D7DF737F9158" in readme
 assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "install.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
 assert (ROOT / "uninstall.ps1").read_bytes().startswith(b"\xef\xbb\xbf")

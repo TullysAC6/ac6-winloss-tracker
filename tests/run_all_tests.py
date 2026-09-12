@@ -35,6 +35,7 @@ files=[
     "test_overlay_static.py",
     "test_server_static.py",
     "test_stable_distribution_static.py",
+    "test_readme_bootstrap_hash.py",
     "test_startup_preflight.py",
     "../test_strict_clear_gate.py",
     "../test_game_overlay_static.py",
