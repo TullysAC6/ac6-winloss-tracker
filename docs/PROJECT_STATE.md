@@ -15,7 +15,7 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · r
 | Accepted runtime | `codex/wgc-rc-validation-20260908` at `93d5a57b88a86ec4b8846a3082089ed97f13a818`, shipped unchanged in v1.1.0 and v1.1.1 |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
-| Documentation generation | draft PR #13 on `coordination/project-management-20260909`; documentation only |
+| Documentation generation | PR #13 — **merged**. Master Requirements Revision 3 is canonical on `main` |
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 
@@ -96,9 +96,11 @@ Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISI
 
 ## Next actions
 
-1. Merge documentation PR #13, which carries Master Requirements Revision 3.
-2. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
-3. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+1. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
+2. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+3. Then #24, and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+
+**PR #5 is the only unmerged generation.** No new feature branch starts until it lands (§4).
 
 
 ### Order after PR #5

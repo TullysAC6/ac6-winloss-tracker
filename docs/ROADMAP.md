@@ -112,9 +112,10 @@ This is the **authoritative order**. The phase tables below describe *what* each
 section describes *when*. Where the two appear to disagree, this section wins and the table is
 corrected.
 
+Completed: **v1.1.1 released**, and **PR #13 merged**, which made Revision 3 canonical on `main`.
+From the current position:
+
 ```text
-v1.1.1 corrected release
-→ PR #13 merge                (documentation becomes canonical on main)
 → PR #5                       (#8 settings, #9 analytics)
 → #14                         fixture / replay harness
 → #24                         app-local Python environment

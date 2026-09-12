@@ -980,36 +980,40 @@ Destructive history actions:
 
 ## Current near-term release flow
 
-Updated 2026-09-12. This is §3 applied to the units currently in flight.
+Updated 2026-09-12. This is §3 applied to the unit currently in flight.
 
-**v1.1.0 is published but its release acceptance is BLOCKED.** The stable GitHub Release exists
-and `main` is at `f2f72a5`, but the immutable `v1.1.0` tag (`7a5959f`) still carries a README
-bootstrap hash calculated from a CRLF archive checkout instead of the public Git blob bytes. The
-tagged install command therefore fails closed with `bootstrap SHA-256 mismatch`. PR #23 corrected
-`main`, but a tag is immutable and a published Release cannot be returned to draft. Until a
-corrected immutable version exists, **`Released` is not claimed, and #7 and #4 stay open.**
+**Public stable is v1.1.1 — RELEASED.** Tag `v1.1.1` → `e0d8476`, runtime `93d5a57`.
+[#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
+[#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against it. The live
+position is [`docs/PROJECT_STATE.md`](PROJECT_STATE.md); check GitHub before trusting any SHA here.
 
-1. Publish a corrected immutable version (recommended `v1.1.1`) so the tagged tree and the
-   published README agree, then re-run the public-distribution smoke test in isolation
-2. Only then record `Released` and close [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7)
-   and [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4). Never move the `v1.1.0` tag
-3. Reconcile the Claude settings/analytics branch (draft PR #5) with the current `main` — merge
+The next product generation is **draft PR #5**:
+
+1. Reconcile the Claude settings/analytics branch (draft PR #5) with the current `main` — merge
    only, no reset, rebase or force-push — and confirm **T0-T2** are green on the reconciled branch
-4. PR handoff (§40) - take PR #5 out of draft
-5. Codex/Astra independent review and required fixes
-6. **Re-run the T0-T2 gates the fixes affect**
-7. **T3** real-AC6 acceptance
-8. Merge to `main`
-9. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and
+2. PR handoff (§40) - take PR #5 out of draft
+3. Codex/Astra independent review and required fixes
+4. **Re-run the T0-T2 gates the fixes affect**
+5. **T3** real-AC6 acceptance
+6. Merge to `main`
+7. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and
    worktree cut from the new `main`, and from there the dependency order recorded under
    **Sequencing** in `docs/ROADMAP.md`: #14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 →
    #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
-10. During review, Claude may implement only the next generation in a separate branch/worktree
+8. During review, Claude may implement only the next generation in a separate branch/worktree
 
 The release-diff review and the post-fix gate rerun must not be skipped: gate evidence produced
 before a rebase or before a review fix does not describe the code that would actually be merged.
-The v1.1.0 hash defect is the worked example — the mismatch was introduced between the reviewed
-content and the bytes the public actually fetches.
+
+**The v1.1.0 hash defect is the worked example, and it is history, not a current blocker.** v1.1.0
+was published and its runtime was accepted, but the README install one-liner inside the tag carried
+a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the Git blob bytes
+`raw.githubusercontent.com` serves, so the published command failed closed. A published tag and
+Release are treated as immutable here, so the tag was never moved; v1.1.1 superseded it with the
+same runtime and corrected distribution metadata. The lesson stands: the mismatch was introduced
+between the reviewed content and the bytes the public actually fetches, so a SHA-256 published in
+the README is computed from the committed Git blob and confirmed against the real public raw URL
+before it is written down. `tests/test_readme_bootstrap_hash.py` now enforces it.
 
 ## Phase 7A — Match Metadata Foundation
 - Ranked / Custom recognition
@@ -1118,7 +1122,9 @@ As of 2026-09-09:
 - PR #5 remains Draft and must not be merged before acceptance
 - Current RC remains pending real-AC6 acceptance
 
-These are a dated snapshot, not permanent product requirements.
+These are a dated snapshot, not permanent product requirements. Most of them are now closed:
+the coordination docs are canonical on `main`, the Project board exists, and the RC was accepted
+and released as v1.1.0 then v1.1.1. Draft PR #5 is the one item still open.
 
 The live version of this snapshot is [`docs/PROJECT_STATE.md`](PROJECT_STATE.md). When the two
 disagree, `PROJECT_STATE.md` is the newer one — this section records the position as of
