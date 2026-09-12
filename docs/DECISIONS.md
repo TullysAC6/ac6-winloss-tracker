@@ -474,13 +474,15 @@ Why not schedule it: it depends on match metadata ([#15](https://github.com/Tull
 
 ---
 
-## Seasonal rank progression, and the A/S discontinuity
+## Seasonal rank progression, and the pre-S / S discontinuity
 
-**Decision (2026-09-12): the user's own rank/rating progression is charted per season, and the below-A and S rating systems are never assumed to be one scale.**
+**Decision (2026-09-12): the user's own rank/rating progression is charted per season, and the pre-S and S rating systems are never assumed to be one scale.**
 
 Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §64. Issue: [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28).
 
-The game presents rating and progression differently below A than at S. So a single continuous line across the A→S boundary is not drawn without a justified basis, and where the two cannot be compared directly they get separate scales or separate presentations. `rating_mode` (name decided at implementation time) is the field that carries the distinction.
+The ladder is `UNRANKED → … → A4 → S`, and the boundary that matters is **pre-S / non-S (UNRANKED through A4) vs S** — **A4 sits on the pre-S side.** Do not write "below A" for that side; it reads as excluding the A band, which is wrong. Use `pre-S (through A4)` or `non-S progression`.
+
+The game presents rating and progression differently on the pre-S side than at S. So a single continuous line across the pre-S → S boundary (A4 → S) is not drawn without a justified basis, and where the two cannot be compared directly they get separate scales or separate presentations. `rating_mode` is the field that carries the distinction — conceptually `pre_s` and `s_rank`, with the actual spelling decided at implementation time.
 
 Why this is a decision and not an implementation detail: one continuous line is the obvious-looking chart, it is what a future session will reach for, and it asserts a comparison the game does not support. The failure is silent — the chart looks right and misstates the progression.
 
@@ -492,4 +494,4 @@ Three supporting rules:
 
 Gated on self-rank recognition being reliable first ([#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)). A progression chart on unreliable recognition is worse than no chart.
 
-Reaching S is an achievement, **not a feature unlock**: no Tracker capability depends on the user's rank. Ranks below A are in scope, because motivation is the purpose and the lower ladder is where it matters most.
+Reaching S is an achievement, **not a feature unlock**: no Tracker capability depends on the user's rank. Every pre-S rank is in scope, because motivation is the purpose and the lower ladder is where it matters most.

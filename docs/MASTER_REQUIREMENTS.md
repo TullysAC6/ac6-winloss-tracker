@@ -432,7 +432,7 @@ For TEAM:
 Missing rank information must be represented as unknown, not guessed.
 
 The user's own rank over time is a separate requirement: see §64, which also fixes the rule that the
-below-A and S rating systems are not assumed to share one scale.
+pre-S (UNRANKED through A4) and S rating systems are not assumed to share one scale.
 
 ---
 
@@ -2117,9 +2117,9 @@ daily / weekly / monthly, rolling win rate, rank-relative performance, opponent 
 full build, and improved matchup — following §44–§47.
 
 It also hosts the seasonal rank / rating progression from §64: a **season selector**, the
-Rank / Rating chart, and — where the below-A and S rating systems cannot be compared directly — a
-**separate scale or separate presentation** rather than one continuous line across the A→S
-boundary.
+Rank / Rating chart, and — where the pre-S (through A4) and S rating systems cannot be compared
+directly — a **separate scale or separate presentation** rather than one continuous line across the
+pre-S → S boundary.
 
 Charts only where something changes over time. A plain win rate does not need a pie chart (§51).
 
@@ -2265,27 +2265,35 @@ A progression chart built on unreliable recognition is worse than no chart: a re
 to the user as a rating drop. So this waits until self-rank acquisition is dependable, and then
 shows only what was actually observed.
 
-## The ladder
+## The ladder and the terminology
 
 ```text
-unranked → … → A4 → S
+UNRANKED → … → A4 → S
 ```
 
-**Everything below A is in scope**, not only the top of the ladder. The purpose of the feature is
+The boundary that matters is **pre-S / non-S (UNRANKED through A4) vs S**. **A4 is on the pre-S
+side**, together with every rank beneath it.
+
+**Do not write "below A" for the pre-S side.** It reads as excluding the A band, which is wrong —
+A1 through A4 are pre-S. Use `pre-S (through A4)`, `non-S progression`, or in Japanese
+`S未満（A4まで）`.
+
+**Every pre-S rank is in scope**, not only the top of the ladder. The purpose of the feature is
 motivation, and the lower ranks are where motivation matters most.
 
 Reaching S is an **Achievement** (§50), **not a feature unlock.** No Tracker capability becomes
 available or unavailable because of the user's rank.
 
-## The A/S discontinuity
+## The pre-S / S discontinuity
 
-The game presents rating and progression **differently below A than at S**. This constraint shapes
-the whole feature:
+The game presents rating and progression **differently on the pre-S side (through A4) than at S**.
+This constraint shapes the whole feature:
 
-- **Do not treat the two as one scale with one meaning.** A value below A and a value at S are not
+- **Do not treat the two as one scale with one meaning.** A pre-S value and an S value are not
   interchangeable merely because both are called a rating.
-- **Do not connect the A→S boundary as a single continuous rating line** without a justified basis.
-  Drawing one line across that boundary asserts a comparison the game does not support.
+- **Do not connect the pre-S → S boundary (A4 → S) as a single continuous rating line** without a
+  justified basis. Drawing one line across that boundary asserts a comparison the game does not
+  support.
 - Where the two cannot be compared directly, they get **separate scales or separate
   presentations** (§60, §64 presentation notes below).
 
@@ -2314,7 +2322,8 @@ Field names are decided at implementation time. This is the shape, not the schem
 season_id
 observed_at
 self_rank
-rating_mode          -- must distinguish the below-A and S presentation systems
+rating_mode          -- must distinguish the pre-S and S presentation systems,
+                     -- e.g. pre_s (UNRANKED through A4) and s_rank
 rating_value
 recognition_status
 recognition_version
@@ -2322,8 +2331,10 @@ source
 match_id             -- optional
 ```
 
-`rating_mode` is the field that carries the A/S distinction. Without it the two systems collapse
-into one column and any chart drawn from it silently misstates the progression.
+`rating_mode` is the field that carries the pre-S / S distinction — conceptually `pre_s` for
+UNRANKED through A4 and `s_rank` for S, with the actual spelling decided at implementation time.
+Without it the two systems collapse into one column and any chart drawn from it silently misstates
+the progression.
 
 ## Work split
 
@@ -2331,8 +2342,8 @@ This section is the requirement; the implementation lands in the issues that own
 
 | Layer | Issue | Items |
 |---|---|---|
-| Metadata foundation | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Season / Rating acquisition; persistence; distinguishing the below-A and S recognition systems |
+| Metadata foundation | [#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15) | Rank / Season / Rating acquisition; persistence; distinguishing the pre-S (through A4) and S recognition systems |
 | Growth analytics | [#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) | Per-season Rank / Rating progression; line chart; Current Rating; Season High / Low; selected-period delta; Rank transition markers; `S RANK REACHED` Achievement |
-| Presentation | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where below-A and S cannot be compared directly |
+| Presentation | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | Season selector on the Statistics page; Rank / Rating chart presentation; separate scale or separate presentation where pre-S and S cannot be compared directly |
 
 Sample-size and sparse-data honesty from §43 and §44 applies to every number this feature shows.
