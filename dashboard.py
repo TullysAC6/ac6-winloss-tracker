@@ -202,13 +202,23 @@ class HistoryFrame:
         for key, label, width in (("time", "Time", 220), ("result", "Result", 180), ("streak", "Streak", 140)):
             self.tree.heading(key, text=label)
             self.tree.column(key, width=width, anchor="center")
-        self.tree.pack(fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(self.frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.tree.pack(side="left", fill="both", expand=True)
+        self._matches = None
 
     def update(self, matches):
+        # Polling identical summaries must not rebuild rows/reset scrolling.
+        if matches == self._matches:
+            return
+        position = self.tree.yview()[0]
         self.tree.delete(*self.tree.get_children())
         for match in matches:
             stamp = datetime.fromtimestamp(float(match["created_at"])).strftime("%Y-%m-%d %H:%M:%S")
             self.tree.insert("", "end", values=(stamp, str(match["result"]).upper(), match["streak_after"]))
+        self._matches = [dict(match) for match in matches]
+        self.tree.yview_moveto(position)
 
 
 class DashboardApp:

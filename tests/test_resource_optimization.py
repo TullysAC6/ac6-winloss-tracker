@@ -156,7 +156,7 @@ with tempfile.TemporaryDirectory() as temporary:
         rows = [json.loads(line) for line in recorder.log_path.read_text(encoding="utf-8").splitlines()]
         assert len(rows) >= 5 and all(row["kind"] == "frame_context" for row in rows[-5:])
         recorder.buffer_frame(frame_state="NON_CLEAR", sample=99)
-        archive = recorder.export()
+        archive = recorder.export(destination_dir=temporary)
         with zipfile.ZipFile(archive) as bundle:
             assert "frame-buffer.jsonl" in bundle.namelist()
             buffered = bundle.read("frame-buffer.jsonl").decode("utf-8")
@@ -214,6 +214,7 @@ with tempfile.TemporaryDirectory() as temporary:
                         "win_rate": 0.0, "best_streak": 0}
 
             def recent_matches(self, limit):
+                assert limit == server.DASHBOARD_RECENT_MATCH_LIMIT == 50
                 self.calls += 1
                 return []
 

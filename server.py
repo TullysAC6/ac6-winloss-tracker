@@ -46,6 +46,7 @@ history_health = {"status": "starting", "error": None}
 history_event_ids = []
 dashboard_cache_lock = threading.Lock()
 dashboard_cache = None
+DASHBOARD_RECENT_MATCH_LIMIT = 50
 
 detector = None
 detector_lock = threading.Lock()
@@ -249,7 +250,7 @@ def _dashboard_summary_uncached():
         try:
             session_meta = store.session_metadata()
             lifetime = store.lifetime_summary()
-            recent = store.recent_matches(10)
+            recent = store.recent_matches(DASHBOARD_RECENT_MATCH_LIMIT)
             set_history_health("active")
             with history_lock:
                 health = dict(history_health)
@@ -326,6 +327,13 @@ def status_payload(s, milestone=None):
 
 
 def publish(event_type, payload, remember=True):
+    if event_type == "detector":
+        try:
+            RECORDER.record("detector_health", state=payload)
+            if payload.get("status") != "active":
+                RECORDER.flush_frame_context("capture_" + str(payload.get("status", "unknown")))
+        except Exception:
+            pass  # Optional diagnostics cannot prevent the health notification.
     return event_bus.publish(event_type, payload, remember=remember)
 
 
@@ -867,8 +875,10 @@ def main(on_ready=None):
     except Exception as e:
         history_failure("startup", e)
 
+    detector_thread = None
     try:
-        threading.Thread(target=detector_supervisor, daemon=True).start()
+        detector_thread = threading.Thread(target=detector_supervisor, daemon=True)
+        detector_thread.start()
         write_runtime_file(server.server_address[1])
         if on_ready is not None:
             on_ready()
@@ -883,6 +893,8 @@ def main(on_ready=None):
         pass
     finally:
         stop_event.set()
+        if detector_thread is not None:
+            detector_thread.join(timeout=4.0)
         with history_lock:
             store = history
         if store is not None:

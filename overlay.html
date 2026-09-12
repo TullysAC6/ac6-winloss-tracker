@@ -50,6 +50,9 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
   const milestone=document.getElementById("milestone");
   const milestoneInner=milestone.querySelector(".inner");
   let statsEnabled=true,latestStats=null,milestoneTimer=null;
+  const overlayStartedAt=Date.now(),effectTtlMs=3000;
+  const seenEffects=new Map();
+  let lastEffectCreatedAt=0;
 
   async function fetchConfig(){const r=await fetch("/config",{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);return await r.json()}
   function hideMilestone(){milestone.classList.remove("show");if(milestoneTimer){clearTimeout(milestoneTimer);milestoneTimer=null}}
@@ -64,13 +67,22 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
   function updateDetector(d){const bad=d.status==="error"||d.status==="degraded";detectorWarning.style.display=bad?"block":"none";if(bad)detectorWarning.textContent=d.status==="degraded"?"勝敗自動検出 要確認":"勝敗自動検出 停止"}
   function updateStatsHealth(d){const bad=d.status==="error";statsWarning.style.display=bad?"block":"none";if(bad){statsPanel.style.display="none";hideMilestone()}else if(statsEnabled&&latestStats){renderStats(latestStats)}}
   function handleJson(e,fn){try{fn(JSON.parse(e.data))}catch(err){console.error("[SSE]",err,e.data)}}
+  function handleEffect(p){
+    const created=p.created_at_ms,age=Date.now()-created;
+    if(p.effect!=="milestone"||typeof p.effect_id!=="string"||!p.effect_id||
+       !Number.isInteger(created)||created<overlayStartedAt||age<0||age>=effectTtlMs||
+       seenEffects.has(p.effect_id)||created<lastEffectCreatedAt)return;
+    for(const [id,stamp] of seenEffects)if(Date.now()-stamp>=effectTtlMs)seenEffects.delete(id);
+    seenEffects.set(p.effect_id,created);lastEffectCreatedAt=created;
+    flashMilestone(p.milestone);
+  }
 
   const es=new EventSource("/events");
   es.addEventListener("stats",e=>handleJson(e,updateStats));
   es.addEventListener("detector",e=>handleJson(e,updateDetector));
   es.addEventListener("stats_health",e=>handleJson(e,updateStatsHealth));
   es.addEventListener("config_health",e=>handleJson(e,d=>{const bad=d.status==="degraded";configWarning.style.display=bad?"block":"none";if(bad)configWarning.textContent="設定ファイル異常（前回正常値で継続）"}));
-  es.addEventListener("effect",e=>handleJson(e,p=>{if(p.effect==="milestone"&&(!p.created_at_ms||Date.now()-Number(p.created_at_ms)<3000))flashMilestone(p.milestone)}));
+  es.addEventListener("effect",e=>handleJson(e,handleEffect));
   es.onerror=e=>console.error("[SSE] reconnecting",e);
 })();
 </script>

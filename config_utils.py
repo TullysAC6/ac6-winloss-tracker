@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     "port": 8765,
     "stats_enabled": True,
     "result_detector_enabled": True,
+    "effect_screenshot_enabled": False,
 }
 
 
@@ -81,7 +82,7 @@ def validate_config(raw):
     if type(c["config_version"]) is not int or c["config_version"] != CONFIG_VERSION:
         raise ValueError(f"config_version: expected {CONFIG_VERSION}, got {c['config_version']}")
     c["port"] = _bounded("port", c["port"], 1024, 65535, int)
-    for k in ("stats_enabled", "result_detector_enabled"):
+    for k in ("stats_enabled", "result_detector_enabled", "effect_screenshot_enabled"):
         if type(c[k]) is not bool:
             raise ValueError(f"{k}: must be true or false")
     return c

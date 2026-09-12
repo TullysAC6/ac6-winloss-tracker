@@ -31,6 +31,9 @@ from pathlib import Path
 from typing import Any
 
 from app_paths import data_dir
+from config_utils import load_config
+from effect_screenshot import EffectScreenshots
+from event_bus import EFFECT_TTL_MS
 
 ROOT = data_dir()
 STATS_PATH = ROOT / "stats.json"
@@ -424,10 +427,12 @@ class GameOverlay:
         self._sse_connected = threading.Event()
         self._next_stats_fallback_at = time.monotonic() + STATS_FALLBACK_SECONDS
         self._effect_ids: set[str] = set()
+        self._last_effect_created_at = 0
         self._active_effect: dict[str, Any] | None = None
         self._effect_visible = False
         self._effect_stop = threading.Event()
         self._effect_thread_started = False
+        self._screenshots = EffectScreenshots()
 
         self.last_stats: dict[str, Any] = {
             "wins": 0,
@@ -758,9 +763,12 @@ class GameOverlay:
             payload.get("effect") == "milestone"
             and effect_id
             and effect_id not in self._effect_ids
-            and created >= int(self._overlay_started_at * 1000) - 2000
+            and created >= int(self._overlay_started_at * 1000)
+            and 0 <= time.time() * 1000 - created < EFFECT_TTL_MS
+            and created >= getattr(self, "_last_effect_created_at", 0)
         ):
             self._effect_ids.add(effect_id)
+            self._last_effect_created_at = created
             self._effect_queue.put(payload)
 
     def _start_effect_listener(self, port: int) -> None:
@@ -870,6 +878,8 @@ class GameOverlay:
         try:
             while True:
                 payload = self._effect_queue.get_nowait()
+                if not 0 <= time.time() * 1000 - int(payload["created_at_ms"]) < EFFECT_TTL_MS:
+                    continue
                 if self._active_effect is not None:
                     self._finish_effect()
                 self._active_effect = {
@@ -878,6 +888,7 @@ class GameOverlay:
                     "started": time.monotonic(),
                     "duration": 6.0 if int(payload["milestone"]) == 50 else 3.5,
                     "render_key": None,
+                    "created_at_ms": int(payload["created_at_ms"]),
                 }
         except queue.Empty:
             pass
@@ -933,6 +944,18 @@ class GameOverlay:
                 self._hide_effect()
             self._hide()
 
+        try:
+            self._screenshots.tick(
+                self._active_effect if self._effect_visible else None, game,
+                # A 0% panel is intentionally hidden; text and the actual
+                # effect remain mandatory visible windows for capture.
+                ((self.panel_hwnd,) if self.panel_opacity > 0 else ())
+                + (self.text_hwnd, self.effect_hwnd),
+                load_config().get("effect_screenshot_enabled", False),
+            )
+        except Exception as error:
+            print(f"[screenshot] optional capture failed: {type(error).__name__}: {error}")
+
         if self.debug:
             now = time.monotonic()
             if now - self._last_debug_at >= 1.0:
@@ -960,6 +983,10 @@ class GameOverlay:
             self.root.mainloop()
         finally:
             self._effect_stop.set()
+            try:
+                self._screenshots.close()
+            except Exception as error:
+                print(f"[screenshot] cleanup failed: {error}")
             if not self._closing:
                 self._finish_effect()
 
