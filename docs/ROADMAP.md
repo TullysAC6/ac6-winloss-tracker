@@ -12,7 +12,7 @@ Status vocabulary:
 |---|---|
 | **DONE** | Shipped in the current public stable release and in use |
 | **IN PROGRESS** | Being worked on right now |
-| **ACCEPTED** | Automated/review/required real-session acceptance complete; release publication pending |
+| **ACCEPTED** | Automated/review/required real-session acceptance complete; released in v1.1.1 |
 | **ACCEPTANCE PENDING** | Code exists, CI green, **not released and not confirmed in a real session** |
 | **PLANNED** | Agreed direction, scheduled after the current phases |
 | **BACKLOG** | Agreed direction, not scheduled, no design yet |
@@ -127,7 +127,7 @@ shipped application feature.
 | Dashboard | DONE | |
 | Game overlay | DONE | |
 | OBS browser-source overlay | DONE | `http://127.0.0.1:8765/` |
-| Dashboard history 10 → 50 rows, scrolling, no redundant repaint | ACCEPTED | Accepted on RC `93d5a57`; v1.1.0 publication pending |
+| Dashboard history 10 → 50 rows, scrolling, no redundant repaint | **DONE** | Accepted on RC `93d5a57`; released in v1.1.1 |
 
 ## Phase 3 — Distribution / release safety
 
@@ -141,8 +141,8 @@ shipped application feature.
 | Abnormal-termination recovery | DONE | Overlay exits by itself when the server dies; a stale `.runtime.json` neither blocks nor hijacks the next start |
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
-| Isolated install / update / rollback / uninstall flow test | ACCEPTED | Accepted on the RC; runs in CI; v1.1.0 publication pending |
-| Dedicated venv isolation | DEFERRED | v1.1.0 installs into the user's Python environment. Recorded in README as a future version |
+| Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
+| Dedicated venv isolation | DEFERRED | v1.1.1 installs into the user's Python environment. Recorded in README as a future version |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -150,17 +150,17 @@ Everything in this phase is the current RC. See [#7](https://github.com/TullysAC
 
 | Item | Status | Notes |
 |---|---|---|
-| Windows Graphics Capture path | ACCEPTED | Detection continues while AC6 is not foreground; v1.1.0 publication pending |
-| Guarded desktop-capture fallback (MSS) | ACCEPTED | Only with AC6 foreground, identical identity/geometry before and after, and nothing overlapping the ROI |
-| Alt+Tab continuity | ACCEPTED | Existing real recovery evidence plus targeted automation |
-| Stale-frame safety | ACCEPTED | Unique native presentation times; a repeated or old frame cannot confirm |
-| Capture-stall recovery | ACCEPTED | Request timeout, worker restart with backoff |
-| Client-rect change handling | ACCEPTED | Unknown geometry fails closed |
+| Windows Graphics Capture path | **DONE** | Detection continues while AC6 is not foreground; released in v1.1.1 |
+| Guarded desktop-capture fallback (MSS) | **DONE** | Only with AC6 foreground, identical identity/geometry before and after, and nothing overlapping the ROI |
+| Alt+Tab continuity | **DONE** | Existing real recovery evidence plus targeted automation |
+| Stale-frame safety | **DONE** | Unique native presentation times; a repeated or old frame cannot confirm |
+| Capture-stall recovery | **DONE** | Request timeout, worker restart with backoff |
+| Client-rect change handling | **DONE** | Unknown geometry fails closed |
 | Milestone effects 5 / 10 / 15 / 20 | DONE | Released in v1.0.1 |
 | Milestone effects 30 / 35 / 40 / 45 | DONE | Released in v1.0.1 |
 | Milestone effect 50 | DONE | Released in v1.0.1 |
-| SSE effect replay / recent effect | ACCEPTED | Fix for [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4); v1.1.0 publication pending |
-| Effect screenshot | ACCEPTED | Focused real-AC6 T3 PASS on RC `93d5a57`; visible user overlays are part of the captured composition |
+| SSE effect replay / recent effect | **DONE** | Fix for [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4); released in v1.1.1 |
+| Effect screenshot | **DONE** | Focused real-AC6 T3 PASS on RC `93d5a57`; visible user overlays are part of the captured composition |
 
 ## Phase 5 — Settings
 
@@ -168,8 +168,8 @@ Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8).
 
 | Item | Status | Notes |
 |---|---|---|
-| Screenshot ON / OFF (`effect_screenshot_enabled`) | ACCEPTED | Config key and launcher settings entry accepted on the RC; v1.1.0 publication pending |
-| Check for a new version | ACCEPTED | Metadata-only check introduced on the RC; v1.1.0 publication pending. Draft PR #5 extensions are not included |
+| Screenshot ON / OFF (`effect_screenshot_enabled`) | **DONE** | Config key and launcher settings entry accepted on the RC; released in v1.1.1 |
+| Check for a new version | **DONE** | Metadata-only check introduced on the RC; released in v1.1.1. Draft PR #5 extensions are not included |
 | Milestone effect ON / OFF (`effect_enabled`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Session / lifetime display switch (`overlay_stats_scope`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Reset all win/loss history | ACCEPTANCE PENDING | Draft PR #5 |
