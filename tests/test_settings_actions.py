@@ -625,11 +625,71 @@ class StoppedTrackerTests(unittest.TestCase):
 
 
 class DiagnosticReportTests(unittest.TestCase):
+    """Every artifact these tests create or delete stays inside an owned root.
+
+    Patching ``diagnostics.Path.home`` is not enough on Windows: the exporter
+    resolves the Desktop through ``effect_screenshot.desktop_directory()``,
+    which calls ``SHGetKnownFolderPath`` and therefore ignores both that patch
+    and ``LOCALAPPDATA``. Independent review traced that these tests could write
+    and then unlink a diagnostics ZIP on the user's real Desktop. So the real
+    lookup itself is redirected here, and the data root is owned per test rather
+    than inherited from the runner.
+    """
+
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
+        self.directory = tempfile.TemporaryDirectory(prefix="ac6-diagnostics-")
         self.addCleanup(self.directory.cleanup)
-        self.home = Path(self.directory.name) / "home"  # No Desktop: falls back to data_dir.
+        self.owned = Path(self.directory.name)
+        self.home = self.owned / "home"
         self.home.mkdir()
+        self.desktop = self.owned / "desktop"
+        self.desktop.mkdir()
+
+        # Import before redirecting the environment. diagnostics builds its
+        # module-level RECORDER singleton at import time, so importing it under
+        # a patched LOCALAPPDATA would permanently root that singleton inside
+        # this test's temporary directory and break every later suite that
+        # reads server.RECORDER.
+        import diagnostics
+        import effect_screenshot
+        from app_paths import data_dir
+
+        # Own the data root, so the evidence fixtures below cannot overwrite or
+        # delete a real installed-version.json or startup.log.
+        self.local_app_data = self.owned / "localappdata"
+        (self.local_app_data / "AC6WinLossTracker").mkdir(parents=True)
+        environment = patch.dict(os.environ,
+                                 {"LOCALAPPDATA": str(self.local_app_data)})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+        self.data_root = data_dir()
+        self.assertTrue(self._is_owned(self.data_root),
+                        f"data root escaped the owned tree: {self.data_root}")
+
+        recorder = patch.object(diagnostics, "RECORDER",
+                                diagnostics.DiagnosticRecorder())
+        recorder.start()
+        self.addCleanup(recorder.stop)
+
+        # The real Windows Desktop lookup, redirected. Patching Path.home alone
+        # leaves SHGetKnownFolderPath pointing at the user's actual Desktop.
+        desktop = patch.object(effect_screenshot, "desktop_directory",
+                               return_value=self.desktop)
+        desktop.start()
+        self.addCleanup(desktop.stop)
+        home = patch.object(diagnostics.Path, "home", return_value=self.home)
+        home.start()
+        self.addCleanup(home.stop)
+
+    def _is_owned(self, path):
+        resolved = Path(path).resolve()
+        owned = self.owned.resolve()
+        return resolved == owned or owned in resolved.parents
+
+    def assert_owned(self, path, what="artifact"):
+        self.assertTrue(self._is_owned(path),
+                        f"{what} escaped the owned test root: {path}")
 
     def test_reuses_the_existing_recorder_export(self):
         import diagnostics
@@ -641,10 +701,12 @@ class DiagnosticReportTests(unittest.TestCase):
     def test_real_export_contains_only_documented_content(self):
         import diagnostics
         diagnostics.RECORDER.record("selftest", note="unit")
-        with patch.object(diagnostics.Path, "home", return_value=self.home), \
-             patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
+        with patch("subprocess.Popen", side_effect=AssertionError("unexpected spawn")):
             report = settings.create_diagnostic_report()
-        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        self.assert_owned(report, "diagnostics ZIP")
+        self.assertEqual(report.parent.resolve(), self.desktop.resolve(),
+                         "the export must land in the redirected Desktop, "
+                         "not wherever SHGetKnownFolderPath points")
         self.assertTrue(report.exists())
         self.assertTrue(report.name.startswith("AC6-Tracker-Diagnostics-"))
         with zipfile.ZipFile(report) as archive:
@@ -662,10 +724,8 @@ class DiagnosticReportTests(unittest.TestCase):
         self.assertIn("フルスクリーン画像", settings.DIAGNOSTIC_PRIVACY)
 
     def test_every_runtime_dependency_is_reported(self):
-        import diagnostics
-        with patch.object(diagnostics.Path, "home", return_value=self.home):
-            report = settings.create_diagnostic_report()
-        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        report = settings.create_diagnostic_report()
+        self.assert_owned(report, "diagnostics ZIP")
         with zipfile.ZipFile(report) as archive:
             manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
         # A missing capture/classifier package is the first thing to rule out.
@@ -682,8 +742,15 @@ class DiagnosticReportTests(unittest.TestCase):
 
     def test_install_and_startup_evidence_is_included(self):
         import diagnostics
-        from app_paths import data_dir
-        root = data_dir()
+        # The data root is owned by setUp, so these fixtures create files rather
+        # than overwriting a real installed-version.json or startup.log. An
+        # earlier revision wrote into the live root and unlinked afterwards,
+        # which destroyed a real startup log.
+        root = self.data_root
+        self.assert_owned(root, "data root")
+        for name in ("installed-version.json", "startup.log"):
+            self.assertFalse((root / name).exists(),
+                             f"{name} must not already exist in an owned root")
         (root / "installed-version.json").write_text(
             json.dumps({"channel": "stable", "version": "1.0.1",
                         "resolved_commit": "a" * 40, "python_role": "preferred"}),
@@ -691,11 +758,8 @@ class DiagnosticReportTests(unittest.TestCase):
         (root / "startup.log").write_text("launch line\n", encoding="utf-8")
         (diagnostics.RECORDER.root / "effect-screenshot.jsonl").write_text(
             '{"status":"saved"}\n', encoding="utf-8")
-        self.addCleanup(lambda: (root / "installed-version.json").unlink(missing_ok=True))
-        self.addCleanup(lambda: (root / "startup.log").unlink(missing_ok=True))
-        with patch.object(diagnostics.Path, "home", return_value=self.home):
-            report = settings.create_diagnostic_report()
-        self.addCleanup(lambda: report.unlink(missing_ok=True))
+        report = settings.create_diagnostic_report()
+        self.assert_owned(report, "diagnostics ZIP")
         with zipfile.ZipFile(report) as archive:
             names = archive.namelist()
         for expected in ("installed-version.json", "startup.log", "effect-screenshot.jsonl"):
@@ -713,13 +777,11 @@ class DiagnosticReportTests(unittest.TestCase):
                 settings.create_diagnostic_report()
 
     def test_export_still_works_when_no_tracker_is_running(self):
-        import diagnostics
         with tempfile.TemporaryDirectory() as name:
             with patch.object(config_utils, "CONFIG_PATH", Path(name) / "config.json"):
                 self.assertIsNone(settings.flush_live_diagnostics())
-                with patch.object(diagnostics.Path, "home", return_value=self.home):
-                    report = settings.create_diagnostic_report()
-        self.addCleanup(lambda: report.unlink(missing_ok=True))
+                report = settings.create_diagnostic_report()
+        self.assert_owned(report, "diagnostics ZIP")
         self.assertTrue(report.exists())
 
 
