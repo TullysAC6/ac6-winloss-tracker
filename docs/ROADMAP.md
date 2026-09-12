@@ -12,7 +12,7 @@ Status vocabulary:
 |---|---|
 | **DONE** | Shipped in the current public stable release and in use |
 | **IN PROGRESS** | Being worked on right now |
-| **ACCEPTED** | Automated/review/required real-session acceptance complete. Published in the v1.1.0 Release, but formal release acceptance is still blocked — see the status note below |
+| **ACCEPTED** | Automated/review/required real-session acceptance complete; released in v1.1.1 |
 | **ACCEPTANCE PENDING** | Code exists, CI green, **not released and not confirmed in a real session** |
 | **PLANNED** | Agreed direction, scheduled after the current phases |
 | **BACKLOG** | Agreed direction, not scheduled, no design yet |
@@ -21,25 +21,21 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
-## v1.1.0 status note — 2026-09-12
+## Release status note — 2026-09-12
 
-The v1.1.0 GitHub Release is **published**, and `main` is at `f2f72a5`. Release acceptance is
-nevertheless **BLOCKED**: the immutable `v1.1.0` tag (`7a5959f`) carries a README bootstrap hash
-taken from a CRLF archive checkout rather than the public Git blob bytes, so the tagged install
-command fails closed with `bootstrap SHA-256 mismatch`. PR #23 corrected `main`, but a tag is
-immutable and a published Release cannot be returned to draft.
+Public stable is **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d8476`.
 
-Therefore, in the tables below:
+**v1.1.0 is superseded.** It was published and its runtime was accepted, including a real-AC6 T3,
+but its formal release acceptance was never completed: the README install one-liner inside the tag
+carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the Git blob
+bytes `raw.githubusercontent.com` serves, so the published command failed closed. The tag was not
+moved and the Release was not edited. v1.1.1 ships the same accepted runtime with corrected
+immutable distribution metadata.
 
-- `ACCEPTED` items shipped in the v1.1.0 Release. Their code is public and in use.
-- **`DONE` is still reserved for v1.0.1 plus anything a corrected, fully accepted release covers.**
-  No item is promoted to `DONE` on the strength of v1.1.0 alone.
-- [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
-  [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) stay open until a corrected
-  immutable version (recommended `v1.1.1`) is published and verified. The `v1.1.0` tag is never
-  moved.
-
----
+Therefore, in the tables below, `DONE` means shipped in v1.1.1 and in use.
+[#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
+[#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against v1.1.1. Neither
+the `v1.1.0` nor the `v1.1.1` tag is ever moved.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -211,7 +207,7 @@ shipped application feature.
 | Dashboard | DONE | |
 | Game overlay | DONE | |
 | OBS browser-source overlay | DONE | `http://127.0.0.1:8765/` |
-| Dashboard history 10 → 50 rows, scrolling, no redundant repaint | ACCEPTED | Accepted on RC `93d5a57`; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
+| Dashboard history 10 → 50 rows, scrolling, no redundant repaint | **DONE** | Accepted on RC `93d5a57`; released in v1.1.1 |
 
 ## Phase 3 — Distribution / release safety
 
@@ -225,8 +221,8 @@ shipped application feature.
 | Abnormal-termination recovery | DONE | Overlay exits by itself when the server dies; a stale `.runtime.json` neither blocks nor hijacks the next start |
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
-| Isolated install / update / rollback / uninstall flow test | ACCEPTED | Accepted on the RC; runs in CI; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
-| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Scheduled after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). v1.1.0 still installs into the user's shared Python environment |
+| Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
+| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Scheduled after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). v1.1.1 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -234,17 +230,17 @@ Everything in this phase is the current RC. See [#7](https://github.com/TullysAC
 
 | Item | Status | Notes |
 |---|---|---|
-| Windows Graphics Capture path | ACCEPTED | Detection continues while AC6 is not foreground; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
-| Guarded desktop-capture fallback (MSS) | ACCEPTED | Only with AC6 foreground, identical identity/geometry before and after, and nothing overlapping the ROI |
-| Alt+Tab continuity | ACCEPTED | Existing real recovery evidence plus targeted automation |
-| Stale-frame safety | ACCEPTED | Unique native presentation times; a repeated or old frame cannot confirm |
-| Capture-stall recovery | ACCEPTED | Request timeout, worker restart with backoff |
-| Client-rect change handling | ACCEPTED | Unknown geometry fails closed |
+| Windows Graphics Capture path | **DONE** | Detection continues while AC6 is not foreground; released in v1.1.1 |
+| Guarded desktop-capture fallback (MSS) | **DONE** | Only with AC6 foreground, identical identity/geometry before and after, and nothing overlapping the ROI |
+| Alt+Tab continuity | **DONE** | Existing real recovery evidence plus targeted automation |
+| Stale-frame safety | **DONE** | Unique native presentation times; a repeated or old frame cannot confirm |
+| Capture-stall recovery | **DONE** | Request timeout, worker restart with backoff |
+| Client-rect change handling | **DONE** | Unknown geometry fails closed |
 | Milestone effects 5 / 10 / 15 / 20 | DONE | Released in v1.0.1 |
 | Milestone effects 30 / 35 / 40 / 45 | DONE | Released in v1.0.1 |
 | Milestone effect 50 | DONE | Released in v1.0.1 |
-| SSE effect replay / recent effect | ACCEPTED | Fix for [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4); shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
-| Effect screenshot | ACCEPTED | Focused real-AC6 T3 PASS on RC `93d5a57`; visible user overlays are part of the captured composition |
+| SSE effect replay / recent effect | **DONE** | Fix for [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4); released in v1.1.1 |
+| Effect screenshot | **DONE** | Focused real-AC6 T3 PASS on RC `93d5a57`; visible user overlays are part of the captured composition |
 
 ## Phase 5 — Settings
 
@@ -252,8 +248,8 @@ Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8).
 
 | Item | Status | Notes |
 |---|---|---|
-| Screenshot ON / OFF (`effect_screenshot_enabled`) | ACCEPTED | Config key and launcher settings entry accepted on the RC; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version |
-| Check for a new version | ACCEPTED | Metadata-only check introduced on the RC; shipped in the v1.1.0 Release; release acceptance blocked pending a corrected immutable version. Draft PR #5 extensions are not included |
+| Screenshot ON / OFF (`effect_screenshot_enabled`) | **DONE** | Config key and launcher settings entry accepted on the RC; released in v1.1.1 |
+| Check for a new version | **DONE** | Metadata-only check introduced on the RC; released in v1.1.1. Draft PR #5 extensions are not included |
 | Milestone effect ON / OFF (`effect_enabled`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Session / lifetime display switch (`overlay_stats_scope`) | ACCEPTANCE PENDING | Draft PR #5 |
 | Reset all win/loss history | ACCEPTANCE PENDING | Draft PR #5 |

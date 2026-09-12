@@ -2,69 +2,83 @@
 
 Last updated: 2026-09-12 JST
 
-Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · handover: [NEXT_SESSION.md](NEXT_SESSION.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
-`Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file. This snapshot was produced by reading GitHub, not chat history.
+`Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current position
+## Position
 
 | Item | State |
 |---|---|
-| `main` | `f2f72a5` — "Merge pull request #23 from TullysAC6/hotfix/readme-bootstrap-hash-v1.1.0" |
-| Latest GitHub Release | **v1.1.0**, published 2026-09-11, tag `v1.1.0` → `7a5959f` |
-| Previous releases | v1.0.1 → `54ba0d8`; v1.0.0 |
-| Release acceptance | **BLOCKED** — see below. `Released` is *not* recorded for v1.1.0 |
-| Canonical requirements | Revision 3 (2026-09-12) |
-| Open generation A | draft PR #5 on `claude/settings-analytics-20260909` — 6 commits ahead of `main`, **17 commits behind** |
-| Open generation B | draft PR #13 on `coordination/project-management-20260909` — documentation only |
+| Public stable | **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33` |
+| `main` | `e0d8476` |
+| Accepted runtime | `codex/wgc-rc-validation-20260908` at `93d5a57b88a86ec4b8846a3082089ed97f13a818`, shipped unchanged in v1.1.0 and v1.1.1 |
+| Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
+| Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
+| Documentation generation | draft PR #13 on `coordination/project-management-20260909`; documentation only |
 
-Merged since the last snapshot: PR #19 (screenshot occlusion), PR #20 (visible overlays in effect screenshots), PR #21 (v1.1.0 release preparation), PR #22 (RC → `main`), PR #23 (bootstrap hash hotfix).
+## Release history and the v1.1.0 → v1.1.1 distinction
 
-## v1.1.0 — published, but acceptance is blocked
+This distinction must not be collapsed, because both releases carry the same runtime.
 
-The stable GitHub Release exists and the code is public and in use. Formal release acceptance is nevertheless **blocked**, and this distinction must not be collapsed.
+**v1.1.0** — runtime was accepted, including a real-AC6 T3, and it was published. Its **formal release acceptance was never completed**: post-release verification found that the README install one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes (`435F7755…`, 8814 bytes) instead of the Git blob bytes `raw.githubusercontent.com` serves (`2FDE252F…`, 8619 bytes), so the published command failed closed with `bootstrap SHA-256 mismatch`. A published tag and Release are treated as immutable here, so the tag was not moved and the Release was not edited. Superseded by v1.1.1.
 
-Post-release verification found that the README integrity hash had been calculated from a Windows CRLF archive checkout (`435F7755…`) instead of the public Git blob bytes returned by `raw.githubusercontent.com` (`2FDE252F…`). The install command in the tagged README therefore stops safely, before execution, with `bootstrap SHA-256 mismatch`.
+**v1.1.1** — the same accepted runtime plus corrected immutable distribution metadata. `git diff --stat v1.1.0 v1.1.1` touches only version metadata, the README one-liners, release notes and tests; no runtime, gameplay, dependency, schema or install-strategy change.
+
+## v1.1.1 published integrity
 
 | | |
 |---|---|
-| Immutable annotated tag | `v1.1.0` → `7a5959fe4b18c6b2cf74f26c239c1463a9feac12` — not moved, deleted or overwritten |
-| Release draft conversion | Refused by GitHub (HTTP 422); a published Release is immutable |
-| Corrective PR | #23, merged to `main` as `f2f72a5c2e004f01bdd53009d230a4be88955dea` |
-| Correct public bootstrap SHA-256 | `2FDE252FA841430C845681BB23860E2D365F8A575CB2ED39515AC5F9F2CB41B7` |
-| PR #23 CI | PASS on Python 3.12 / 3.13 / 3.14 plus the aggregate job |
-| Post-correction distribution smoke | PASS — latest install and fixed-tag uninstall through metadata, GitHub digest, checksum and syntax validation, with child execution stubbed so user data and the live tracker were untouched |
+| Tag object | `7bf2a866646f46ad6e3804cdbb9229dc305be4e1` (annotated) → peeled commit `e0d84768dd739118f4bb9183af3d111041bddf33` |
+| `bootstrap.ps1` blob | `0960b5ea9764c1c30328db9278a887869e3cb7fd` |
+| Git blob SHA-256 | `C99A08AE973B745407A2FD2C6855F48DD0BCC9B498D34A7CEE84D7DF737F9158` (8619 bytes) |
+| Public raw SHA-256 at `refs/tags/v1.1.1` | identical |
+| README literal inside the tag (×2) | identical |
+| `install.ps1` asset | `f7e6a32eb2628c468c04b69d85d99204438e35f47cdb8ec8f5be1eeea03cadb5`, 57356 bytes |
+| `uninstall.ps1` asset | `f971c45ae8735b7040a89264f1379dda7c1d98f9402a4881434b2166917e2a00`, 8831 bytes |
 
-Because the immutable `v1.1.0` tag still contains the historical README hash mismatch, a follow-up immutable version (recommended `v1.1.1`) is required to satisfy the tagged-tree invariant. Until then:
+Both `.sha256` sidecars match their asset, and all four match the digests GitHub reports. Assets were generated by `scripts/prepare-release-assets.ps1` from a clean checkout of the `v1.1.1` tag and are byte-identical to the tagged tree as checked out on Windows — the CRLF form of the tagged blobs, which is the convention every prior release used. `bootstrap.ps1` verifies the installer against GitHub's asset digest, so the asset chain is self-consistent regardless of line-ending form.
 
-- **Do not record `Released`** in this file or in `NEXT_SESSION.md`.
-- **Do not close** [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) or [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4).
-- **Never move the `v1.1.0` tag.**
+The rule this encodes: **the SHA-256 published in the README is the hash of the committed Git blob, never of a working-tree file.** `tests/test_readme_bootstrap_hash.py` now enforces it and fails on the v1.1.0 defect.
 
-## Implemented and shipped in v1.1.0
+## Implemented and released
 
 - Windows Graphics Capture for result recognition, with a guarded foreground desktop fallback.
-- Continued recognition and recovery around Alt+Tab and capture interruption.
-- Exactly-once fresh milestone effect recovery across an SSE reconnect ([#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4)).
+- Continued recognition and recovery around Alt+Tab/capture interruption.
+- Exactly-once fresh milestone effect recovery across an SSE reconnect (#4).
 - Dashboard history expanded to the latest 50 rows with scrolling.
 - Optional milestone Effect Screenshot and its settings GUI.
-- Effect Screenshot capture of the composition the user actually sees over the AC6 client, including visible SteamP2PScanner / NVIDIA / Steam / Discord-style overlays. Overlap alone is not a rejection reason.
+- Effect Screenshot capture of the composition the user actually sees over the AC6 client, including visible SteamP2PScanner/NVIDIA/Steam/Discord-style overlays. Overlap alone is not a screenshot rejection reason.
 - Diagnostic and process/lifecycle hardening, including duplicate prevention and owned-worker cleanup.
-- Source install / update / rollback / uninstall flows that preserve history and configuration.
+- Source install/update/rollback/uninstall flows that preserve history and configuration.
 
-Detector MSS fallback still uses `region_unobscured()`. Screenshot capture still requires the AC6 foreground/target HWND/client rect, a visible Tracker effect, real banner pixels, duplicate suppression, and the bounded owned-worker lifecycle.
+Detector MSS fallback still uses `region_unobscured()`. Screenshot capture still requires the AC6 foreground/target HWND/client rect, visible Tracker effect, real banner pixels, duplicate suppression, and the bounded owned-worker lifecycle.
 
-Supported shipped mode remains **RANK MATCH: SINGLE only**. The TEAM / CUSTOM requirements in the master requirements are future requirements, not released behaviour.
+## Accepted
 
-## Gate evidence carried forward
+Runtime `93d5a57` is accepted and released.
 
-For runtime RC `93d5a57`, accepted for v1.1.0:
+- T0: PASS on the runtime, on the v1.1.0 release prep, and again on the v1.1.1 release prep.
+- T1: **N/A / not run**. The formal fixture/replay harness is issue #14 and is not implemented; no T1 PASS is claimed.
+- T2: PASS, including the isolated install → update → injected rollback → abnormal-exit recovery → uninstall → reinstall flow with history/config/Screenshot-setting preservation.
+- Independent runtime review: PASS for PR #20. Independent release-diff review: PASS for PR #29, no High or Release blocker.
+- Focused real-AC6 T3: PASS on 2026-09-11 JST. Five real wins produced exactly one PNG for effect `1m4k1FRsEEoa3U5mqRiDCL51`; the PNG contains the AC6 game, the real `5連勝 激アツ!!` banner, and the user's visible overlay composition. Evidence in issue #7.
+- v1.1.1 did **not** re-request real-AC6 T3. The runtime is byte-unchanged, so the v1.1.0 T3 evidence carries forward. Post-release public-distribution verification PASS: the published one-liner's hash gate passes, the release chain resolves `v1.1.1`, and the verified installer asset matches. Installer child execution was stubbed, so no user data and no live Tracker was touched.
 
-- **T0** PASS. **T1 N/A / not run** — the formal fixture/replay harness is [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) and does not exist; no T1 PASS is claimed. **T2** PASS.
-- Independent runtime review PASS for PR #20; no High or Release blocker.
-- Focused real-AC6 **T3** PASS on 2026-09-11: five real wins produced exactly one PNG for effect `1m4k1FRsEEoa3U5mqRiDCL51`, containing the AC6 game, the real `5連勝 激アツ!!` banner, and the user's visible overlay composition. Evidence in [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7).
+## Release Acceptance scope
 
-The earlier `spsgui.exe` occlusion FAIL predates PR #20 and is superseded. Natural DRAW, milestones 10–50, a natural WGC stall, a stale-age anomaly, client-rect mutation and a milestone precisely during an SSE reconnect were recorded as non-blocking for this release, covered by targeted automation plus existing real-session evidence. This documentation sync executed no tests and claims no new gate results.
+The following were not treated as blockers, because the same paths have automation and/or existing real-session evidence while forcing every case in live play would be disproportionate:
+
+- Natural DRAW: semantics are covered by result/state/history automation; no natural DRAW occurred in the recorded sessions.
+- Milestones 10–50: the milestone-5 T3 exercises the shared real capture path; all configured levels are covered by automation/native screenshot checks.
+- Natural WGC stall, stale-age rejection, client-rect mutation, and a milestone precisely during SSE reconnect: covered by targeted automation plus existing real recovery evidence where available.
+- Alt+Tab: real capture loss/recovery and a subsequent exactly-once result are recorded; targeted automation covers the boundary conditions.
+
+Residual non-blocking risk: rare GPU/compositor/window-manager timing may behave differently on an unobserved desktop. The bounded diagnostics and fail-closed optional screenshot path remain in place; screenshot failure cannot alter result counting.
+
+## Release scope
+
+Supported mode in v1.1.1 remains **RANK MATCH: SINGLE only**. The broader TEAM/CUSTOM requirements in the master requirements are future requirements, not implemented or released behavior.
 
 ## Requirements added on 2026-09-12 — Revision 3
 
@@ -78,26 +92,30 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 | Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
 | Seasonal rank / rating progression | The user's own rank and rating over time, separated by season and never carried forward. **The pre-S and S rating systems are not one scale** — the boundary is pre-S / non-S (UNRANKED through A4) vs S, with **A4 on the pre-S side** — and the pre-S → S boundary is not drawn as one continuous line without a justified basis. Event-driven recognition only; recognition failure never touches WIN/LOSE, ResultGate, streak or match persistence. Work lands in #15 (acquisition, persistence, `rating_mode`), #16 (progression, chart, Season High/Low, delta, transition markers, `S RANK REACHED`) and #25 (season selector, chart presentation) | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | PLANNED, gated on reliable self-rank recognition |
 
-Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISIONS.md](DECISIONS.md).
+Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISIONS.md](DECISIONS.md). Order: **Sequencing** in [ROADMAP.md](ROADMAP.md).
 
 ## Next actions
 
-1. Publish a corrected immutable version (recommended `v1.1.1`) so the tagged tree and the published README agree, then re-run the public-distribution smoke test in isolation.
-2. Only then record `Released`, and close [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) in a docs-only commit. Never move the `v1.1.0` tag.
-3. Merge documentation PR #13, so Revision 3 is canonical on `main` rather than on a branch. Documentation only.
-4. Reconcile draft PR #5 with the current `main` — **merge only; no reset, rebase or force-push** — then T0 → T1 (N/A until #14) → T2 → PR handoff and review → required fixes → re-run the affected gates → T3 → `main`.
-5. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) on a fresh branch and worktree cut from the new `main`.
-6. From there, the dependency order recorded under **Sequencing** in [ROADMAP.md](ROADMAP.md):
+1. Merge documentation PR #13, which carries Master Requirements Revision 3.
+2. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
+3. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
+
+
+### Order after PR #5
+
+The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
 ```text
-#24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 → #16-A / #28 → UI-3A
+#14 → #24 → UI-0 → UI-1A → UI-1B → #15 → UI-2 → #16-A / #28 → UI-3A
    → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 
-Two of those placements are dependencies rather than preferences: **#15 precedes UI-2** so the Dashboard and History shell is built once against a settled match-metadata contract, and **#16 owns the analytics data while UI-3A / UI-3B own the chart rendering**.
+**#15 precedes UI-2** so the Dashboard and History shell is built once against a settled
+match-metadata contract, and **#16 owns the analytics data while UI-3A / UI-3B own the chart
+rendering**.
 
-At most **two unmerged generations** at a time (MASTER_REQUIREMENTS §4). Today those are PR #5 and PR #13.
+Never move the `v1.1.0` or `v1.1.1` tag.
 
 ## Process safety
 
-Do not modify the user's live Tracker, history, config, stats, diagnostics, port 8765, runtime files or Overlay mutex. Use isolated temporary roots, bounded waits, and verify child/grandchild process, port, runtime-file and temporary-directory cleanup. Do not kill processes owned by another session. This documentation sync started no long-running process.
+Do not modify the user's live Tracker, history, config, stats, diagnostics, port 8765, runtime files, or Overlay mutex during release testing. Use isolated temporary roots, bounded waits, and verify child/grandchild/process/port/temp cleanup.
