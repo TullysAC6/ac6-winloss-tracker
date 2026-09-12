@@ -28,6 +28,7 @@ files=[
     "test_result_gate.py",
     "test_config.py",
     "test_settings_actions.py",
+    "test_purge_atomicity.py",
     "test_history_store.py",
     "test_history_analytics.py",
     "test_dashboard_runtime.py",

@@ -734,10 +734,10 @@ class SettingsWindow:
         if payload.get("removed_sessions"):
             lines.append(f"空になったセッション {payload['removed_sessions']} 件も削除しました。")
         if payload.get("mode") == "all":
-            lines.append(
-                "セッション成績もリセットしました。" if payload.get("session_reset")
-                else f"セッション成績はリセットできませんでした: {payload.get('session_error')}"
-            )
+            # A reported success now always means both stores were cleared
+            # together. A partial purge comes back as an error instead, and the
+            # message there says which state the Tracker was left in.
+            lines.append("セッション成績もリセットしました。")
         self.purge_status.config(text="\n".join(lines))
 
     # ---------------------------------------------------------------- support

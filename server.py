@@ -603,6 +603,109 @@ def validate_purge_request(body, now=None):
     return "before", cutoff
 
 
+class PurgeFailed(RuntimeError):
+    """A purge that did not reach a reported success.
+
+    ``history_cleared`` and ``stats_restored`` describe the state the Tracker
+    was actually left in, so the caller can say which of the two consistent
+    states applies rather than guessing.
+    """
+
+    def __init__(self, stage, error, *, history_cleared, stats_restored=None):
+        super().__init__(f"{stage}: {type(error).__name__}: {error}")
+        self.stage = stage
+        self.history_cleared = bool(history_cleared)
+        self.stats_restored = stats_restored
+
+    def message(self):
+        """What the user is actually left with, not just what threw."""
+        if self.history_cleared:
+            return ("履歴とセッション成績は削除・初期化されましたが、検出状態の同期に"
+                    "失敗しました。Trackerを再起動してください。")
+        if self.stats_restored is False:
+            return ("履歴は削除していません。セッション成績のみ初期化された状態です"
+                    "（履歴は保持されています）。")
+        return "履歴は削除していません。"
+
+    def payload(self):
+        detail = {
+            "error": f"{self.message()} ({self})",
+            "stage": self.stage,
+            "history_cleared": self.history_cleared,
+        }
+        if self.stats_restored is not None:
+            detail["stats_restored"] = self.stats_restored
+        return detail
+
+
+def _purge_all_coordinated():
+    """Clear lifetime history and the session together, recoverably.
+
+    ``history.db`` and ``stats.json`` are separate stores, so there is no single
+    transaction across both and none is claimed. Instead the reversible write is
+    done first and kept undoable, and the irreversible one is done last:
+
+    1. snapshot the session stats,
+    2. reset the session — nothing destructive has happened yet, so a failure
+       here simply leaves the pre-operation state,
+    3. purge the database — on failure the snapshot is written back, returning
+       the pre-operation state.
+
+    Every failure therefore lands on one of two self-consistent states: nothing
+    purged, or history intact with the session reset, which is the ordinary
+    "reset session" state the product already supports. A failure never reports
+    success, and the state it left behind is named in the error.
+    """
+    before = stats.snapshot()
+
+    try:
+        s = stats.reset()
+    except Exception as error:
+        # Nothing was deleted: the database has not been touched yet.
+        raise PurgeFailed("session reset", error, history_cleared=False) from error
+
+    try:
+        outcome = store_purge_all()
+    except Exception as error:
+        try:
+            stats.restore(before)
+            restored = True
+        except Exception:
+            restored = False
+        raise PurgeFailed(
+            "history purge", error, history_cleared=False, stats_restored=restored
+        ) from error
+
+    # Both stores are now cleared and agree. What follows is in-memory
+    # convergence; it cannot reintroduce a disagreement, but a failure is still
+    # reported rather than swallowed, because the gate and detector would not
+    # have been told about the mutation.
+    history_event_ids.clear()
+    try:
+        result_gate.lock_now()
+        with detector_lock:
+            current = detector
+        if current:
+            current.external_mutation()
+    except Exception as error:
+        raise PurgeFailed(
+            "post-purge synchronization", error, history_cleared=True
+        ) from error
+
+    outcome["session_reset"] = True
+    outcome["stats"] = status_payload(s)
+    publish_stats_active(s)
+    return outcome
+
+
+def store_purge_all():
+    with history_lock:
+        store = history
+    if store is None:
+        raise RuntimeError("history store is unavailable")
+    return store.purge_all()
+
+
 def purge_history(mode, cutoff=None):
     """Delete lifetime history in the owning process, under the result lock.
 
@@ -615,29 +718,21 @@ def purge_history(mode, cutoff=None):
         if store is None:
             raise RuntimeError("history store is unavailable")
         if mode == "all":
-            outcome = store.purge_all()
-            history_event_ids.clear()
+            try:
+                outcome = _purge_all_coordinated()
+            finally:
+                # The dashboard must never serve a cached summary that predates
+                # a partially applied purge, whichever way it ended.
+                set_history_health("active")
+                invalidate_dashboard_summary()
+                publish_lifetime()
         else:
             outcome = store.purge_before(cutoff)
-        set_history_health("active")
-        invalidate_dashboard_summary()
+            set_history_health("active")
+            invalidate_dashboard_summary()
+            outcome["session_reset"] = False
+            publish_lifetime()
         outcome["mode"] = mode
-        outcome["session_reset"] = False
-        if mode == "all":
-            # A cleared lifetime history with a non-zero session counter would
-            # be contradictory on the overlay, so the session is reset too.
-            try:
-                s = stats.reset()
-                result_gate.lock_now()
-                with detector_lock:
-                    current = detector
-                if current:
-                    current.external_mutation()
-                publish_stats_active(s)
-                outcome["session_reset"] = True
-            except Exception as e:
-                outcome["session_error"] = f"{type(e).__name__}: {e}"
-        publish_lifetime()
         return outcome
 
 
@@ -871,6 +966,10 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 try:
                     self.json_response({"ok": True, **purge_history(mode, cutoff)})
+                except PurgeFailed as e:
+                    # Never a 200/ok:true. The payload names which consistent
+                    # state the Tracker was actually left in.
+                    self.json_response({"ok": False, **e.payload()}, 500)
                 except ActiveSessionOverlap as e:
                     # Nothing was deleted: the store refuses before it writes.
                     self.json_response({

@@ -421,3 +421,14 @@ class StatsManager:
             if self.path.exists():
                 self._load_unlocked()
             return self._save_unlocked(self._default())
+
+    def restore(self, stats):
+        """Write a previously taken snapshot back, atomically.
+
+        This exists so a caller that has to reset the session before an
+        irreversible step elsewhere can undo that reset when the irreversible
+        step fails. The value is validated like any other write, so a damaged
+        snapshot is rejected rather than persisted.
+        """
+        with self.lock:
+            return self._restore_main_unlocked(stats)
