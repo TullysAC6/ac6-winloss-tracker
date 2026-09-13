@@ -4,7 +4,7 @@ Set-StrictMode -Version Latest
 $root = Split-Path -Parent $PSScriptRoot
 $readmePath = Join-Path $root 'README.md'
 $readme = [System.IO.File]::ReadAllText($readmePath)
-$expectedHash = 'C99A08AE973B745407A2FD2C6855F48DD0BCC9B498D34A7CEE84D7DF737F9158'
+$expectedHash = '82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B'
 
 function Get-ReadmeCommand {
     param([Parameter(Mandatory = $true)][string]$Heading)
@@ -24,8 +24,8 @@ function Assert-ReadmeCommand {
     if ($Command -match '^(?i)powershell(?:\.exe)?\s') {
         throw 'README command must run directly in the opened PowerShell session'
     }
-    if ($Command -notmatch "refs/tags/v1\.1\.1/bootstrap\.ps1") {
-        throw 'README command does not use the immutable v1.1.1 bootstrap'
+    if ($Command -notmatch "refs/tags/v1\.2\.0/bootstrap\.ps1") {
+        throw 'README command does not use the immutable v1.2.0 bootstrap'
     }
     if ($Command -notmatch [Regex]::Escape($expectedHash)) {
         throw 'README command does not contain the expected bootstrap SHA-256'
