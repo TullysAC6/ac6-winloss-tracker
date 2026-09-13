@@ -15,6 +15,17 @@ and both are exercised here:
   a still-running orphan passed the gate. Ownership is now a Job Object, proven
   with real processes.
 
+Review 5189617002 added two more:
+
+* WaitForSingleObject returning WAIT_FAILED was read as "exited", so a live
+  orphan dropped out of the owned set and teardown passed;
+* a test took "any descendant other than the child" to be the grandchild, and
+  could pick up a console host instead. Subjects are now identified without
+  asking the scanner under test: the child reports its grandchild's pid, and
+  each process is pinned by handle and checked for its image, its membership of
+  the harness's job, and native liveness. Test children are started without a
+  console, so none is allocated for them.
+
 Every case reclaims whatever it deliberately held on to, so this file leaves no
 thread, socket, handle, process or directory behind.
 """
@@ -40,8 +51,13 @@ t2 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(t2)
 
 ERROR_ACCESS_DENIED = 5
+ERROR_INVALID_HANDLE = 6
 ERROR_NO_MORE_FILES = 18
 INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+WAIT_FAILED = 0xFFFFFFFF
+# No console is allocated for a test child, so no console host process joins
+# the tree and nothing but the processes a test starts can be mistaken for them.
+NO_CONSOLE = getattr(subprocess, "DETACHED_PROCESS", 0)
 
 
 def setUpModule():
@@ -49,8 +65,101 @@ def setUpModule():
     t2.establish_process_ownership()
 
 
+class PinnedProcess:
+    """A process identified and held by handle, independently of the harness.
+
+    The open handle keeps the process object alive, so the pid cannot be
+    recycled while the test looks at it. Liveness, image and job membership are
+    read through this test's own kernel32 calls, never through the scanner that
+    is under test, and the handle reclaims the process whatever the assertions do.
+    """
+
+    SYNCHRONIZE = 0x00100000
+    PROCESS_TERMINATE = 0x0001
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    WAIT_OBJECT_0 = 0x0
+    WAIT_TIMEOUT = 0x102
+
+    def __init__(self, pid):
+        from ctypes import wintypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        declarations = {
+            "OpenProcess": ([wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE),
+            "WaitForSingleObject": ([wintypes.HANDLE, wintypes.DWORD], wintypes.DWORD),
+            "TerminateProcess": ([wintypes.HANDLE, wintypes.UINT], wintypes.BOOL),
+            "CloseHandle": ([wintypes.HANDLE], wintypes.BOOL),
+            "QueryFullProcessImageNameW": (
+                [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                 ctypes.POINTER(wintypes.DWORD)], wintypes.BOOL),
+            "IsProcessInJob": (
+                [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)],
+                wintypes.BOOL),
+        }
+        for name, (argtypes, restype) in declarations.items():
+            function = getattr(kernel32, name)
+            function.argtypes, function.restype = argtypes, restype
+        self._kernel32, self._wintypes = kernel32, wintypes
+        self.pid = pid
+        self.handle = kernel32.OpenProcess(
+            self.SYNCHRONIZE | self.PROCESS_TERMINATE | self.PROCESS_QUERY_LIMITED_INFORMATION,
+            False, pid)
+        if not self.handle:
+            raise OSError(f"could not open process {pid}: error {ctypes.get_last_error()}")
+
+    def alive(self):
+        waited = self._kernel32.WaitForSingleObject(self.handle, 0)
+        if waited == self.WAIT_TIMEOUT:
+            return True
+        if waited == self.WAIT_OBJECT_0:
+            return False
+        raise AssertionError(f"liveness of {self.pid} could not be observed: "
+                             f"{waited:#x}, error {ctypes.get_last_error()}")
+
+    def image_name(self):
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = self._wintypes.DWORD(len(buffer))
+        if not self._kernel32.QueryFullProcessImageNameW(self.handle, 0, buffer,
+                                                         ctypes.byref(size)):
+            raise OSError(f"image of {self.pid} unreadable: error {ctypes.get_last_error()}")
+        return Path(buffer.value).name
+
+    def in_job(self, job_handle):
+        member = self._wintypes.BOOL()
+        if not self._kernel32.IsProcessInJob(self.handle, job_handle, ctypes.byref(member)):
+            raise OSError(f"job membership of {self.pid} unreadable: "
+                          f"error {ctypes.get_last_error()}")
+        return bool(member.value)
+
+    def reclaim(self):
+        if not self.handle:
+            return
+        try:
+            if self.alive():
+                self._kernel32.TerminateProcess(self.handle, 1)
+                self._kernel32.WaitForSingleObject(self.handle, 10000)
+            if self.alive():
+                raise AssertionError(f"process {self.pid} could not be reclaimed")
+        finally:
+            self._kernel32.CloseHandle(self.handle)
+            self.handle = None
+
+
 class GateCase(unittest.TestCase):
     """Shared scaffolding: an owned temporary root and the teardown state."""
+
+    # test -> child -> grandchild. The child starts a long-lived grandchild
+    # without a console, reports its pid, and exits once told to.
+    FAMILY = (
+        "import pathlib, subprocess, sys, time\n"
+        "work = pathlib.Path(sys.argv[1])\n"
+        "grandchild = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'],\n"
+        "                              creationflags=getattr(subprocess, 'DETACHED_PROCESS', 0))\n"
+        "(work / 'grandchild.tmp').write_text(str(grandchild.pid))\n"
+        "(work / 'grandchild.tmp').replace(work / 'grandchild.pid')\n"
+        "deadline = time.monotonic() + 60\n"
+        "while not (work / 'release').exists() and time.monotonic() < deadline:\n"
+        "    time.sleep(0.05)\n"
+    )
 
     def setUp(self):
         t2.RESULTS.clear()
@@ -104,20 +213,47 @@ class GateCase(unittest.TestCase):
         self.assertEqual(0 if all(ok for _, _, ok in t2.RESULTS) else 1, 1,
                          "main() would have exited 0")
 
-    def spawn_bounded(self, code, extra=()):
+    def identify(self, pid, baseline=None):
+        """Prove who ``pid`` is without asking the scanner under test.
+
+        A pinned handle, so the pid cannot be recycled; the Python image this
+        test started; membership of the harness's job, read with this test's
+        own IsProcessInJob call; native liveness; and, when a pre-spawn
+        baseline is given, absence from it.
+        """
+        if baseline is not None:
+            self.assertNotIn(pid, baseline, "a subject must be new since the pre-spawn baseline")
+        pinned = PinnedProcess(pid)
+        self.addCleanup(pinned.reclaim)
+        self.assertTrue(pinned.alive(), f"subject {pid} is not running")
+        self.assertEqual(pinned.image_name().lower(), Path(sys.executable).name.lower(),
+                         f"subject {pid} runs {pinned.image_name()}, not the Python this "
+                         "test started")
+        self.assertTrue(pinned.in_job(t2.process_owner()._job),
+                        f"subject {pid} is not a member of the harness's ownership job")
+        return pinned
+
+    def spawn_bounded(self, code, extra=(), baseline=None):
         """A real child that exits on its own, and is reaped whatever happens."""
-        child = subprocess.Popen([sys.executable, "-c", code, *extra])
+        child = subprocess.Popen([sys.executable, "-c", code, *extra], creationflags=NO_CONSOLE)
         self.addCleanup(self.reap, child)
+        child.pinned = self.identify(child.pid, baseline) if os.name == "nt" else None
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline:
             if child.pid in t2.owned_descendants():
-                owner = t2.process_owner()
-                if owner is not None:
-                    self.assertTrue(owner.is_owned(child.pid),
-                                    "a spawned child must be created inside the ownership job")
                 return child
             time.sleep(0.1)
         self.fail("the spawned child never appeared as a descendant")
+
+    def start_family(self):
+        """A child and its reported grandchild, each identified independently."""
+        work = Path(tempfile.mkdtemp(prefix="family-", dir=self.directory))
+        baseline = t2.owned_descendants()
+        child = self.spawn_bounded(self.FAMILY, [str(work)], baseline)
+        report = work / "grandchild.pid"
+        self.assertTrue(self.wait_until(report.exists), "the child never reported its grandchild")
+        grandchild = self.identify(int(report.read_text()), baseline | {child.pid})
+        return work, baseline, child, grandchild
 
     def reap(self, child):
         if child.poll() is None:
@@ -216,39 +352,34 @@ class TeardownGateTests(GateCase):
 
     # ------------------------------------------------- real process ownership
     def test_a_real_leaked_child_fails_the_gate(self):
-        child = self.spawn_bounded("import time; time.sleep(30)")
-        t2.teardown(self.state(children_before=set()))
+        baseline = t2.owned_descendants()
+        child = self.spawn_bounded("import time; time.sleep(30)", baseline=baseline)
+        t2.teardown(self.state(children_before=baseline))
         self.assert_gate_failed("no owned child or grandchild process left")
         failures = " ".join(self.failing_checks())
         self.assertNotIn("process table inspected successfully", failures,
                          "the scan itself succeeded; only the leak should fail")
-        self.reap(child)
-        self.assertNotIn(child.pid, t2.owned_descendants())
+        self.assertIn("Z leaked owned processes reclaimed", self.passing_checks())
+        self.assertFalse(child.pinned.alive(), "teardown must reclaim the leaked child")
 
+    @unittest.skipUnless(os.name == "nt", "subjects are identified by Windows handle and job")
     def test_a_real_leaked_grandchild_fails_the_gate(self):
         """Depth matters: a worker's worker is still this harness's problem."""
-        code = ("import subprocess, sys, time\n"
-                "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
-                "time.sleep(30)\n")
-        child = self.spawn_bounded(code)
-        grandchildren = self.wait_until(lambda: t2.owned_descendants() - {child.pid}, 10)
-        self.assertTrue(grandchildren, "no grandchild appeared to test with")
-        owned = {child.pid} | set(grandchildren)
+        _, baseline, child, grandchild = self.start_family()
 
-        # Detected while everything is still running, before teardown acts.
-        detected = t2.owned_descendants()
-        self.assertTrue(set(grandchildren) <= detected,
-                        f"the grandchild must be detected, saw {sorted(detected)}")
+        # The harness sees both independently identified processes while they run.
+        self.assertTrue(
+            self.wait_until(lambda: {child.pid, grandchild.pid} <= t2.owned_descendants()),
+            "the harness must see the running child and grandchild")
 
-        t2.teardown(self.state(children_before=set()))
+        t2.teardown(self.state(children_before=baseline))
         self.assert_gate_failed("no owned child or grandchild process left")
         self.assertIn("Z leaked owned processes reclaimed", self.passing_checks())
 
-        self.reap(child)
-        self.assertEqual(self.wait_until(lambda: not (t2.owned_descendants() & owned)), True,
-                         "the fault test must leave no owned process behind")
-        self.assertFalse(any(self.pid_is_alive(pid) for pid in owned),
-                         "every process this test started must be reaped")
+        # Reclaimed, as proven through handles the scanner never touched.
+        self.assertFalse(grandchild.alive(), "teardown must reclaim the grandchild")
+        self.assertFalse(child.pinned.alive(), "teardown must reclaim the child")
+        self.assertEqual(t2.owned_descendants() - baseline, set())
 
     def test_an_unreadable_process_table_fails_the_gate(self):
         """Inability to inspect must never be reported as zero children."""
@@ -428,71 +559,9 @@ class ToolhelpWalkTests(GateCase):
         self.assert_gate_failed("overlay mutex scope is N/A")
 
 
-class PinnedProcess:
-    """A handle opened on a pid while it is known to be ours.
-
-    The open handle keeps the process object alive, so the pid cannot be
-    recycled; the test uses it only to reclaim its own grandchild whatever the
-    assertions do. The harness's ownership is what is under test, not this.
-    """
-
-    SYNCHRONIZE = 0x00100000
-    PROCESS_TERMINATE = 0x0001
-    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-    WAIT_TIMEOUT = 0x102
-
-    def __init__(self, pid):
-        from ctypes import wintypes
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-        kernel32.OpenProcess.restype = wintypes.HANDLE
-        kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-        kernel32.WaitForSingleObject.restype = wintypes.DWORD
-        kernel32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
-        kernel32.TerminateProcess.restype = wintypes.BOOL
-        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
-        kernel32.CloseHandle.restype = wintypes.BOOL
-        self._kernel32 = kernel32
-        self.pid = pid
-        self.handle = kernel32.OpenProcess(
-            self.SYNCHRONIZE | self.PROCESS_TERMINATE | self.PROCESS_QUERY_LIMITED_INFORMATION,
-            False, pid)
-        if not self.handle:
-            raise OSError(f"could not open process {pid}: error {ctypes.get_last_error()}")
-
-    def alive(self):
-        return self._kernel32.WaitForSingleObject(self.handle, 0) == self.WAIT_TIMEOUT
-
-    def reclaim(self):
-        if not self.handle:
-            return
-        try:
-            if self.alive():
-                self._kernel32.TerminateProcess(self.handle, 1)
-                self._kernel32.WaitForSingleObject(self.handle, 10000)
-            if self.alive():
-                raise AssertionError(f"process {self.pid} could not be reclaimed")
-        finally:
-            self._kernel32.CloseHandle(self.handle)
-            self.handle = None
-
-
 @unittest.skipUnless(os.name == "nt", "Job Object ownership is Windows-specific")
 class OrphanOwnershipTests(GateCase):
-    """Review 5188346877: the parent exits first and its child keeps running."""
-
-    # The child starts a long-lived grandchild, reports its pid, and exits as
-    # soon as it is told to -- leaving the grandchild orphaned but running.
-    CHILD = (
-        "import pathlib, subprocess, sys, time\n"
-        "work = pathlib.Path(sys.argv[1])\n"
-        "grandchild = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
-        "(work / 'grandchild.tmp').write_text(str(grandchild.pid))\n"
-        "(work / 'grandchild.tmp').replace(work / 'grandchild.pid')\n"
-        "deadline = time.monotonic() + 60\n"
-        "while not (work / 'release').exists() and time.monotonic() < deadline:\n"
-        "    time.sleep(0.05)\n"
-    )
+    """The parent exits first and its child keeps running."""
 
     @staticmethod
     def ancestors(parents, pid):
@@ -503,48 +572,71 @@ class OrphanOwnershipTests(GateCase):
             chain.append(pid)
         return chain
 
-    def test_an_orphaned_grandchild_stays_owned_fails_the_gate_and_is_reclaimed(self):
-        work = Path(self.directory) / "orphan"
-        work.mkdir()
-        baseline = t2.owned_descendants()
-        child = self.spawn_bounded(self.CHILD, [str(work)])
-        pid_file = work / "grandchild.pid"
-        self.assertTrue(self.wait_until(pid_file.exists), "the child never reported a grandchild")
-        grandchild = int(pid_file.read_text())
-        pinned = PinnedProcess(grandchild)
-        self.addCleanup(pinned.reclaim)
-
-        # 1. Everything alive: child and grandchild are both owned.
-        self.assertTrue(self.wait_until(lambda: {child.pid, grandchild} <= t2.owned_descendants()),
-                        "a running grandchild must be owned")
-
-        # 2. The parent exits first.
+    def orphan(self):
+        """A running grandchild whose parent has exited, identified independently."""
+        work, baseline, child, grandchild = self.start_family()
+        self.assertTrue(
+            self.wait_until(lambda: {child.pid, grandchild.pid} <= t2.owned_descendants()),
+            "a running child and grandchild must both be owned")
         (work / "release").write_text("go")
         child.wait(timeout=20)
         self.assertIsNotNone(child.returncode)
-        self.assertTrue(pinned.alive(), "the grandchild must outlive its parent for this test")
+        self.assertFalse(child.pinned.alive(), "precondition: the parent has exited")
+        self.assertTrue(grandchild.alive(), "precondition: the grandchild outlives its parent")
+        return baseline, grandchild
 
-        # 3. Only the grandchild is alive, and ancestry can no longer reach it.
+    def test_an_orphaned_grandchild_stays_owned_fails_the_gate_and_is_reclaimed(self):
+        """Review 5188346877: ancestry alone lost the orphan."""
+        baseline, grandchild = self.orphan()
+
+        # Only the grandchild is alive, and ancestry can no longer reach it.
         parents = t2.process_parents()
-        self.assertIn(grandchild, parents)
-        self.assertNotIn(os.getpid(), self.ancestors(parents, grandchild),
+        self.assertIn(grandchild.pid, parents)
+        self.assertNotIn(os.getpid(), self.ancestors(parents, grandchild.pid),
                          "precondition: the orphan is not anyone's descendant of ours")
-        self.assertNotIn(grandchild, t2.ancestry_descendants(parents, os.getpid()))
+        self.assertNotIn(grandchild.pid, t2.ancestry_descendants(parents, os.getpid()))
 
-        # 4. Ownership still holds.
-        self.assertIn(grandchild, t2.owned_descendants(),
+        # Ownership still holds.
+        self.assertIn(grandchild.pid, t2.owned_descendants(),
                       "an orphaned grandchild is still owned and must still be seen")
 
-        # 5. The cleanup gate fails on it ...
+        # The cleanup gate fails on it, and reclaims it.
         t2.teardown(self.state(children_before=baseline))
         self.assert_gate_failed("no owned child or grandchild process left")
         self.assertNotIn("Z process table inspected successfully", self.failing_checks())
-
-        # 6. ... and reclaims it, leaving nothing owned.
         self.assertIn("Z leaked owned processes reclaimed", self.passing_checks())
-        self.assertFalse(pinned.alive(), "teardown must reclaim the orphaned grandchild")
+        self.assertFalse(grandchild.alive(), "teardown must reclaim the orphaned grandchild")
         self.assertEqual(t2.owned_descendants() - baseline, set())
         self.assertEqual(t2.process_owner().owned(), set())
+
+    def test_a_liveness_observation_failure_is_not_process_exit(self):
+        """Review 5189617002: WAIT_FAILED was read as exit, hiding a live orphan."""
+        baseline, grandchild = self.orphan()
+        owner = t2.process_owner()
+
+        def wait_failed(handle, milliseconds):
+            ctypes.set_last_error(ERROR_INVALID_HANDLE)
+            return WAIT_FAILED
+
+        # Only the owner's liveness observation fails; the job listing and the
+        # Tool Help table stay real.
+        with patch.object(owner._kernel32, "WaitForSingleObject", wait_failed):
+            with self.assertRaises(t2.ProcessScanError) as caught:
+                t2.owned_descendants()
+            t2.teardown(self.state(children_before=baseline))
+        self.assertIn("0xffffffff", str(caught.exception))
+        self.assertIn(f"error {ERROR_INVALID_HANDLE}", str(caught.exception))
+        self.assert_gate_failed("process table inspected successfully")
+        self.assert_gate_failed("no owned child or grandchild process left")
+        self.assertTrue(grandchild.alive(),
+                        "the orphan was still running while the gate judged the run")
+
+        # Once liveness can be observed again the orphan is owned, and reaped.
+        self.assertIn(grandchild.pid, t2.owned_descendants())
+        self.assertTrue(owner.reclaim(grandchild.pid))
+        self.assertFalse(grandchild.alive())
+        self.assertEqual(t2.owned_descendants() - baseline, set())
+        self.assertEqual(owner.owned(), set())
 
     def test_an_unrelated_process_is_never_owned_or_reclaimed(self):
         owner = t2.process_owner()
@@ -562,9 +654,10 @@ class OrphanOwnershipTests(GateCase):
         with patch.object(owner, "is_member_handle", return_value=False):
             self.assertFalse(owner.is_owned(child.pid))
             self.assertFalse(owner.reclaim(child.pid))
-        self.assertIsNone(child.poll(), "an unverified process must not be terminated")
+        self.assertTrue(child.pinned.alive(), "an unverified process must not be terminated")
         self.assertTrue(owner.reclaim(child.pid))
         child.wait(timeout=10)
+        self.assertFalse(child.pinned.alive())
 
     def test_ownership_that_was_never_established_fails_closed(self):
         with patch.object(t2, "_PROCESS_OWNER", None):
@@ -612,7 +705,8 @@ class HarnessStructureTests(unittest.TestCase):
     def test_ownership_is_a_job_not_only_ancestry(self):
         source = (ROOT / "tests" / "t2_settings_analytics_e2e.py").read_text(encoding="utf-8")
         for required in ("CreateJobObjectW", "AssignProcessToJobObject", "IsProcessInJob",
-                         "JOB_OBJECT_BASIC_PROCESS_ID_LIST", "ERROR_NO_MORE_FILES"):
+                         "JOB_OBJECT_BASIC_PROCESS_ID_LIST", "ERROR_NO_MORE_FILES",
+                         "WAIT_FAILED"):
             with self.subTest(api=required):
                 self.assertIn(required, source)
 

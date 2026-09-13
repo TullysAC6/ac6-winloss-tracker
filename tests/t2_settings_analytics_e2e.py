@@ -33,6 +33,7 @@ sys.path.insert(0, str(ROOT))
 # Cleanup bounds. A hang is a failure, so the watchdog always yields an exit code.
 THREAD_JOIN_SECONDS = 20
 ROOT_REMOVE_ATTEMPTS = 10
+RECLAIM_SETTLE_SECONDS = 5
 WATCHDOG_SECONDS = 900
 
 RESULTS: list[tuple[str, str, bool]] = []
@@ -798,6 +799,121 @@ def main() -> int:
               f"snapshot stats={snapshot['stats']['wins']}/{snapshot['stats']['losses']} "
               f"lifetime={snapshot['lifetime']['wins']}/{snapshot['lifetime']['losses']}")
 
+        # ------------------- H3. accepted results are durable in both stores
+        print("\nH3. an accepted result is durable in history and counted in stats, or neither")
+
+        def rows():
+            probe = sqlite3.connect(data / "history.db")
+            try:
+                return probe.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
+            finally:
+                probe.close()
+
+        def run_sql(statement):
+            probe = sqlite3.connect(data / "history.db")
+            try:
+                probe.execute(statement)
+                probe.commit()
+            finally:
+                probe.close()
+
+        watched = []
+        unwatched_publish = server.publish
+
+        def watch(kind, payload, remember=True):
+            watched.append(kind)
+            return unwatched_publish(kind, payload, remember=remember)
+
+        # Review 5189617002's reproduction: a real SQLite trigger refuses every
+        # match row, installed before the purge so the purge's proof runs with it.
+        run_sql("CREATE TRIGGER t2_refuse_match_rows BEFORE INSERT ON matches "
+                "BEGIN SELECT RAISE(ABORT, 'injected: match row refused'); END")
+        status, body = post("/api/history/purge", {"mode": "all"})
+        check("H3", "purge with refused match rows still names a writable session",
+              status == 200 and body.get("session_id") == store.current_session_id,
+              f"status={status} session={body.get('session_id')}")
+        identities_before = list(server.history_event_ids)
+        server.publish = watch
+        try:
+            time.sleep(COOLDOWN_SECONDS + 0.4)  # the purge locked the gate
+            outcomes = [server.record_result(result, "manual")
+                        for result in ("win",) * 5 + ("loss",)]
+        finally:
+            server.publish = unwatched_publish
+        stats_now, lifetime_now = totals()
+        on_disk = json.loads((data / "stats.json").read_text(encoding="utf-8"))
+        check("H3", "five WINs and a LOSE are refused while rows cannot be written",
+              outcomes == [False] * 6, str(outcomes))
+        check("H3", "nothing counted: /stats, streak and stats.json unchanged",
+              stats_now == (0, 0) and get("/stats")["streak"] == 0
+              and (on_disk["wins"], on_disk["losses"], on_disk["streak"]) == (0, 0, 0),
+              f"stats={stats_now} stats.json={on_disk['wins']}/{on_disk['losses']}")
+        check("H3", "nothing in history: rows and lifetime unchanged",
+              rows() == 0 and lifetime_now == (0, 0), f"rows={rows()} lifetime={lifetime_now}")
+        check("H3", "no milestone effect, stats or lifetime event for a refused result",
+              [kind for kind in watched if kind in ("effect", "stats", "lifetime")] == [],
+              str(watched))
+        check("H3", "no undo identity for a refused result",
+              list(server.history_event_ids) == identities_before,
+              str(server.history_event_ids))
+        readings = []
+        for _ in range(2):
+            server.invalidate_dashboard_summary()
+            readings.append(get("/api/dashboard/summary")["history_health"]["status"])
+        check("H3", "history stays degraded however often the dashboard reads it",
+              readings == ["degraded", "degraded"], str(readings))
+
+        run_sql("DROP TRIGGER t2_refuse_match_rows")
+        accepted = server.record_result("win", "manual")  # the refusals released the gate
+        check("H3", "once rows can be written, the next WIN is accepted in both stores",
+              accepted is True and totals() == ((1, 0), (1, 0)) and rows() == 1,
+              f"accepted={accepted} totals={totals()} rows={rows()}")
+        check("H3", "history health is active again after a write succeeds",
+              get("/api/dashboard/summary")["history_health"]["status"] == "active")
+
+        # stats.json cannot be written after the row was: the row is taken back.
+        blocker = data / "stats.json.tmp"
+        raised = None
+        time.sleep(COOLDOWN_SECONDS + 0.4)
+        blocker.mkdir()
+        try:
+            server.record_result("win", "manual")
+        except Exception as error:  # the stats failure propagates, as before
+            raised = error
+        finally:
+            blocker.rmdir()
+        check("H3", "a stats write failure is not an accepted result",
+              raised is not None, type(raised).__name__ if raised else "no exception")
+        check("H3", "no history-only row is left behind",
+              rows() == 1 and totals() == ((1, 0), (1, 0)) and not server.uncounted_event_ids,
+              f"rows={rows()} totals={totals()} uncounted={server.uncounted_event_ids}")
+        accepted = server.record_result("win", "manual")  # the failure released the gate
+        check("H3", "the next WIN is counted in both stores once stats can be written",
+              accepted is True and totals() == ((2, 0), (2, 0)) and rows() == 2,
+              f"accepted={accepted} totals={totals()} rows={rows()}")
+
+        # An undo that history refuses changes neither store.
+        run_sql("CREATE TRIGGER t2_refuse_match_delete BEFORE DELETE ON matches "
+                "BEGIN SELECT RAISE(ABORT, 'injected: match delete refused'); END")
+        try:
+            status, body = post("/api/stats/undo")
+            check("H3", "an undo history refuses fails and leaves both stores as they were",
+                  status == 500 and totals() == ((2, 0), (2, 0)) and rows() == 2,
+                  f"status={status} totals={totals()} rows={rows()}")
+        finally:
+            run_sql("DROP TRIGGER t2_refuse_match_delete")
+        status, body = post("/api/stats/undo")
+        check("H3", "the undo then removes the result from both stores",
+              status == 200 and body.get("removed") is not None
+              and totals() == ((1, 0), (1, 0)) and rows() == 1,
+              f"status={status} totals={totals()} rows={rows()}")
+        snapshot = dict(server.safe_snapshot_bundle())
+        stats_now, lifetime_now = totals()
+        check("H3", "an SSE reconnect snapshot matches both stores",
+              (snapshot["stats"]["wins"], snapshot["stats"]["losses"]) == stats_now
+              and (snapshot["lifetime"]["wins"], snapshot["lifetime"]["losses"]) == lifetime_now,
+              f"snapshot stats={snapshot['stats']['wins']}/{snapshot['stats']['losses']}")
+
     finally:
         # Cleanup is part of the gate, not an epilogue. The exit status is
         # computed after teardown so a stuck thread, a bound port or a surviving
@@ -943,6 +1059,7 @@ class ProcessOwner:
     SYNCHRONIZE = 0x00100000
     WAIT_OBJECT_0 = 0x0
     WAIT_TIMEOUT = 0x102
+    WAIT_FAILED = 0xFFFFFFFF
 
     def __init__(self):
         import ctypes
@@ -1043,8 +1160,27 @@ class ProcessOwner:
                 f"IsProcessInJob failed: error {self._ctypes.get_last_error()}")
         return bool(result.value)
 
+    def _exited(self, handle, milliseconds):
+        """True once the process has exited, False while it is still running.
+
+        Only WAIT_OBJECT_0 proves exit and only WAIT_TIMEOUT proves life. Any
+        other answer -- WAIT_FAILED above all -- means liveness could not be
+        observed. Review 5189617002 showed WAIT_FAILED read as "not alive",
+        which dropped a running orphan from the owned set and let teardown
+        pass. It raises instead, carrying the error, so the gate fails.
+        """
+        waited = self._kernel32.WaitForSingleObject(handle, milliseconds)
+        if waited == self.WAIT_OBJECT_0:
+            return True
+        if waited == self.WAIT_TIMEOUT:
+            return False
+        error = self._ctypes.get_last_error()
+        raise ProcessScanError(
+            f"WaitForSingleObject returned {waited:#x} (error {error}): "
+            "process liveness could not be observed")
+
     def _alive(self, handle):
-        return self._kernel32.WaitForSingleObject(handle, 0) == self.WAIT_TIMEOUT
+        return not self._exited(handle, 0)
 
     def owned(self):
         """Live members of the job other than this process, each verified by handle."""
@@ -1096,8 +1232,7 @@ class ProcessOwner:
             if not (self.is_member_handle(handle) and self._alive(handle)):
                 return False
             self._kernel32.TerminateProcess(handle, 1)
-            waited = self._kernel32.WaitForSingleObject(handle, int(timeout_seconds * 1000))
-            return waited == self.WAIT_OBJECT_0
+            return self._exited(handle, int(timeout_seconds * 1000))
         finally:
             self._kernel32.CloseHandle(handle)
 
@@ -1262,7 +1397,14 @@ def teardown(state):
             for pid in sorted(leaked):
                 if owner is not None:
                     owner.reclaim(pid)
+            # A process outside the job, such as the console host of a
+            # reclaimed child, leaves only after the process it served has
+            # gone; give it a bounded moment rather than calling it a leak.
             remaining = owned_descendants() - set(baseline)
+            settle_until = time.monotonic() + RECLAIM_SETTLE_SECONDS
+            while remaining and time.monotonic() < settle_until:
+                time.sleep(0.2)
+                remaining = owned_descendants() - set(baseline)
             reclaimed = not remaining
             reclaim_detail = (f"reclaimed {sorted(leaked - remaining)}"
                               + (f"; still running {sorted(remaining)}" if remaining else ""))
