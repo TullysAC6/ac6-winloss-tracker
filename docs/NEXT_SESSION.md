@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-12 JST
+Last updated: 2026-09-13 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -19,13 +19,19 @@ Issue #6
 
 ## Current handoff
 
-- Public stable is **v1.1.1 — RELEASED**. Tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33`. `main` was `e032499` when this was written and advanced again when PR #13 merged; run `git rev-parse origin/main` rather than trusting that.
+- Public stable is **v1.1.1 — RELEASED**. Tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33`. `main` moved to `a042b18` when PR #5 merged on 2026-09-13, and again when the bookkeeping PR that updates this file merged. Run `git rev-parse origin/main` rather than trusting that.
 - **v1.1.0 is superseded.** Its runtime was accepted and it was published, but its formal release acceptance was never completed: the README one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the published Git blob bytes, so the command failed closed. The tag was not moved and the Release was not edited.
 - v1.1.1 ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
 - T1 remains **N/A / not run** because issue #14's formal fixture/replay harness does not exist. Do not call it PASS.
-- Draft PR #5 is a separate generation and has not been reconciled with the current `main`.
-- PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`. The documentation generation is closed, so only one unmerged generation remains.
+- **PR #5 (#8 settings, #9 analytics) is Implemented + Accepted + merged to `main` (`a042b18`), and not released.**
+  - Focused real-AC6 T3 PASS on the exact head `38a21c2` on 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)). `main` CI is green.
+  - #8 and #9 are closed as completed.
+  - v1.1.1 does **not** contain PR #5, so do not describe its settings or analytics as released.
+- PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`.
+  - **Draft PR #31** (Revision 4, docs-only) is the only unmerged generation.
+  - Do not treat Revision 4 as canonical until it merges.
+- MASTER_REQUIREMENTS §34 and §36 still describe PR #5 as the next or open item. They are dated snapshots, and `PROJECT_STATE.md` is the live position. Reconcile them explicitly in the next requirements revision.
 
 ## The rule that cost a release — do not lose it
 
@@ -49,20 +55,22 @@ Issue #6
 
 ## Required order from here
 
-1. Reconcile draft PR #5 with the current `main`. **Merge only — no reset, no rebase, no force-push.** Then T0 → T1 (N/A) → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
-2. Then [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness, on a fresh branch and worktree from the new `main`.
-3. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+1. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness.** Not started.
+   - Cut a fresh branch and worktree from the current `main`, which contains PR #5.
+   - Read its design/readiness comment first. PR #5 has now landed, so resolve that comment's conflict matrix against the merged `main` (for example `CONFIG_VERSION` 18 and the merged `tests/run_all_tests.py` registry).
+   - Then T0 → T1 → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
+2. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-At most two unmerged generations exist at a time. PR #13 merging freed a slot, so **PR #5 is the only unmerged generation**. Do not open a new feature branch until it lands.
+At most two unmerged generations exist at a time (§4). PR #5 has landed and draft PR #31 is docs-only, so **#14 may take the product slot**. No third generation starts.
 
 ## Order after that — dependency, not preference
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.1.1 and PR #13 are done. From here:
+v1.1.1, PR #13 and PR #5 are done; PR #5 is accepted and merged but not released. From here:
 
 ```text
-PR #5 → #14 → #24 → UI-0 → UI-1A → UI-1B
+#14 → #24 → UI-0 → UI-1A → UI-1B
 → #15 → UI-2 → #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B
 → #16-B → #18 → #27 → UI-4
 ```
@@ -74,7 +82,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #13 has merged, so **PR #5 is the only unmerged generation** — and nothing new starts until it lands.
+At most two unmerged generations exist at a time (§4). PR #5 has merged, so the product slot goes to **#14** next. Draft PR #31 (docs-only) is the other open generation.
 
 ## What is newly recorded and must not be lost
 
@@ -102,3 +110,9 @@ Never move the `v1.1.0` or `v1.1.1` tag.
 ## Process safety
 
 Do not stop or reinstall the user's current Tracker unless explicitly required and authorized. Release tests use isolated roots and ports, bounded waits, and must leave no child/grandchild process, test port, runtime file, mutex, staging directory or temporary asset directory behind. Stub installer child execution when smoke-testing the public distribution, so the user's live install, history and config are untouched.
+
+What worked for PR #5's T3, for the next one:
+
+- **Isolate the run.** Run the exact-head worktree against an isolated `LOCALAPPDATA` seeded from a SHA-256-verified copy of the real data root. Use a read-only SSE logger and read-only before/after evidence, and the live data stays byte-identical.
+- **Keep the normal launcher closed.** While that isolated instance owns port 8765, **do not start the normal launcher**. It correctly fails closed with `ENV-PORT-IN-USE`, but it still writes to the live `startup.log`.
+- **Ignore empty SQLite sidecars.** A read-only (`?mode=ro`) SQLite query on the live `history.db` can leave empty `-wal` / `-shm` sidecars. That is not a data change.

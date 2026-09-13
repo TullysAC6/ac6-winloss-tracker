@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-12 JST
+Last updated: 2026-09-13 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
@@ -11,11 +11,13 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 3) · r
 | Item | State |
 |---|---|
 | Public stable | **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33` |
-| `main` | `e0d8476` |
+| `main` | `a042b18`, the PR #5 merge, with green `main` CI. The bookkeeping PR that updates this file moves it again, so run `git rev-parse origin/main` |
 | Accepted runtime | `codex/wgc-rc-validation-20260908` at `93d5a57b88a86ec4b8846a3082089ed97f13a818`, shipped unchanged in v1.1.0 and v1.1.1 |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
-| Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
+| Settings / analytics generation | **PR #5: Implemented + Accepted + merged to `main`** (`a042b18`, 2026-09-13). Focused real-AC6 T3 PASS on the exact head `38a21c2`. **Not released**, and not part of v1.1.1 |
 | Documentation generation | PR #13 — **merged**. Master Requirements Revision 3 is canonical on `main` |
+| Unmerged generations | Draft PR #31 only: docs-only, Master Requirements Revision 4. No product generation is open |
+| Next product task | [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) fixture / replay harness. **Not started** |
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 
@@ -80,6 +82,46 @@ Residual non-blocking risk: rare GPU/compositor/window-manager timing may behave
 
 Supported mode in v1.1.1 remains **RANK MATCH: SINGLE only**. The broader TEAM/CUSTOM requirements in the master requirements are future requirements, not implemented or released behavior.
 
+## Accepted on `main`, not released — PR #5 (#8 / #9)
+
+| | |
+|---|---|
+| Implemented | **yes**. The four-tab Settings GUI (表示・演出 / 成績 / メンテナンス / サポート); `effect_enabled` and `overlay_stats_scope` (config 17 → 18); history analytics (today / week / month / all time, recent 10 / 30 / 100); CSV export; DB `quick_check` / `integrity_check`; history purge (all / before a date); the Diagnostic Report from Settings; the update-check extension; and ordered result persistence with `pending-history.json` recovery |
+| Accepted | **yes**. Focused real-AC6 T3 PASS on the exact head `38a21c2`, 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)) |
+| Merged | `main` at `a042b18`, a merge commit whose tree is identical to `38a21c2`. `main` CI is green ([run 34761001222](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34761001222)) |
+| Released | **no**. v1.1.1 does not contain it; shipping it needs a new release and its own release procedure |
+
+Gates on `38a21c2`:
+
+- **T0:** PASS. The full local suite (42 files) passed, and CI is green.
+- **T1:** **N/A / not run.** #14 does not exist yet.
+- **T2:** PASS on 209/209 feature checks, and the lifecycle run passed all 7 phases.
+- **Independent review:** five rounds requested changes, then [5190665161](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#pullrequestreview-5190665161) gave GO with no High or Medium findings.
+- **T3:** **PASS**, as an isolated T3:
+  - **Setup.** The exact-head worktree ran against an isolated `LOCALAPPDATA` seeded from a SHA-256-verified copy of the real data root.
+  - **Result.** One real Ranked Single WIN (`auto`, 2026-09-13 22:24:40) took history from 184 → 185 and stats to 1 / 0, streak 1.
+  - **Effect.** `effect_enabled` was `false`, and there were **0 effect events**. No `pending-history.json` remained.
+  - **Exercised.** The Settings tabs, analytics on the real history, `quick_check` / `integrity_check`, CSV export (185 rows), session ↔ lifetime switching and the Diagnostic Report.
+  - **Shutdown.** It returned HTTP 200 and left no process, port, runtime file or mutex behind.
+
+The evidence is split by source on purpose; #8 and #9 name the source of each criterion.
+
+| Source | Covers |
+|---|---|
+| Real T3 | Settings tabs; effect OFF with the result and streak still counted; exactly one real result; session / lifetime display; analytics on the real history; integrity check; CSV; Diagnostic Report |
+| Prior real acceptance (v1.1.1, #7) | Effect Screenshot control and capture path, unchanged by PR #5 |
+| T0 / T2 | Destructive reset / delete-before-date, restart persistence, update-check mechanics, milestone suppression with the effect OFF, and every failure path |
+
+Some checks were **not** run on the user's real history: destructive maintenance, live-DB fault injection, a forced pending-history state and a 5-win milestone replay. They would be irreversible on the only copy, and T2 already drives the same server path. T2 also covers failure boundaries that a live run cannot inject safely.
+
+**Live v1.1.1 data was not changed by the T3.** `history.db`, `stats.json` and `config.json` stayed byte-identical to the pre-T3 baseline. The only live change was a `startup.log` entry: the user accidentally started the normal launcher while the isolated instance owned port 8765, and it failed closed with `ENV-PORT-IN-USE` before taking ownership.
+
+PR #5 (*Known limitations*) lists the known residuals; none of them blocks:
+
+- the abrupt-death window between the history commit and the stats write
+- the missing recovery hint for a corrupt `pending-history.json`
+- the two meanings of `matches`
+
 ## Requirements added on 2026-09-12 — Revision 3
 
 Adopted by the user, recorded here so they are recoverable from GitHub alone. All are **planned or backlog**; none is authorisation to implement now.
@@ -96,14 +138,20 @@ Requirements: MASTER_REQUIREMENTS §52, §56–§63 and §64. Reasoning: [DECISI
 
 ## Next actions
 
-1. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
-2. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
-3. Then #24, and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+1. **Issue [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness.** Cut a fresh branch and worktree from the current `main`, which now contains PR #5. Not started. It follows the §3 gate order. T1 stays **N/A / not run** until #14 itself provides it.
+2. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-**PR #5 is the only unmerged generation.** No new feature branch starts until it lands (§4).
+**PR #5 has landed** (2026-09-13). The only unmerged generation is draft PR #31 (docs-only), so #14 may take the product slot. No third generation starts (§4).
+
+Two dated snapshots in MASTER_REQUIREMENTS Revision 3 still describe PR #5 as pending:
+
+- §34: "the next product generation is draft PR #5"
+- §36: "Draft PR #5 is the one item still open"
+
+Both sections name this file as the live position. They are deliberately left untouched on `main`; they get reconciled in the next requirements revision, draft PR #31 (Revision 4).
 
 
-### Order after PR #5
+### Order from here
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
