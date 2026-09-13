@@ -31,6 +31,7 @@ files=[
     "test_purge_atomicity.py",
     "test_purge_history_writability.py",
     "test_result_persistence_invariant.py",
+    "test_pending_history_recovery.py",
     "test_test_isolation.py",
     "test_t2_harness_selfcheck.py",
     "test_history_store.py",

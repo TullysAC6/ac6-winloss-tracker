@@ -302,7 +302,9 @@ class StatsWriteFailureLeavesNoHistoryOnlyResult(DurableResultHarness):
         for key in ("rows", "stats", "stats_json", "streak", "lifetime", "undo"):
             self.assertEqual(after[key], before[key],
                              f"a stats write failure changed {key}: a history-only result")
-        self.assertEqual([kind for kind, _ in events if kind in ("stats", "lifetime", "effect")], [])
+        self.assertEqual([kind for kind, _ in events if kind in ("stats", "effect")], [])
+        self.assertEqual([payload["wins"] for kind, payload in events if kind == "lifetime"],
+                         [before["lifetime"][0]])
         self.assertEqual(self.server.uncounted_event_ids, [])
         self.assert_counts_agree(after, "after a stats write failure")
 

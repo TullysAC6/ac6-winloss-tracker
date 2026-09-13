@@ -24,6 +24,7 @@ from history_analytics import ACTIVE_SESSION_PURGE_MESSAGE, latest_allowed_cutof
 from history_store import ActiveSessionOverlap, HistoryStore, read_history_schema_version
 from result_detector import ResultDetector
 from result_gate import ResultGate
+from pending_history import PendingHistory
 from stats_manager import StatsCorruptError, StatsManager
 
 
@@ -48,6 +49,7 @@ history_event_ids = []
 # History rows written for a result that could then not be counted in stats.
 # Each is taken back out before any further result is accepted.
 uncounted_event_ids = []
+pending_history = PendingHistory(DATA_ROOT)
 dashboard_cache_lock = threading.Lock()
 dashboard_cache = None
 DASHBOARD_RECENT_MATCH_LIMIT = 50
@@ -228,6 +230,8 @@ def set_history_health(status, error=None, *, after_read=False):
     changed = False
     with history_lock:
         if status == "active":
+            if uncounted_event_ids:
+                return
             if after_read and history_write_failed:
                 return
             if not after_read:
@@ -578,6 +582,10 @@ class UndoFailed(RuntimeError):
     """History refused to remove the result, so nothing was undone."""
 
 
+class UndoIncomplete(RuntimeError):
+    """Stats changed but history compensation is still pending."""
+
+
 def undo_result():
     """Undo the latest accepted result in both stores, or in neither.
 
@@ -588,6 +596,8 @@ def undo_result():
     the row is queued to be taken out of history, completing the undo.
     """
     with result_lock:
+        if uncounted_event_ids and not settle_uncounted_results(history):
+            raise UndoIncomplete("previous history correction is still pending")
         before = stats.snapshot()
         s, removed = stats.undo()
         invalidate_dashboard_summary()
@@ -607,7 +617,18 @@ def undo_result():
                         error=f"{type(restore_error).__name__}: {restore_error}",
                     )
                     history_event_ids.pop()
-                    uncounted_event_ids.append(event_id)
+                    remember_uncounted_result(event_id)
+                    result_gate.clear_for_manual_correction()
+                    with detector_lock:
+                        current = detector
+                    if current:
+                        current.after_undo()
+                    publish_stats_active(s)
+                    publish_lifetime()
+                    raise UndoIncomplete(
+                        "stats were undone but history cleanup is pending; "
+                        "the previous stats could not be restored"
+                    ) from restore_error
                 else:
                     invalidate_dashboard_summary()
                     publish_stats_active(s)
@@ -917,10 +938,37 @@ def discard_uncounted_result(store, event_id):
     try:
         store.discard_result(event_id)
     except Exception as error:  # noqa: BLE001 - recorded as history health
-        uncounted_event_ids.append(event_id)
+        remember_uncounted_result(event_id)
         history_failure("discard_result", error)
+    else:
+        # A reconnect may have observed the row between the history commit
+        # and the failed stats write. Correct that snapshot on the live stream.
+        publish_lifetime()
     finally:
         invalidate_dashboard_summary()
+
+
+def remember_uncounted_result(event_id):
+    if event_id not in uncounted_event_ids:
+        uncounted_event_ids.append(event_id)
+    try:
+        pending_history.save(uncounted_event_ids)
+    except Exception as error:
+        # Keep the in-memory obligation and refuse a clean shutdown unless it
+        # can be settled or saved. Do not hide the original write failure.
+        history_failure("save_pending_history", error)
+
+
+def prepare_history_shutdown():
+    if not result_lock.acquire(timeout=5.0):
+        raise RuntimeError("result persistence is busy; shutdown was not completed")
+    try:
+        if uncounted_event_ids and not settle_uncounted_results(history):
+            # A normal restart can finish this even while DELETE is refused.
+            # If the recovery file cannot be written either, shutdown fails.
+            pending_history.save(uncounted_event_ids)
+    finally:
+        result_lock.release()
 
 
 def settle_uncounted_results(store):
@@ -930,11 +978,12 @@ def settle_uncounted_results(store):
         while uncounted_event_ids:
             try:
                 store.discard_result(uncounted_event_ids[0])
+                removed = True
+                pending_history.save(uncounted_event_ids[1:])
             except Exception as error:  # noqa: BLE001 - recorded as history health
                 history_failure("discard_result", error)
                 return False
             uncounted_event_ids.pop(0)
-            removed = True
         return True
     finally:
         if removed:
@@ -1223,6 +1272,7 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             if path == "/api/system/shutdown":
+                prepare_history_shutdown()
                 self.json_response({"ok": True, "status": "shutting_down"})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
                 return
@@ -1402,11 +1452,14 @@ def main(on_ready=None):
     history_event_ids.clear()
     try:
         store = HistoryStore(DATA_ROOT)
+        pending_ids = pending_history.load()
         store.start_session()
+        uncounted_event_ids[:] = pending_ids
         invalidate_dashboard_summary()
         with history_lock:
             history = store
-        set_history_health("active")
+        if settle_uncounted_results(store):
+            set_history_health("active")
         print(f"[history] session {store.current_session_id} started")
     except Exception as e:
         history_failure("startup", e)
@@ -1433,14 +1486,12 @@ def main(on_ready=None):
             detector_thread.join(timeout=4.0)
         with history_lock:
             store = history
-        if store is not None and uncounted_event_ids:
-            # Best effort: take out a row written for a result that was never
-            # counted while this process still can.
-            if result_lock.acquire(timeout=5.0):
-                try:
-                    settle_uncounted_results(store)
-                finally:
-                    result_lock.release()
+        shutdown_error = None
+        try:
+            prepare_history_shutdown()
+        except Exception as error:
+            shutdown_error = error
+            history_failure("shutdown_pending_history", error)
         if store is not None:
             try:
                 store.close_session("shutdown")
@@ -1448,6 +1499,8 @@ def main(on_ready=None):
                 history_failure("shutdown", e)
         server.server_close()
         remove_runtime_file()
+        if shutdown_error is not None:
+            raise shutdown_error
 
 
 if __name__ == "__main__":
