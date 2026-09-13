@@ -10,7 +10,7 @@ from app_paths import data_dir
 ROOT = data_dir()
 CONFIG_PATH = ROOT / "config.json"
 
-CONFIG_VERSION = 17
+CONFIG_VERSION = 18
 
 _lock = threading.Lock()
 _last_good = None
@@ -24,7 +24,11 @@ DEFAULT_CONFIG = {
     "stats_enabled": True,
     "result_detector_enabled": True,
     "effect_screenshot_enabled": False,
+    "effect_enabled": True,
+    "overlay_stats_scope": "session",
 }
+
+OVERLAY_STATS_SCOPES = ("session", "lifetime")
 
 
 def _bounded(name, value, lo, hi, cast):
@@ -49,7 +53,7 @@ def _migrate_known_config(raw):
         return dict(DEFAULT_CONFIG), None
     if type(version) is not int:
         raise ValueError("config_version: must be an integer")
-    if version not in (12, 13, 14, 15, 16):
+    if version not in (12, 13, 14, 15, 16, 17):
         raise ValueError(f"config_version: unsupported version {version}")
 
     migrated = {}
@@ -82,9 +86,12 @@ def validate_config(raw):
     if type(c["config_version"]) is not int or c["config_version"] != CONFIG_VERSION:
         raise ValueError(f"config_version: expected {CONFIG_VERSION}, got {c['config_version']}")
     c["port"] = _bounded("port", c["port"], 1024, 65535, int)
-    for k in ("stats_enabled", "result_detector_enabled", "effect_screenshot_enabled"):
+    for k in ("stats_enabled", "result_detector_enabled", "effect_screenshot_enabled",
+              "effect_enabled"):
         if type(c[k]) is not bool:
             raise ValueError(f"{k}: must be true or false")
+    if c["overlay_stats_scope"] not in OVERLAY_STATS_SCOPES:
+        raise ValueError("overlay_stats_scope: must be " + " or ".join(OVERLAY_STATS_SCOPES))
     return c
 
 

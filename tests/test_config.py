@@ -18,7 +18,7 @@ for key in ("port",):
     except ValueError: pass
     else: raise AssertionError(f"boolean accepted for numeric key: {key}")
 
-for old_version in (12,13,14,15,16):
+for old_version in (12,13,14,15,16,17):
     old=dict(base); old["config_version"]=old_version
     assert validate_config(old)["config_version"]==CONFIG_VERSION
 

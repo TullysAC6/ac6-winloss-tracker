@@ -49,23 +49,27 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
   const configWarning=document.getElementById("config-warning");
   const milestone=document.getElementById("milestone");
   const milestoneInner=milestone.querySelector(".inner");
-  let statsEnabled=true,latestStats=null,milestoneTimer=null;
+  let statsEnabled=true,latestStats=null,milestoneTimer=null,latestLifetime=null,statsScope="session";
   const overlayStartedAt=Date.now(),effectTtlMs=3000;
   const seenEffects=new Map();
   let lastEffectCreatedAt=0;
 
   async function fetchConfig(){const r=await fetch("/config",{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);return await r.json()}
   function hideMilestone(){milestone.classList.remove("show");if(milestoneTimer){clearTimeout(milestoneTimer);milestoneTimer=null}}
-  function applyConfig(c){statsEnabled=c.stats_enabled!==false;if(!statsEnabled){statsPanel.style.display="none";hideMilestone()}else if(latestStats){renderStats(latestStats)}const h=c.config_health||{};const bad=h.status==="degraded";configWarning.style.display=bad?"block":"none";if(bad)configWarning.textContent="設定ファイル異常（前回正常値で継続）"}
+  function applyConfig(c){statsEnabled=c.stats_enabled!==false;statsScope=c.overlay_stats_scope==="lifetime"?"lifetime":"session";if(!statsEnabled){statsPanel.style.display="none";hideMilestone()}else{refreshStats()}const h=c.config_health||{};const bad=h.status==="degraded";configWarning.style.display=bad?"block":"none";if(bad)configWarning.textContent="設定ファイル異常（前回正常値で継続）"}
   try{applyConfig(await fetchConfig())}catch(e){console.error("[config]",e)}
   setInterval(async()=>{try{applyConfig(await fetchConfig())}catch(e){console.error("[config]",e)}},3000);
 
   function milestoneText(n){return({5:"5連勝　激アツ!!",10:"10連勝　超激アツ!!",15:"15連勝　覚醒ゾーン突入",20:"20連勝　RUSH突入!!",25:"25連勝　RUSH継続!!",30:"30連勝!!",35:"35連勝!!",40:"40連勝!!",45:"45連勝!!",50:"50連勝　LEGEND"})[n]||`${n}連勝!!`}
   function flashMilestone(n){if(!statsEnabled||!n)return;if(milestoneTimer)clearTimeout(milestoneTimer);milestone.className="";milestone.id="milestone";milestone.classList.add(`effect-${Number(n)}`);milestoneInner.textContent=milestoneText(Number(n));milestone.classList.add("show");milestoneTimer=setTimeout(()=>{milestone.classList.remove("show");milestone.className="";milestone.id="milestone";milestoneTimer=null},3000)}
-  function renderStats(s){if(!statsEnabled){statsPanel.style.display="none";return}statsPanel.style.display="block";statsPanel.querySelector(".record").textContent=`WIN ${s.wins}　LOSE ${s.losses}`;statsPanel.querySelector(".rate").textContent=`　勝率 ${Number(s.win_rate).toFixed(1)}%`;statsPanel.querySelector(".streak").textContent=`　連勝 ${s.streak}`;statsPanel.querySelector(".status").textContent=s.status_level?`　${s.status}`:"";statsPanel.querySelector(".sub").textContent=`最高連勝 ${s.best_streak}`;statsPanel.className="";statsPanel.id="stats-panel";if(s.status_level)statsPanel.classList.add("hot-"+s.status_level)}
-  function updateStats(s){latestStats=s;renderStats(s)}
+  function renderStats(s){if(!statsEnabled){statsPanel.style.display="none";return}statsPanel.style.display="block";statsPanel.querySelector(".record").textContent=`WIN ${s.wins}　LOSE ${s.losses}`;statsPanel.querySelector(".rate").textContent=`　勝率 ${Number(s.win_rate).toFixed(1)}%`;statsPanel.querySelector(".streak").textContent=`　連勝 ${s.streak}`;statsPanel.querySelector(".status").textContent=s.status_level?`　${s.status}`:"";statsPanel.querySelector(".sub").textContent=`${s.scope_label||""}最高連勝 ${s.best_streak}`;statsPanel.className="";statsPanel.id="stats-panel";if(s.status_level)statsPanel.classList.add("hot-"+s.status_level)}
+  function updateStats(s){latestStats=s;refreshStats()}
+  function usableLifetime(d){return d&&["wins","losses","win_rate","best_streak"].every(k=>typeof d[k]==="number"&&isFinite(d[k]))}
+  function statsView(){if(!latestStats)return null;if(statsScope!=="lifetime"||!usableLifetime(latestLifetime))return latestStats;
+    return Object.assign({},latestStats,{wins:latestLifetime.wins,losses:latestLifetime.losses,win_rate:latestLifetime.win_rate,best_streak:latestLifetime.best_streak,scope_label:"累計　"})}
+  function refreshStats(){const view=statsView();if(view)renderStats(view)}
   function updateDetector(d){const bad=d.status==="error"||d.status==="degraded";detectorWarning.style.display=bad?"block":"none";if(bad)detectorWarning.textContent=d.status==="degraded"?"勝敗自動検出 要確認":"勝敗自動検出 停止"}
-  function updateStatsHealth(d){const bad=d.status==="error";statsWarning.style.display=bad?"block":"none";if(bad){statsPanel.style.display="none";hideMilestone()}else if(statsEnabled&&latestStats){renderStats(latestStats)}}
+  function updateStatsHealth(d){const bad=d.status==="error";statsWarning.style.display=bad?"block":"none";if(bad){statsPanel.style.display="none";hideMilestone()}else if(statsEnabled){refreshStats()}}
   function handleJson(e,fn){try{fn(JSON.parse(e.data))}catch(err){console.error("[SSE]",err,e.data)}}
   function handleEffect(p){
     const created=p.created_at_ms,age=Date.now()-created;
@@ -81,6 +85,7 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
   es.addEventListener("stats",e=>handleJson(e,updateStats));
   es.addEventListener("detector",e=>handleJson(e,updateDetector));
   es.addEventListener("stats_health",e=>handleJson(e,updateStatsHealth));
+  es.addEventListener("lifetime",e=>handleJson(e,d=>{latestLifetime=d;refreshStats()}));
   es.addEventListener("config_health",e=>handleJson(e,d=>{const bad=d.status==="degraded";configWarning.style.display=bad?"block":"none";if(bad)configWarning.textContent="設定ファイル異常（前回正常値で継続）"}));
   es.addEventListener("effect",e=>handleJson(e,handleEffect));
   es.onerror=e=>console.error("[SSE] reconnecting",e);
