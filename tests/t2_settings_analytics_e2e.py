@@ -169,10 +169,13 @@ def main() -> int:
     server = None
     thread = None
     try:
+        # Ownership first: every process started from here on, at any depth,
+        # is created inside the job -- including one whose parent exits first.
+        establish_process_ownership()
         children_before = owned_descendants()
     except ProcessScanError as error:
-        # Without a working scanner the lifecycle gate cannot be honoured.
-        print(f"cannot inspect the process table: {error}")
+        # Without proven ownership the lifecycle gate cannot be honoured.
+        print(f"cannot establish process ownership: {error}")
         children_before = None
 
     try:
@@ -602,6 +605,10 @@ def main() -> int:
         check("I", "purge_all accepted", status == 200, f"status={status}")
         check("I", "session reset alongside purge_all", body.get("session_reset") is True,
               str(body.get("session_reset")))
+        check("I", "purge_all names the session that is recording",
+              body.get("session_id") is not None
+              and body.get("session_id") == server.history.current_session_id,
+              f"response={body.get('session_id')} active={server.history.current_session_id}")
         cleared = get("/api/dashboard/summary")["lifetime"]
         check("I", "lifetime cleared", cleared["matches"] == 0, str(cleared["matches"]))
         check("I", "session counters cleared", get("/stats")["wins"] == 0)
@@ -660,6 +667,137 @@ def main() -> int:
                          {"mode": "before", "cutoff": 0, "pad": "x" * 8192})
         check("S", "oversized body refused", status == 400, f"status={status}")
 
+        # --------------------------------- H2. purge leaves history writable
+        print("\nH2. a purge that reports success leaves history able to record")
+        store = server.history
+
+        def open_sessions():
+            probe = sqlite3.connect(data / "history.db")
+            try:
+                return [row[0] for row in probe.execute(
+                    "SELECT id FROM sessions WHERE ended_at IS NULL ORDER BY id")]
+            finally:
+                probe.close()
+
+        def totals():
+            stats_now = get("/stats")
+            lifetime_now = get("/api/dashboard/summary")["lifetime"]
+            return ((stats_now["wins"], stats_now["losses"]),
+                    (lifetime_now["wins"], lifetime_now["losses"]))
+
+        def moved(before_pair, after_pair):
+            return (after_pair[0] - before_pair[0], after_pair[1] - before_pair[1])
+
+        def attempt(result):
+            """One result through the production path, waiting out the real gate.
+
+            Returns whether it was accepted and how far it moved stats and
+            history, so a result counted in stats alone cannot hide.
+            """
+            time.sleep(COOLDOWN_SECONDS + 0.4)
+            stats_before, history_before = totals()
+            accepted = server.record_result(result, "manual")
+            stats_after, history_after = totals()
+            return (accepted, moved(stats_before, stats_after),
+                    moved(history_before, history_after))
+
+        # The reviewer's exact reproduction: start_session fails during the purge.
+        def refuse_start(*args, **kwargs):
+            raise OSError("injected start_session failure")
+
+        store.start_session = refuse_start
+        try:
+            status, body = post("/api/history/purge", {"mode": "all"})
+            check("H2", "reproduction: 200 only with a writable session",
+                  status == 200 and open_sessions() == [store.current_session_id],
+                  f"status={status} active={store.current_session_id} open={open_sessions()}")
+            check("H2", "reproduction: the response names the recording session",
+                  body.get("session_id") == store.current_session_id,
+                  f"response={body.get('session_id')} active={store.current_session_id}")
+            for result, expected in (("win", (1, 0)), ("loss", (0, 1))):
+                accepted, stats_moved, history_moved = attempt(result)
+                check("H2", f"reproduction: {result.upper()} accepted", accepted is True)
+                check("H2", f"reproduction: {result.upper()} persisted, not stats-only",
+                      stats_moved == history_moved == expected,
+                      f"stats {stats_moved} history {history_moved}")
+            status, body = post("/api/stats/undo")
+            check("H2", "reproduction: undo removes the LOSE from both stores",
+                  status == 200 and totals() == ((1, 0), (1, 0)), str(totals()))
+        finally:
+            vars(store).pop("start_session", None)
+
+        # No writable session can be established: never 200, and no result is
+        # accepted until one can be.
+        fault = {"armed": False}
+        real_connect = store._connect
+        real_purge_all = store.purge_all
+
+        class SessionInsertFault:
+            def __init__(self, connection):
+                self._connection = connection
+
+            def execute(self, sql, *args):
+                if fault["armed"] and "INSERT INTO sessions" in sql:
+                    raise sqlite3.OperationalError("injected: cannot insert a session row")
+                return self._connection.execute(sql, *args)
+
+            def __enter__(self):
+                self._connection.__enter__()
+                return self
+
+            def __exit__(self, *exc):
+                return self._connection.__exit__(*exc)
+
+            def __getattr__(self, name):
+                return getattr(self._connection, name)
+
+        def purge_then_lose_session():
+            outcome = real_purge_all()
+            probe = sqlite3.connect(data / "history.db")
+            try:
+                probe.execute(
+                    "UPDATE sessions SET ended_at=?, ended_reason=? WHERE ended_at IS NULL",
+                    (time.time(), "closed-out-of-band"))
+                probe.commit()
+            finally:
+                probe.close()
+            fault["armed"] = True
+            return outcome
+
+        store._connect = lambda: SessionInsertFault(real_connect())
+        store.purge_all = purge_then_lose_session
+        try:
+            status, body = post("/api/history/purge", {"mode": "all"})
+            check("H2", "no writable session: purge is never 200",
+                  status == 500 and body.get("ok") is False, f"status={status} {body}")
+            check("H2", "no writable session: the failure names the history session",
+                  body.get("stage") == "history session", str(body.get("stage")))
+            check("H2", "no writable session: dashboard shows history degraded",
+                  get("/api/dashboard/summary")["history_health"]["status"] == "degraded")
+            vars(store).pop("purge_all", None)
+            accepted, stats_moved, history_moved = attempt("win")
+            check("H2", "no writable session: a WIN is refused, not counted in stats",
+                  accepted is False and stats_moved == history_moved == (0, 0),
+                  f"accepted={accepted} stats {stats_moved} history {history_moved}")
+            fault["armed"] = False
+            accepted, stats_moved, history_moved = attempt("win")
+            check("H2", "recording resumes by itself once a session can be created",
+                  accepted is True and stats_moved == history_moved == (1, 0),
+                  f"accepted={accepted} stats {stats_moved} history {history_moved}")
+            check("H2", "history health is active again",
+                  get("/api/dashboard/summary")["history_health"]["status"] == "active")
+        finally:
+            vars(store).pop("_connect", None)
+            vars(store).pop("purge_all", None)
+
+        snapshot = dict(server.safe_snapshot_bundle())
+        stats_now, lifetime_now = totals()
+        check("H2", "an SSE reconnect snapshot matches /stats and the dashboard",
+              (snapshot["stats"]["wins"], snapshot["stats"]["losses"]) == stats_now
+              and (snapshot["lifetime"]["wins"], snapshot["lifetime"]["losses"]) == lifetime_now,
+              f"snapshot stats={snapshot['stats']['wins']}/{snapshot['stats']['losses']} "
+              f"lifetime={snapshot['lifetime']['wins']}/{snapshot['lifetime']['losses']}")
+
     finally:
         # Cleanup is part of the gate, not an epilogue. The exit status is
         # computed after teardown so a stuck thread, a bound port or a surviving
@@ -673,7 +811,7 @@ def main() -> int:
 
 
 class ProcessScanError(RuntimeError):
-    """The process table could not be read.
+    """The process table could not be read, or ownership could not be proven.
 
     This is raised rather than returning an empty set on purpose. Independent
     review found the previous implementation shelled out to wmic, swallowed a
@@ -683,12 +821,23 @@ class ProcessScanError(RuntimeError):
     """
 
 
+ERROR_NO_MORE_FILES = 18
+ERROR_INVALID_PARAMETER = 87
+ERROR_MORE_DATA = 234
+
+
 def process_parents():
-    """Map every visible pid to its parent pid, using the OS directly.
+    """Map every live pid to its parent pid, using the OS directly.
 
     Windows uses the Tool Help snapshot API through ctypes; there is no external
-    command and no new dependency. Any failure raises.
+    command and no new dependency. The walk has exactly one normal ending:
+    Process32NextW returning FALSE with ERROR_NO_MORE_FILES. Review 5188346877
+    showed any other ending -- ERROR_ACCESS_DENIED part-way through, say --
+    returned as if the table were complete, and a partial table cannot prove
+    that nothing was left running. Every failure raises, including a table that
+    does not contain this very process.
     """
+    parents = {}
     if os.name == "nt":
         import ctypes
         from ctypes import wintypes
@@ -722,55 +871,264 @@ def process_parents():
         snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
         if snapshot == INVALID_HANDLE_VALUE or not snapshot:
             raise ProcessScanError(
-                f"CreateToolhelp32Snapshot failed: {ctypes.get_last_error()}")
-        parents = {}
+                f"CreateToolhelp32Snapshot failed: error {ctypes.get_last_error()}")
         try:
             entry = PROCESSENTRY32W()
             entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
             if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
                 raise ProcessScanError(
-                    f"Process32FirstW failed: {ctypes.get_last_error()}")
+                    f"Process32FirstW failed: error {ctypes.get_last_error()}")
             while True:
                 parents[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
-                if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
-                    break
+                if kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                    continue
+                error = ctypes.get_last_error()
+                if error != ERROR_NO_MORE_FILES:
+                    raise ProcessScanError(
+                        f"Process32NextW stopped after {len(parents)} entries with "
+                        f"error {error} instead of ERROR_NO_MORE_FILES: the process "
+                        "table is incomplete")
+                break
         finally:
             kernel32.CloseHandle(snapshot)
-        if not parents:
-            raise ProcessScanError("process table came back empty")
-        return parents
-
-    parents = {}
-    try:
-        for name in os.listdir("/proc"):
-            if not name.isdigit():
-                continue
-            try:
-                with open(f"/proc/{name}/stat", "r", encoding="utf-8") as handle:
-                    fields = handle.read().rsplit(")", 1)[-1].split()
-                parents[int(name)] = int(fields[1])
-            except (OSError, IndexError, ValueError):
-                continue
-    except OSError as error:
-        raise ProcessScanError(f"/proc could not be read: {error}") from error
+    else:
+        try:
+            for name in os.listdir("/proc"):
+                if not name.isdigit():
+                    continue
+                try:
+                    with open(f"/proc/{name}/stat", "r", encoding="utf-8") as handle:
+                        fields = handle.read().rsplit(")", 1)[-1].split()
+                    parents[int(name)] = int(fields[1])
+                except (OSError, IndexError, ValueError):
+                    continue
+        except OSError as error:
+            raise ProcessScanError(f"/proc could not be read: {error}") from error
     if not parents:
         raise ProcessScanError("process table came back empty")
+    if os.getpid() not in parents:
+        raise ProcessScanError(
+            f"process table does not contain this process ({os.getpid()})")
     return parents
 
 
-def owned_descendants(root_pid=None):
-    """Live descendants of this process, at any depth.
+class ProcessOwner:
+    """Durable ownership of every process this harness starts, at any depth.
 
-    This is ownership, not a name match: unrelated python.exe processes on the
-    machine are irrelevant, and a non-Python grandchild is still caught.
+    Parent-pid ancestry is not ownership. Windows does not re-parent an orphan,
+    so once a child exits before its own child, that still-running grandchild is
+    nobody's descendant -- review 5188346877 left exactly such a process running
+    while the gate reported that nothing owned was left.
+
+    A Job Object is ownership. This process joins a job before anything is
+    started; every process it starts, and every process those start, is created
+    inside the job and stays a member after its parent exits. Membership is kept
+    by the kernel rather than inferred from pids, and every member is verified
+    with IsProcessInJob on an opened handle before it is reported or terminated.
+    The handle pins the process object, so a recycled pid naming some unrelated
+    process can never be mistaken for ours, even between the check and the kill.
+
+    KILL_ON_JOB_CLOSE is only an emergency backstop for a run that dies without
+    cleaning up (the watchdog's os._exit). It is never evidence of cleanup:
+    teardown reclaims explicitly and then proves nothing owned is left. The job
+    handle is deliberately never closed while this process is alive, because
+    this process is itself a member.
     """
-    root_pid = os.getpid() if root_pid is None else int(root_pid)
-    parents = process_parents()
-    if root_pid not in parents:
-        # A table that cannot see this very process is not trustworthy enough
-        # to conclude "no children" from.
+
+    JOB_OBJECT_BASIC_PROCESS_ID_LIST = 3
+    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
+    PROCESS_TERMINATE = 0x0001
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    SYNCHRONIZE = 0x00100000
+    WAIT_OBJECT_0 = 0x0
+    WAIT_TIMEOUT = 0x102
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes
+
+        self._ctypes, self._wintypes = ctypes, wintypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        declarations = {
+            "CreateJobObjectW": ([ctypes.c_void_p, wintypes.LPCWSTR], wintypes.HANDLE),
+            "SetInformationJobObject": (
+                [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD],
+                wintypes.BOOL),
+            "AssignProcessToJobObject": ([wintypes.HANDLE, wintypes.HANDLE], wintypes.BOOL),
+            "GetCurrentProcess": ([], wintypes.HANDLE),
+            "QueryInformationJobObject": (
+                [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                 ctypes.POINTER(wintypes.DWORD)], wintypes.BOOL),
+            "IsProcessInJob": (
+                [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)],
+                wintypes.BOOL),
+            "OpenProcess": ([wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE),
+            "TerminateProcess": ([wintypes.HANDLE, wintypes.UINT], wintypes.BOOL),
+            "WaitForSingleObject": ([wintypes.HANDLE, wintypes.DWORD], wintypes.DWORD),
+            "CloseHandle": ([wintypes.HANDLE], wintypes.BOOL),
+        }
+        for name, (argtypes, restype) in declarations.items():
+            function = getattr(kernel32, name)
+            function.argtypes, function.restype = argtypes, restype
+        self._kernel32 = kernel32
+
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            raise ProcessScanError(f"CreateJobObjectW failed: error {ctypes.get_last_error()}")
+        limits = self._extended_limits()
+        limits.basic.flags = self.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not kernel32.SetInformationJobObject(
+                job, self.JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                ctypes.byref(limits), ctypes.sizeof(limits)):
+            error = ctypes.get_last_error()
+            kernel32.CloseHandle(job)  # nothing has joined yet, so closing is safe
+            raise ProcessScanError(f"SetInformationJobObject failed: error {error}")
+        if not kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess()):
+            error = ctypes.get_last_error()
+            kernel32.CloseHandle(job)  # the assignment failed, so this process is not a member
+            raise ProcessScanError(f"this process could not join an ownership job: error {error}")
+        self._job = job
+        if not self.is_member_handle(kernel32.GetCurrentProcess()):
+            raise ProcessScanError("this process is not a member of its own ownership job")
+
+    def _extended_limits(self):
+        ctypes, wintypes = self._ctypes, self._wintypes
+
+        class Basic(ctypes.Structure):
+            _fields_ = [("process_time", ctypes.c_longlong), ("job_time", ctypes.c_longlong),
+                        ("flags", wintypes.DWORD), ("minimum", ctypes.c_size_t),
+                        ("maximum", ctypes.c_size_t), ("active", wintypes.DWORD),
+                        ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                        ("scheduling", wintypes.DWORD)]
+
+        class IO(ctypes.Structure):
+            _fields_ = [(name, ctypes.c_ulonglong) for name in
+                        ("read_ops", "write_ops", "other_ops",
+                         "read_bytes", "write_bytes", "other_bytes")]
+
+        class Extended(ctypes.Structure):
+            _fields_ = [("basic", Basic), ("io", IO), ("process_memory", ctypes.c_size_t),
+                        ("job_memory", ctypes.c_size_t), ("peak_process", ctypes.c_size_t),
+                        ("peak_job", ctypes.c_size_t)]
+
+        return Extended()
+
+    def member_pids(self):
+        """Every pid the kernel lists in the job -- the complete list, or raise."""
+        ctypes, wintypes = self._ctypes, self._wintypes
+        capacity = 256
+        for _ in range(8):
+            class IdList(ctypes.Structure):
+                _fields_ = [("assigned", wintypes.DWORD), ("listed", wintypes.DWORD),
+                            ("ids", ctypes.c_size_t * capacity)]
+
+            listing = IdList()
+            ok = self._kernel32.QueryInformationJobObject(
+                self._job, self.JOB_OBJECT_BASIC_PROCESS_ID_LIST,
+                ctypes.byref(listing), ctypes.sizeof(listing), None)
+            error = ctypes.get_last_error()
+            if ok and listing.listed == listing.assigned:
+                return {int(listing.ids[index]) for index in range(listing.listed)}
+            if ok or error == ERROR_MORE_DATA:
+                capacity = max(capacity * 4, int(listing.assigned) + 64)
+                continue
+            raise ProcessScanError(f"QueryInformationJobObject failed: error {error}")
+        raise ProcessScanError("the job membership list never came back complete")
+
+    def is_member_handle(self, handle):
+        result = self._wintypes.BOOL()
+        if not self._kernel32.IsProcessInJob(handle, self._job, self._ctypes.byref(result)):
+            raise ProcessScanError(
+                f"IsProcessInJob failed: error {self._ctypes.get_last_error()}")
+        return bool(result.value)
+
+    def _alive(self, handle):
+        return self._kernel32.WaitForSingleObject(handle, 0) == self.WAIT_TIMEOUT
+
+    def owned(self):
+        """Live members of the job other than this process, each verified by handle."""
+        me = os.getpid()
+        found = set()
+        for pid in self.member_pids():
+            if pid == me:
+                continue
+            handle = self._kernel32.OpenProcess(
+                self.PROCESS_QUERY_LIMITED_INFORMATION | self.SYNCHRONIZE, False, pid)
+            if not handle:
+                error = self._ctypes.get_last_error()
+                if error == ERROR_INVALID_PARAMETER:
+                    continue  # exited after the listing was taken
+                raise ProcessScanError(f"job member {pid} could not be verified: error {error}")
+            try:
+                if self.is_member_handle(handle) and self._alive(handle):
+                    found.add(pid)
+            finally:
+                self._kernel32.CloseHandle(handle)
+        return found
+
+    def is_owned(self, pid):
+        """Whether ``pid`` names a live process inside this job right now."""
+        if int(pid) == os.getpid():
+            return False
+        handle = self._kernel32.OpenProcess(
+            self.PROCESS_QUERY_LIMITED_INFORMATION | self.SYNCHRONIZE, False, int(pid))
+        if not handle:
+            return False
+        try:
+            return self.is_member_handle(handle) and self._alive(handle)
+        finally:
+            self._kernel32.CloseHandle(handle)
+
+    def reclaim(self, pid, timeout_seconds=10.0):
+        """Terminate ``pid`` only if the job vouches for it; True once it has exited.
+
+        A process outside the job is never touched, whatever its pid or name.
+        """
+        if int(pid) == os.getpid():
+            return False
+        handle = self._kernel32.OpenProcess(
+            self.PROCESS_TERMINATE | self.PROCESS_QUERY_LIMITED_INFORMATION | self.SYNCHRONIZE,
+            False, int(pid))
+        if not handle:
+            return False
+        try:
+            if not (self.is_member_handle(handle) and self._alive(handle)):
+                return False
+            self._kernel32.TerminateProcess(handle, 1)
+            waited = self._kernel32.WaitForSingleObject(handle, int(timeout_seconds * 1000))
+            return waited == self.WAIT_OBJECT_0
+        finally:
+            self._kernel32.CloseHandle(handle)
+
+
+_PROCESS_OWNER = None
+_PROCESS_OWNER_LOCK = threading.Lock()
+
+
+def establish_process_ownership():
+    """Join the ownership job; call before anything is started. Idempotent."""
+    global _PROCESS_OWNER
+    if os.name != "nt":
+        return None
+    with _PROCESS_OWNER_LOCK:
+        if _PROCESS_OWNER is None:
+            _PROCESS_OWNER = ProcessOwner()
+        return _PROCESS_OWNER
+
+
+def process_owner():
+    """The ownership job, which must already exist; None where there is none."""
+    if os.name != "nt":
+        return None
+    if _PROCESS_OWNER is None:
         raise ProcessScanError(
-            f"process table does not contain this process ({root_pid})")
+            "process ownership was not established before anything was started")
+    return _PROCESS_OWNER
+
+
+def ancestry_descendants(parents, root_pid):
+    """Descendants reachable through parent pids. Blind to an orphan by design."""
     children = {}
     for pid, parent in parents.items():
         children.setdefault(parent, []).append(pid)
@@ -781,6 +1139,32 @@ def owned_descendants(root_pid=None):
             continue
         found.add(pid)
         pending.extend(children.get(pid, ()))
+    return found
+
+
+def owned_descendants(root_pid=None):
+    """Live processes this harness owns, at any depth, including orphans.
+
+    The union of two views, each of which fails closed:
+
+    * job membership (Windows): durable ownership that survives a parent exiting
+      before its child and cannot be fooled by pid reuse;
+    * parent-pid ancestry: a cross-check that still sees a descendant that has
+      somehow left the job while its parent is alive.
+
+    Unrelated processes on the machine are in neither view, whatever their name.
+    """
+    me = os.getpid()
+    root_pid = me if root_pid is None else int(root_pid)
+    parents = process_parents()
+    if root_pid not in parents:
+        # A table that cannot see this very process is not trustworthy enough
+        # to conclude "no children" from.
+        raise ProcessScanError(
+            f"process table does not contain this process ({root_pid})")
+    found = ancestry_descendants(parents, root_pid)
+    if root_pid == me and os.name == "nt":
+        found |= process_owner().owned()
     return found
 
 
@@ -864,6 +1248,29 @@ def teardown(state):
         detail = "not established: the process table could not be inspected"
     check("Z", "no owned child or grandchild process left",
           scanned and not leaked, detail)
+
+    # A leak has already failed the gate above; reclaiming it does not undo
+    # that. What follows makes sure the failure cannot outlive the run: only
+    # processes the job vouches for are terminated -- never one matched by pid
+    # or name alone -- and the table is inspected again to prove none is left.
+    reclaimed, reclaim_detail = scanned, ""
+    if not scanned:
+        reclaim_detail = "not established: the process table could not be inspected"
+    elif leaked:
+        try:
+            owner = process_owner()
+            for pid in sorted(leaked):
+                if owner is not None:
+                    owner.reclaim(pid)
+            remaining = owned_descendants() - set(baseline)
+            reclaimed = not remaining
+            reclaim_detail = (f"reclaimed {sorted(leaked - remaining)}"
+                              + (f"; still running {sorted(remaining)}" if remaining else ""))
+        except Exception as error:
+            reclaimed = False
+            reclaim_detail = f"{type(error).__name__}: {error}"
+            exceptions.append(f"reclaim: {reclaim_detail}")
+    check("Z", "leaked owned processes reclaimed", reclaimed, reclaim_detail)
 
     runtime_left = []
     try:
