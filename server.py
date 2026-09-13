@@ -249,7 +249,11 @@ def _dashboard_summary_uncached():
             session_meta = store.session_metadata()
             lifetime = store.lifetime_summary()
             recent = store.recent_matches(DASHBOARD_RECENT_MATCH_LIMIT)
-            set_history_health("active")
+            # A readable database is not a recording one: without an active
+            # session the next result cannot be stored, so a degraded health
+            # recorded for that must not be overwritten by a successful read.
+            if session_meta is not None:
+                set_history_health("active")
             with history_lock:
                 health = dict(history_health)
         except Exception as e:
@@ -439,6 +443,14 @@ def record_result(result, source):
         c = load_config()
         cooldown = 5.0
 
+        # A history store with no active session would let the stats write
+        # below count a result that history silently drops. Re-establish it
+        # first; if that is impossible, refuse the result before any state --
+        # the gate included -- is touched, exactly as a gate rejection does.
+        if not history_ready_for_result():
+            print(f"[result] history session unavailable; {result} from {source} not recorded")
+            return False
+
         # Auto and manual paths share one gate. Rejected duplicates do NOT
         # mutate detector state or extend the cooldown.
         if not result_gate.try_accept(cooldown, now=now):
@@ -619,6 +631,10 @@ class PurgeFailed(RuntimeError):
 
     def message(self):
         """What the user is actually left with, not just what threw."""
+        if self.stage == "history session":
+            return ("履歴とセッション成績は削除・初期化されましたが、新しい記録先の履歴"
+                    "セッションを作成できませんでした。作成できるまで勝敗は記録しません。"
+                    "Trackerを再起動してください。")
         if self.history_cleared:
             return ("履歴とセッション成績は削除・初期化されましたが、検出状態の同期に"
                     "失敗しました。Trackerを再起動してください。")
@@ -684,21 +700,43 @@ def _purge_all_coordinated():
             # ordinary "reset session" state, but only once the rest of that
             # contract is applied -- above all the undo identities, which would
             # otherwise let an empty session delete the history this error says
-            # was retained.
-            converge_session_reset(s)
+            # was retained. The history session is advanced here, because the
+            # purge that would have opened a fresh one did not happen.
+            converge_session_reset(s, advance_history=True)
         raise PurgeFailed(
             "history purge", error, history_cleared=False, stats_restored=restored
         ) from error
 
-    # Both stores are now cleared and agree. What follows is the rest of the
-    # session-reset contract; a failure in it is reported rather than swallowed,
-    # but the state is still converged first so no client keeps a stale session.
+    # Both stores are now cleared and agree. purge_all opened the fresh session
+    # in the same transaction as the delete, and that session is where the next
+    # result must land -- so it is kept, not advanced a second time. Advancing it
+    # again closed a valid session before opening another, and a failed insert
+    # then left the store with no session at all while this returned success.
+    #
+    # Success therefore has to be proven rather than assumed: the active session
+    # must exist and be open. The rest of the session-reset contract is applied
+    # whatever that proof finds, so no client keeps a stale session, and then the
+    # first failure is reported -- a missing history session first, because that
+    # is the one that would silently drop results.
+    session_error = None
     try:
-        converge_session_reset(s)
-    except Exception as error:
+        outcome["session_id"] = require_writable_history_session()
+    except Exception as error:  # noqa: BLE001 - reported below
+        session_error = error
+        history_failure("establish_session", error)
+    sync_error = None
+    try:
+        converge_session_reset(s, advance_history=False)
+    except Exception as error:  # noqa: BLE001 - reported below
+        sync_error = error
+    if session_error is not None:
         raise PurgeFailed(
-            "post-purge synchronization", error, history_cleared=True
-        ) from error
+            "history session", session_error, history_cleared=True
+        ) from session_error
+    if sync_error is not None:
+        raise PurgeFailed(
+            "post-purge synchronization", sync_error, history_cleared=True
+        ) from sync_error
 
     outcome["session_reset"] = True
     outcome["stats"] = status_payload(s)
@@ -710,13 +748,19 @@ def _publish_session(s):
     publish_stats_active(s)
 
 
-def converge_session_reset(s):
+def converge_session_reset(s, *, advance_history):
     """Apply the rest of ``reset_stats``'s contract to an already-reset session.
 
     ``stats.reset()`` alone only rewrites stats.json. The supported session
-    reset also drops the undo identities, advances the history session, locks
-    the gate, tells the detector, and publishes the new session to connected
-    clients. A purge that ends with the session reset owes every one of those.
+    reset also drops the undo identities, locks the gate, tells the detector,
+    publishes the new session to connected clients, and -- when no fresh history
+    session exists yet -- advances the history session. A purge that ends with
+    the session reset owes every one of those.
+
+    ``advance_history`` is explicit because the two callers differ. A successful
+    purge has already opened a fresh session inside its own transaction and must
+    not replace it; a purge that failed leaves the old session in place, and that
+    one needs advancing.
 
     The undo identities are dropped first and cannot fail. That ordering is the
     safety-critical part: ``undo_result`` pops an identity and deletes that
@@ -749,19 +793,68 @@ def converge_session_reset(s):
     attempt(synchronize)
     attempt(lambda: _publish_session(s))
 
-    # Advancing the history session is tolerant here exactly as it is in
-    # reset_stats: it must not mask the failure that brought us here.
-    with history_lock:
-        store = history
-    if store is not None:
-        try:
-            store.reset_session()
-            set_history_health("active")
-        except Exception as e:
-            history_failure("reset_session", e)
+    if advance_history:
+        # One transaction, and ownership moves only after it commits: a failure
+        # leaves the previous session active and writable instead of leaving no
+        # session at all. It is recorded rather than raised so it cannot mask
+        # the failure that brought the caller here.
+        with history_lock:
+            store = history
+        if store is not None:
+            try:
+                store.establish_session("manual_reset")
+                set_history_health("active")
+            except Exception as e:
+                history_failure("establish_session", e)
 
     if failure is not None:
         raise failure
+
+
+def require_writable_history_session():
+    """Prove the next accepted result can be written to history, or raise.
+
+    Called before a purge reports success. If the in-memory owner is missing or
+    points at a closed session, one transactional attempt is made to establish
+    a new one; if that fails too, the caller must not report success.
+    """
+    with history_lock:
+        store = history
+    if store is None:
+        raise RuntimeError("history store is unavailable")
+    session_id = store.confirm_active_session()
+    if session_id is None:
+        store.establish_session("recovered")
+        session_id = store.confirm_active_session()
+        if session_id is None:
+            raise RuntimeError("no active history session after establishing one")
+    return session_id
+
+
+def history_ready_for_result():
+    """Whether an accepted result would reach history as well as stats.
+
+    Stats and history are separate stores. A history store that exists but has
+    no active session would let a result be counted in stats and silently
+    dropped from history. This re-establishes the session once, so a temporary
+    failure does not stop recording once the database is healthy again; if that
+    is impossible it answers False, and the caller refuses the result the way a
+    gate rejection does rather than counting it in stats alone.
+
+    Cheap on the normal path -- an attribute read, no query. A store that could
+    not be opened at startup keeps its existing degraded behaviour.
+    """
+    with history_lock:
+        store = history
+    if store is None or store.current_session_id is not None:
+        return True
+    try:
+        store.establish_session("recovered")
+        set_history_health("active")
+        return True
+    except Exception as error:  # noqa: BLE001 - recorded as history health
+        history_failure("establish_session", error)
+        return False
 
 
 def store_purge_all():
@@ -786,10 +879,13 @@ def purge_history(mode, cutoff=None):
         if mode == "all":
             try:
                 outcome = _purge_all_coordinated()
+                # Only a purge that proved a writable session reports history as
+                # active. A failure keeps whatever health its own steps recorded,
+                # so a session that could not be established stays degraded.
+                set_history_health("active")
             finally:
                 # The dashboard must never serve a cached summary that predates
                 # a partially applied purge, whichever way it ended.
-                set_history_health("active")
                 invalidate_dashboard_summary()
                 publish_lifetime()
         else:

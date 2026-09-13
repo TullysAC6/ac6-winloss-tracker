@@ -29,6 +29,7 @@ files=[
     "test_config.py",
     "test_settings_actions.py",
     "test_purge_atomicity.py",
+    "test_purge_history_writability.py",
     "test_test_isolation.py",
     "test_t2_harness_selfcheck.py",
     "test_history_store.py",

@@ -264,6 +264,58 @@ class HistoryStore:
                 )
             self._current_session_id = None
 
+    def confirm_active_session(self) -> int | None:
+        """The active session id, proven to name a session that is still open.
+
+        For callers that must prove the next result can be persisted; it runs a
+        query, so it is not used on the result hot path. An owner that names a
+        closed or missing session, or that cannot be checked at all, is dropped:
+        a result must then establish a fresh session first rather than be
+        written against a session nobody can vouch for.
+        """
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                return None
+            try:
+                with self._connection() as connection:
+                    row = connection.execute(
+                        "SELECT 1 FROM sessions WHERE id=? AND ended_at IS NULL",
+                        (session_id,),
+                    ).fetchone()
+            except Exception:
+                self._current_session_id = None
+                raise
+            if row is None:
+                self._current_session_id = None
+                return None
+            return session_id
+
+    def establish_session(self, reason: str, started_at: float | None = None) -> int:
+        """Close any open session and open a new one, as a single transaction.
+
+        ``reset_session`` closes and starts in two separate commits and clears
+        the in-memory owner between them, so a failed start leaves the store
+        with no active session at all. Here the close and the insert commit
+        together or not at all, and ownership moves only after that commit: on
+        failure the previous session, if there was one, is still the active and
+        writable one.
+        """
+        started_at = time.time() if started_at is None else float(started_at)
+        with self._lock:
+            with self._connection() as connection:
+                connection.execute(
+                    "UPDATE sessions SET ended_at=?, ended_reason=? WHERE ended_at IS NULL",
+                    (started_at, str(reason)),
+                )
+                session_id = int(
+                    connection.execute(
+                        "INSERT INTO sessions(started_at) VALUES (?)", (started_at,)
+                    ).lastrowid
+                )
+            self._current_session_id = session_id
+            return session_id
+
     def reset_session(self) -> int:
         self.close_session("manual_reset")
         return self.start_session()
