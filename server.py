@@ -45,6 +45,9 @@ history = None
 history_lock = threading.RLock()
 history_health = {"status": "starting", "error": None}
 history_event_ids = []
+# History rows written for a result that could then not be counted in stats.
+# Each is taken back out before any further result is accepted.
+uncounted_event_ids = []
 dashboard_cache_lock = threading.Lock()
 dashboard_cache = None
 DASHBOARD_RECENT_MATCH_LIMIT = 50
@@ -213,9 +216,22 @@ def invalidate_dashboard_summary():
         dashboard_cache = None
 
 
-def set_history_health(status, error=None):
+# A failed read may be cleared by a later read that succeeds. A failed write --
+# a result row, an undo, a session -- is cleared only by a write that succeeds:
+# a database that can still be read may still refuse the next result.
+HISTORY_READ_OPERATIONS = frozenset({"dashboard_summary", "lifetime_summary"})
+history_write_failed = False
+
+
+def set_history_health(status, error=None, *, after_read=False):
+    global history_write_failed
     changed = False
     with history_lock:
+        if status == "active":
+            if after_read and history_write_failed:
+                return
+            if not after_read:
+                history_write_failed = False
         next_health = {
             "status": str(status),
             "error": None if error is None else str(error),
@@ -229,7 +245,11 @@ def set_history_health(status, error=None):
 
 
 def history_failure(operation, error):
+    global history_write_failed
     message = f"{type(error).__name__}: {error}"
+    with history_lock:
+        if operation not in HISTORY_READ_OPERATIONS:
+            history_write_failed = True
     set_history_health("degraded", message)
     RECORDER.record("history_error", operation=operation, error=message)
     print(f"[history] WARNING: {operation} failed: {message}")
@@ -249,11 +269,11 @@ def _dashboard_summary_uncached():
             session_meta = store.session_metadata()
             lifetime = store.lifetime_summary()
             recent = store.recent_matches(DASHBOARD_RECENT_MATCH_LIMIT)
-            # A readable database is not a recording one: without an active
-            # session the next result cannot be stored, so a degraded health
-            # recorded for that must not be overwritten by a successful read.
+            # A readable database is not a recording one. A read can clear a
+            # failed read, but never a failed write or a missing session: the
+            # next result could still not be stored.
             if session_meta is not None:
-                set_history_health("active")
+                set_history_health("active", after_read=True)
             with history_lock:
                 health = dict(history_health)
         except Exception as e:
@@ -443,12 +463,12 @@ def record_result(result, source):
         c = load_config()
         cooldown = 5.0
 
-        # A history store with no active session would let the stats write
-        # below count a result that history silently drops. Re-establish it
-        # first; if that is impossible, refuse the result before any state --
-        # the gate included -- is touched, exactly as a gate rejection does.
+        # A result is accepted only once it is durable in history AND counted
+        # in stats; neither store may hold an accepted result the other lacks.
+        # Refuse before the gate when history cannot take a result at all: no
+        # store, no session, or an earlier row still waiting to be taken back.
         if not history_ready_for_result():
-            print(f"[result] history session unavailable; {result} from {source} not recorded")
+            print(f"[result] history unavailable; {result} from {source} not recorded")
             return False
 
         # Auto and manual paths share one gate. Rejected duplicates do NOT
@@ -461,19 +481,47 @@ def record_result(result, source):
         # not let optional context creation participate in those writes. The
         # stable logical match relation remains the result event_id.
         context_id = secrets.token_urlsafe(18)
+        event_id = secrets.token_urlsafe(18)
+        with history_lock:
+            store = history
 
-        # Only keep the cooldown reservation when the stats mutation actually
-        # succeeds. If disk I/O or stats validation fails, release the gate so
-        # the same visible result can be retried after the detector re-arms.
+        # stats.json and history.db cannot share a transaction, so the two
+        # writes are ordered and a failure of either is undone:
+        #
+        # 1. project the stats this result would produce, writing nothing;
+        # 2. write the history row from that projection. If it fails the result
+        #    is not accepted: nothing counted, no streak, no effect, no undo
+        #    identity, no event;
+        # 3. count it in stats. If that fails the row is taken back out, so
+        #    history never keeps a result that stats did not count.
+        #
+        # Either failure releases the cooldown reservation, so the same visible
+        # result can be retried after the detector re-arms.
         try:
             before = stats.snapshot()
-            s = stats.add(result, source)
-            invalidate_dashboard_summary()
+            projected = stats.project_add(result, source)
         except Exception:
             result_gate.clear_for_manual_correction()
             raise
 
-        event_id = secrets.token_urlsafe(18)
+        try:
+            if store is None or not store.record_result(event_id, result, source, projected):
+                raise RuntimeError("the history row was not stored")
+        except Exception as e:
+            result_gate.clear_for_manual_correction()
+            history_failure("record_result", e)
+            print(f"[result] {result} from {source} not recorded: history write failed")
+            return False
+
+        try:
+            s = stats.add(result, source)
+        except Exception:
+            result_gate.clear_for_manual_correction()
+            discard_uncounted_result(store, event_id)
+            raise
+        invalidate_dashboard_summary()
+        set_history_health("active")
+
         milestone = None
         if result == "win":
             for n in range(5, 51, 5):
@@ -488,34 +536,21 @@ def record_result(result, source):
 
         publish_stats_active(s)
 
-        with history_lock:
-            store = history
-        stored_event_id = None
-        if store is not None:
-            try:
-                if store.record_result(event_id, result, source, s):
-                    stored_event_id = event_id
-                set_history_health("active")
-            except Exception as e:
-                # Current stats and detector flow remain authoritative even if
-                # the optional lifetime store is temporarily unavailable.
-                history_failure("record_result", e)
-        if store is not None and stored_event_id is not None:
-            try:
-                store.create_match_context(
-                    context_id,
-                    stored_event_id,
-                    result_detected_at=result_detected_at,
-                )
-            except Exception as e:
-                # Phase 0 context is enrichment. The accepted stats/history row
-                # above remains authoritative even if this separate write fails.
-                RECORDER.record(
-                    "match_context_error",
-                    context_id=context_id,
-                    error=f"{type(e).__name__}: {e}",
-                )
-        history_event_ids.append(stored_event_id)
+        try:
+            store.create_match_context(
+                context_id,
+                event_id,
+                result_detected_at=result_detected_at,
+            )
+        except Exception as e:
+            # Phase 0 context is enrichment. The accepted stats/history row
+            # above remains authoritative even if this separate write fails.
+            RECORDER.record(
+                "match_context_error",
+                context_id=context_id,
+                error=f"{type(e).__name__}: {e}",
+            )
+        history_event_ids.append(event_id)
         publish_lifetime()
 
         if milestone and c["effect_enabled"]:
@@ -539,25 +574,55 @@ def record_result(result, source):
         return True
 
 
+class UndoFailed(RuntimeError):
+    """History refused to remove the result, so nothing was undone."""
+
+
 def undo_result():
+    """Undo the latest accepted result in both stores, or in neither.
+
+    Stats are undone first and the matching history row second. If history
+    refuses, the stats undo is written back, so an undone result never stays in
+    history while stats stop counting it, and the failure is raised rather than
+    reported as an undo. If even that write-back fails, stats stay undone and
+    the row is queued to be taken out of history, completing the undo.
+    """
     with result_lock:
+        before = stats.snapshot()
         s, removed = stats.undo()
         invalidate_dashboard_summary()
+        with history_lock:
+            store = history
+        event_id = history_event_ids[-1] if removed is not None and history_event_ids else None
+        if event_id is not None and store is not None:
+            try:
+                store.undo_event(event_id)
+            except Exception as e:
+                history_failure("undo", e)
+                try:
+                    s = stats.restore(before)
+                except Exception as restore_error:
+                    RECORDER.record(
+                        "undo_restore_error",
+                        error=f"{type(restore_error).__name__}: {restore_error}",
+                    )
+                    history_event_ids.pop()
+                    uncounted_event_ids.append(event_id)
+                else:
+                    invalidate_dashboard_summary()
+                    publish_stats_active(s)
+                    raise UndoFailed(
+                        f"history could not remove the result; nothing was undone ({e})"
+                    ) from e
+            else:
+                history_event_ids.pop()
+                set_history_health("active")
         result_gate.clear_for_manual_correction()
         with detector_lock:
             current = detector
         if current:
             current.after_undo()
         publish_stats_active(s)
-        stored_event_id = history_event_ids.pop() if history_event_ids else None
-        with history_lock:
-            store = history
-        if store is not None and stored_event_id is not None:
-            try:
-                store.undo_event(stored_event_id)
-                set_history_health("active")
-            except Exception as e:
-                history_failure("undo", e)
         publish_lifetime()
         return s, removed
 
@@ -707,6 +772,10 @@ def _purge_all_coordinated():
             "history purge", error, history_cleared=False, stats_restored=restored
         ) from error
 
+    # Every history row is gone, including any that was waiting to be taken
+    # back out after its result could not be counted.
+    uncounted_event_ids.clear()
+
     # Both stores are now cleared and agree. purge_all opened the fresh session
     # in the same transaction as the delete, and that session is where the next
     # result must land -- so it is kept, not advanced a second time. Advancing it
@@ -831,22 +900,74 @@ def require_writable_history_session():
     return session_id
 
 
+def report_history_unavailable():
+    """Keep a missing history store visible as a failed write, recorded once."""
+    with history_lock:
+        reported = history_write_failed and history_health["status"] == "degraded"
+    if not reported:
+        history_failure("history_store", RuntimeError("history store is unavailable"))
+
+
+def discard_uncounted_result(store, event_id):
+    """Take back a history row whose result could not be counted in stats.
+
+    If history refuses that too, the row is remembered; no further result is
+    accepted until it has been removed.
+    """
+    try:
+        store.discard_result(event_id)
+    except Exception as error:  # noqa: BLE001 - recorded as history health
+        uncounted_event_ids.append(event_id)
+        history_failure("discard_result", error)
+    finally:
+        invalidate_dashboard_summary()
+
+
+def settle_uncounted_results(store):
+    """Remove every remembered uncounted row; False while one remains."""
+    removed = False
+    try:
+        while uncounted_event_ids:
+            try:
+                store.discard_result(uncounted_event_ids[0])
+            except Exception as error:  # noqa: BLE001 - recorded as history health
+                history_failure("discard_result", error)
+                return False
+            uncounted_event_ids.pop(0)
+            removed = True
+        return True
+    finally:
+        if removed:
+            # Clients may have been shown lifetime totals that included the row.
+            invalidate_dashboard_summary()
+            publish_lifetime()
+
+
 def history_ready_for_result():
-    """Whether an accepted result would reach history as well as stats.
+    """Whether a result could be made durable in history right now.
 
-    Stats and history are separate stores. A history store that exists but has
-    no active session would let a result be counted in stats and silently
-    dropped from history. This re-establishes the session once, so a temporary
-    failure does not stop recording once the database is healthy again; if that
-    is impossible it answers False, and the caller refuses the result the way a
-    gate rejection does rather than counting it in stats alone.
+    An accepted result is written to history before it is counted, so a result
+    is refused here -- before the gate, before anything changes -- whenever
+    that is impossible:
 
-    Cheap on the normal path -- an attribute read, no query. A store that could
-    not be opened at startup keeps its existing degraded behaviour.
+    * there is no history store at all, because it could not be opened;
+    * a row written for an earlier result that could not be counted is still
+      waiting to be taken back out;
+    * there is no active session and one cannot be established.
+
+    A missing session is re-established here, so recording resumes by itself
+    once the database is healthy again. On the normal path this is attribute
+    reads, with no query. Passing it does not promise the row write will
+    succeed; record_result handles that failure on its own.
     """
     with history_lock:
         store = history
-    if store is None or store.current_session_id is not None:
+    if store is None:
+        report_history_unavailable()
+        return False
+    if uncounted_event_ids and not settle_uncounted_results(store):
+        return False
+    if store.current_session_id is not None:
         return True
     try:
         store.establish_session("recovered")
@@ -1312,6 +1433,14 @@ def main(on_ready=None):
             detector_thread.join(timeout=4.0)
         with history_lock:
             store = history
+        if store is not None and uncounted_event_ids:
+            # Best effort: take out a row written for a result that was never
+            # counted while this process still can.
+            if result_lock.acquire(timeout=5.0):
+                try:
+                    settle_uncounted_results(store)
+                finally:
+                    result_lock.release()
         if store is not None:
             try:
                 store.close_session("shutdown")

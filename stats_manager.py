@@ -368,34 +368,51 @@ class StatsManager:
                 "recent_results": [dict(x) for x in s["recent_results"]],
             }
 
-    def add(self, result, source):
+    @staticmethod
+    def _check_result(result, source):
         if result not in ("win", "loss"):
             raise ValueError(result)
         if not isinstance(source, str) or not source:
             raise ValueError("source is required")
 
+    def _with_result(self, s, result, source):
+        prev_streak = s["streak"]
+        prev_best = s["best_streak"]
+
+        if result == "win":
+            s["wins"] += 1
+            s["streak"] += 1
+            s["best_streak"] = max(s["best_streak"], s["streak"])
+        else:
+            s["losses"] += 1
+            s["streak"] = 0
+
+        s["recent_results"].append({
+            "result": result,
+            "source": source,
+            "ts": time.time(),
+            "prev_streak": prev_streak,
+            "prev_best": prev_best,
+        })
+        s["recent_results"] = s["recent_results"][-self.RECENT_MAX:]
+        return s
+
+    def add(self, result, source):
+        self._check_result(result, source)
         with self.lock:
-            s = self._load_unlocked()
-            prev_streak = s["streak"]
-            prev_best = s["best_streak"]
+            return self._save_unlocked(
+                self._with_result(self._load_unlocked(), result, source))
 
-            if result == "win":
-                s["wins"] += 1
-                s["streak"] += 1
-                s["best_streak"] = max(s["best_streak"], s["streak"])
-            else:
-                s["losses"] += 1
-                s["streak"] = 0
+    def project_add(self, result, source):
+        """The stats ``add`` would store for this result, without writing them.
 
-            s["recent_results"].append({
-                "result": result,
-                "source": source,
-                "ts": time.time(),
-                "prev_streak": prev_streak,
-                "prev_best": prev_best,
-            })
-            s["recent_results"] = s["recent_results"][-self.RECENT_MAX:]
-            return self._save_unlocked(s)
+        Lets a caller make a separate store durable first, from exactly the
+        totals and streak this store will then count.
+        """
+        self._check_result(result, source)
+        with self.lock:
+            return self._validate_current(
+                self._with_result(self._load_unlocked(), result, source))
 
     def undo(self):
         with self.lock:

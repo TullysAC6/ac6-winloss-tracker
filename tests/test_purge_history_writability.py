@@ -332,6 +332,7 @@ class WritableHistoryHarness(unittest.TestCase):
         self.drain()
         accepted = self.server.record_result(result, "manual")
         events = self.drain()
+        self.last_events = events
         after = self.observe()
         self.assert_no_stats_only_result(before, after, result, accepted)
         if accepted:

@@ -98,8 +98,8 @@ with tempfile.TemporaryDirectory() as temporary:
         assert len(reset_summary["recent_matches"]) == 5
 
         class FailingHistory:
-            # An active session whose writes fail: the tolerant path under test
-            # is a failing write, not a missing session.
+            # An active session whose row writes fail. A result that cannot be
+            # stored in history is not accepted, so nothing is counted either.
             current_session_id = 1
 
             def record_result(self, *args, **kwargs):
@@ -111,17 +111,25 @@ with tempfile.TemporaryDirectory() as temporary:
         healthy_history = server.history
         server.history = FailingHistory()
         server.result_gate.clear_for_manual_correction()
-        assert server.record_result("win", "history-failure-test") is True
-        assert server.stats.snapshot()["wins"] == 1
+        assert server.record_result("win", "history-failure-test") is False
+        assert server.stats.snapshot()["wins"] == 0
         assert server.history_health["status"] == "degraded"
         failure_summary = server.dashboard_summary()
-        assert failure_summary["session"]["wins"] == 1
+        assert failure_summary["session"]["wins"] == 0
         assert failure_summary["history_health"]["status"] == "degraded"
         server.history = healthy_history
-        server.undo_result()
+        # Nothing was accepted, so there is nothing to undo.
+        assert server.undo_result()[1] is None
         assert server.stats.snapshot()["wins"] == 0
-        assert server.dashboard_summary()["session"]["wins"] == 0
+        # A read that succeeds does not clear the failed write ...
+        server.invalidate_dashboard_summary()
+        assert server.dashboard_summary()["history_health"]["status"] == "degraded"
         assert len(healthy_history.recent_matches(10)) == 5
+        # ... a write that succeeds does.
+        server.result_gate.clear_for_manual_correction()
+        assert server.record_result("win", "history-recovery-test") is True
+        assert server.history_health["status"] == "active"
+        assert len(healthy_history.recent_matches(10)) == 6
 
         httpd.shutdown()
         thread.join(timeout=3)

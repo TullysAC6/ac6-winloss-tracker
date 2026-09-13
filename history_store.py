@@ -597,6 +597,37 @@ class HistoryStore:
                     "removed_sessions": max(0, int(removed_sessions)),
                     "cutoff": cutoff}
 
+    def discard_result(self, event_id: str) -> bool:
+        """Remove a result row that was written but never counted.
+
+        Unlike ``undo_event`` this does not depend on which session is active:
+        the row may still be waiting to be removed after the session moved on.
+        The owning session's aggregates are recomputed from its remaining rows.
+        Returns False when there is no such row, which is already the goal.
+        """
+        with self._lock, self._connection() as connection:
+            row = connection.execute(
+                "SELECT id,session_id FROM matches WHERE event_id=?", (str(event_id),)
+            ).fetchone()
+            if row is None:
+                return False
+            session_id = int(row["session_id"])
+            connection.execute("DELETE FROM matches WHERE id=?", (int(row["id"]),))
+            aggregate = connection.execute(
+                "SELECT COALESCE(SUM(result='win'),0) wins, "
+                "COALESCE(SUM(result='loss'),0) losses, "
+                "COALESCE(SUM(result='draw'),0) draws, "
+                "COALESCE(MAX(streak_after),0) best_streak "
+                "FROM matches WHERE session_id=?",
+                (session_id,),
+            ).fetchone()
+            connection.execute(
+                "UPDATE sessions SET wins=?,losses=?,draws=?,best_streak=? WHERE id=?",
+                (aggregate["wins"], aggregate["losses"], aggregate["draws"],
+                 aggregate["best_streak"], session_id),
+            )
+            return True
+
     def lifetime_summary(self) -> dict[str, Any]:
         with self._lock, self._connection() as connection:
             row = connection.execute(
