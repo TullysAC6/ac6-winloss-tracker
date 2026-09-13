@@ -4,7 +4,8 @@ s=(ROOT/'server.py').read_text(encoding='utf-8')
 
 assert 'client = None' in s
 assert 'if client is not None:' in s and 'event_bus.unregister(client)' in s
-assert '}, remember=False)' in s[s.index('if milestone:'):s.index('print(',s.index('if milestone:'))]
+gate = 'if milestone and c["effect_enabled"]:'
+assert '}, remember=False)' in s[s.index(gate):s.index('print(', s.index(gate))]
 assert 'config_health' in s
 print('server SSE/effect/config-health static checks: OK')
 

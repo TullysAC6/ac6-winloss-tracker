@@ -98,6 +98,10 @@ with tempfile.TemporaryDirectory() as temporary:
         assert len(reset_summary["recent_matches"]) == 5
 
         class FailingHistory:
+            # An active session whose writes fail: the tolerant path under test
+            # is a failing write, not a missing session.
+            current_session_id = 1
+
             def record_result(self, *args, **kwargs):
                 raise OSError("intentional history failure")
 

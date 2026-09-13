@@ -56,7 +56,7 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(list(self.path.parent.glob(".config-*.tmp")), [])
 
     def test_invalid_config_is_never_replaced(self):
-        for raw in ("{", '[]', '{"config_version":99}', '{"config_version":17,"unexpected":1}'):
+        for raw in ("{", '[]', '{"config_version":99}', '{"config_version":18,"unexpected":1}'):
             self.path.write_text(raw)
             with self.assertRaises(ValueError):
                 settings.save_screenshot_setting(True)

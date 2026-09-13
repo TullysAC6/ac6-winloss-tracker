@@ -9,6 +9,16 @@ from pathlib import Path
 from typing import Any
 
 
+class ActiveSessionOverlap(RuntimeError):
+    """A purge cutoff would remove matches the active session still counts."""
+
+    def __init__(self, matches: int):
+        self.matches = int(matches)
+        super().__init__(
+            f"cutoff removes {self.matches} match(es) from the active session"
+        )
+
+
 def read_history_schema_version(root: str | Path) -> int:
     """Inspect history.db without creating a database, journal, or WAL file."""
     path = Path(root) / "history.db"
@@ -254,6 +264,58 @@ class HistoryStore:
                 )
             self._current_session_id = None
 
+    def confirm_active_session(self) -> int | None:
+        """The active session id, proven to name a session that is still open.
+
+        For callers that must prove the next result can be persisted; it runs a
+        query, so it is not used on the result hot path. An owner that names a
+        closed or missing session, or that cannot be checked at all, is dropped:
+        a result must then establish a fresh session first rather than be
+        written against a session nobody can vouch for.
+        """
+        with self._lock:
+            session_id = self._current_session_id
+            if session_id is None:
+                return None
+            try:
+                with self._connection() as connection:
+                    row = connection.execute(
+                        "SELECT 1 FROM sessions WHERE id=? AND ended_at IS NULL",
+                        (session_id,),
+                    ).fetchone()
+            except Exception:
+                self._current_session_id = None
+                raise
+            if row is None:
+                self._current_session_id = None
+                return None
+            return session_id
+
+    def establish_session(self, reason: str, started_at: float | None = None) -> int:
+        """Close any open session and open a new one, as a single transaction.
+
+        ``reset_session`` closes and starts in two separate commits and clears
+        the in-memory owner between them, so a failed start leaves the store
+        with no active session at all. Here the close and the insert commit
+        together or not at all, and ownership moves only after that commit: on
+        failure the previous session, if there was one, is still the active and
+        writable one.
+        """
+        started_at = time.time() if started_at is None else float(started_at)
+        with self._lock:
+            with self._connection() as connection:
+                connection.execute(
+                    "UPDATE sessions SET ended_at=?, ended_reason=? WHERE ended_at IS NULL",
+                    (started_at, str(reason)),
+                )
+                session_id = int(
+                    connection.execute(
+                        "INSERT INTO sessions(started_at) VALUES (?)", (started_at,)
+                    ).lastrowid
+                )
+            self._current_session_id = session_id
+            return session_id
+
     def reset_session(self) -> int:
         self.close_session("manual_reset")
         return self.start_session()
@@ -455,6 +517,85 @@ class HistoryStore:
                     "id": int(row["id"]), "event_id": str(row["event_id"]),
                     "result": str(row["result"]),
                 }
+
+    def purge_all(self) -> dict[str, int]:
+        """Delete every recorded match, context and session in one transaction.
+
+        A fresh session row is opened inside the same transaction so the store
+        keeps a valid FK target and server.py can continue recording results
+        without a restart. The in-memory session id is only advanced after the
+        transaction commits.
+        """
+        started_at = time.time()
+        with self._lock:
+            with self._connection() as connection:
+                removed = int(
+                    connection.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
+                )
+                connection.execute("DELETE FROM match_contexts")
+                connection.execute("DELETE FROM matches")
+                connection.execute("DELETE FROM sessions")
+                session_id = int(
+                    connection.execute(
+                        "INSERT INTO sessions(started_at) VALUES (?)", (started_at,)
+                    ).lastrowid
+                )
+            self._current_session_id = session_id
+            return {"removed_matches": removed, "removed_sessions": 0,
+                    "session_id": session_id}
+
+    def purge_before(self, cutoff: float) -> dict[str, int]:
+        """Delete matches strictly older than ``cutoff`` in one transaction.
+
+        ``cutoff`` is an absolute epoch timestamp; the caller decides the local
+        calendar boundary. Rows at exactly ``cutoff`` are kept. Related
+        match_contexts rows are removed by the ON DELETE CASCADE foreign key,
+        session aggregates are recomputed from the surviving matches, and
+        sessions left with no matches are dropped unless one is still active.
+
+        A cutoff that would remove matches the active session still counts in
+        stats.json raises ActiveSessionOverlap before anything is deleted, so
+        the session and lifetime displays cannot end up disagreeing.
+        """
+        cutoff = float(cutoff)
+        with self._lock:
+            session_id = self._current_session_id
+            with self._connection() as connection:
+                if session_id is not None:
+                    overlap = int(
+                        connection.execute(
+                            "SELECT COUNT(*) FROM matches "
+                            "WHERE session_id=? AND created_at < ?",
+                            (session_id, cutoff),
+                        ).fetchone()[0]
+                    )
+                    if overlap:
+                        raise ActiveSessionOverlap(overlap)
+                removed = int(
+                    connection.execute(
+                        "SELECT COUNT(*) FROM matches WHERE created_at < ?", (cutoff,)
+                    ).fetchone()[0]
+                )
+                connection.execute("DELETE FROM matches WHERE created_at < ?", (cutoff,))
+                connection.execute(
+                    "UPDATE sessions SET "
+                    "wins=(SELECT COUNT(*) FROM matches "
+                    "      WHERE session_id=sessions.id AND result='win'),"
+                    "losses=(SELECT COUNT(*) FROM matches "
+                    "        WHERE session_id=sessions.id AND result='loss'),"
+                    "draws=(SELECT COUNT(*) FROM matches "
+                    "       WHERE session_id=sessions.id AND result='draw'),"
+                    "best_streak=COALESCE((SELECT MAX(streak_after) FROM matches "
+                    "                      WHERE session_id=sessions.id),0)"
+                )
+                removed_sessions = connection.execute(
+                    "DELETE FROM sessions WHERE id IS NOT ? AND NOT EXISTS "
+                    "(SELECT 1 FROM matches WHERE matches.session_id=sessions.id)",
+                    (session_id,),
+                ).rowcount
+            return {"removed_matches": removed,
+                    "removed_sessions": max(0, int(removed_sessions)),
+                    "cutoff": cutoff}
 
     def lifetime_summary(self) -> dict[str, Any]:
         with self._lock, self._connection() as connection:

@@ -29,6 +29,8 @@ POLL_SECONDS = 0.75
 CONFIRM_HITS = 2
 CLEAR_HITS_REQUIRED = 3
 COOLDOWN_SECONDS = 5.0
+# Diagnostics only: bound how often an unchanged capture failure is logged.
+CAPTURE_GAP_LOG_SECONDS = 30.0
 # DwmGetWindowAttribute: a window DWM does not composite cannot cover anything.
 DWMWA_CLOAKED = 14
 
@@ -1258,6 +1260,26 @@ class ResultDetector:
         self._last_motion_signature = None
         self._last_gate_reject_log = 0.0
         self._last_diagnostic_visual = None
+        self._last_capture_gap_status = None
+        self._last_capture_gap_log = 0.0
+
+    def _record_capture_gap(self):
+        """Persist why no frame could be classified, rate-limited.
+
+        Without this, a session that never captures a frame leaves no trace at
+        all in detector.jsonl, and a Diagnostic Report cannot separate a
+        capture problem from a classifier or arming problem.
+        """
+        if not self.diagnostics:
+            return
+        now = time.monotonic()
+        if (self.capture.status == self._last_capture_gap_status
+                and now - self._last_capture_gap_log < CAPTURE_GAP_LOG_SECONDS):
+            return
+        self._last_capture_gap_status = self.capture.status
+        self._last_capture_gap_log = now
+        self.diagnostics.record("capture_unavailable", status=self.capture.status,
+                                state=self.state.snapshot())
 
     def external_mutation(self):
         self.state.external_mutation()
@@ -1326,6 +1348,7 @@ class ResultDetector:
                             self.state.note_capture_gap()
                             self._last_motion_signature = None
                             self.health.update(status="waiting", error=self.capture.status)
+                            self._record_capture_gap()
                             self.stop_event.wait(poll)
                             continue
                         if self.capture.discontinuity:

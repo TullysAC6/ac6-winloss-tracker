@@ -20,7 +20,8 @@ from config_utils import (
 )
 from diagnostics import RECORDER
 from event_bus import EventBus
-from history_store import HistoryStore, read_history_schema_version
+from history_analytics import ACTIVE_SESSION_PURGE_MESSAGE, latest_allowed_cutoff
+from history_store import ActiveSessionOverlap, HistoryStore, read_history_schema_version
 from result_detector import ResultDetector
 from result_gate import ResultGate
 from stats_manager import StatsCorruptError, StatsManager
@@ -239,10 +240,7 @@ def _dashboard_summary_uncached():
     with history_lock:
         store = history
         health = dict(history_health)
-    empty_lifetime = {
-        "wins": 0, "losses": 0, "draws": 0, "matches": 0,
-        "win_rate": 0.0, "best_streak": 0,
-    }
+    empty_lifetime = dict(EMPTY_LIFETIME)
     session_meta = None
     lifetime = empty_lifetime
     recent = []
@@ -251,7 +249,11 @@ def _dashboard_summary_uncached():
             session_meta = store.session_metadata()
             lifetime = store.lifetime_summary()
             recent = store.recent_matches(DASHBOARD_RECENT_MATCH_LIMIT)
-            set_history_health("active")
+            # A readable database is not a recording one: without an active
+            # session the next result cannot be stored, so a degraded health
+            # recorded for that must not be overwritten by a successful read.
+            if session_meta is not None:
+                set_history_health("active")
             with history_lock:
                 health = dict(history_health)
         except Exception as e:
@@ -375,6 +377,7 @@ def safe_snapshot_bundle():
 
     snapshots.append(("config_health", {"system": True, "kind": "config_health", **get_config_health()}))
     snapshots.append(("detector", detector_snapshot()))
+    snapshots.append(("lifetime", lifetime_payload()))
     return snapshots
 
 
@@ -396,6 +399,33 @@ def encode_snapshot(event_type, payload):
 
 
 
+EMPTY_LIFETIME = {
+    "wins": 0, "losses": 0, "draws": 0, "matches": 0,
+    "win_rate": 0.0, "best_streak": 0,
+}
+
+
+def lifetime_payload():
+    """Lifetime totals for overlays that display the accumulated scope.
+
+    Read under history_lock only. It must never take result_lock or the event
+    bus lock, because the SSE snapshot path already holds the bus lock here.
+    """
+    with history_lock:
+        store = history
+    summary = dict(EMPTY_LIFETIME)
+    if store is not None:
+        try:
+            summary = store.lifetime_summary()
+        except Exception as e:
+            history_failure("lifetime_summary", e)
+    return {"system": True, "kind": "lifetime", **summary}
+
+
+def publish_lifetime():
+    publish("lifetime", lifetime_payload(), remember=False)
+
+
 def publish_stats_active(s):
     publish("stats", status_payload(s))
     publish("stats_health", {
@@ -412,6 +442,14 @@ def record_result(result, source):
     with result_lock:
         c = load_config()
         cooldown = 5.0
+
+        # A history store with no active session would let the stats write
+        # below count a result that history silently drops. Re-establish it
+        # first; if that is impossible, refuse the result before any state --
+        # the gate included -- is touched, exactly as a gate rejection does.
+        if not history_ready_for_result():
+            print(f"[result] history session unavailable; {result} from {source} not recorded")
+            return False
 
         # Auto and manual paths share one gate. Rejected duplicates do NOT
         # mutate detector state or extend the cooldown.
@@ -478,8 +516,9 @@ def record_result(result, source):
                     error=f"{type(e).__name__}: {e}",
                 )
         history_event_ids.append(stored_event_id)
+        publish_lifetime()
 
-        if milestone:
+        if milestone and c["effect_enabled"]:
             publish("effect", {
                 "system": True,
                 "kind": "effect",
@@ -519,6 +558,7 @@ def undo_result():
                 set_history_health("active")
             except Exception as e:
                 history_failure("undo", e)
+        publish_lifetime()
         return s, removed
 
 
@@ -541,8 +581,348 @@ def reset_stats():
             except Exception as e:
                 history_failure("reset_session", e)
         history_event_ids.clear()
+        publish_lifetime()
         return s
 
+
+
+MAX_CONTROL_BODY_BYTES = 4096
+
+
+def validate_purge_request(body, now=None):
+    """Reject anything but an explicit, in-range purge instruction."""
+    now = time.time() if now is None else float(now)
+    if not isinstance(body, dict):
+        raise ValueError("purge request must be a JSON object")
+    mode = body.get("mode")
+    if mode not in ("all", "before"):
+        raise ValueError("mode must be 'all' or 'before'")
+    if mode == "all":
+        return "all", None
+    cutoff = body.get("cutoff")
+    if type(cutoff) is bool or not isinstance(cutoff, (int, float)):
+        raise ValueError("cutoff must be an epoch timestamp")
+    cutoff = float(cutoff)
+    if cutoff != cutoff or cutoff in (float("inf"), float("-inf")):
+        raise ValueError("cutoff must be a finite epoch timestamp")
+    if cutoff < 0:
+        raise ValueError("cutoff must not be negative")
+    # Today's local midnight is the newest cutoff a client may ask for. A later
+    # one would delete matches the live session still counts in stats.json and
+    # leave the session and lifetime displays disagreeing.
+    if cutoff > latest_allowed_cutoff(now):
+        raise ValueError("cutoff must not be later than today's local midnight")
+    return "before", cutoff
+
+
+class PurgeFailed(RuntimeError):
+    """A purge that did not reach a reported success.
+
+    ``history_cleared`` and ``stats_restored`` describe the state the Tracker
+    was actually left in, so the caller can say which of the two consistent
+    states applies rather than guessing.
+    """
+
+    def __init__(self, stage, error, *, history_cleared, stats_restored=None):
+        super().__init__(f"{stage}: {type(error).__name__}: {error}")
+        self.stage = stage
+        self.history_cleared = bool(history_cleared)
+        self.stats_restored = stats_restored
+
+    def message(self):
+        """What the user is actually left with, not just what threw."""
+        if self.stage == "history session":
+            return ("履歴とセッション成績は削除・初期化されましたが、新しい記録先の履歴"
+                    "セッションを作成できませんでした。作成できるまで勝敗は記録しません。"
+                    "Trackerを再起動してください。")
+        if self.history_cleared:
+            return ("履歴とセッション成績は削除・初期化されましたが、検出状態の同期に"
+                    "失敗しました。Trackerを再起動してください。")
+        if self.stats_restored is False:
+            return ("履歴は削除していません。セッション成績のみ初期化された状態です"
+                    "（履歴は保持されています）。")
+        return "履歴は削除していません。"
+
+    def payload(self):
+        detail = {
+            "error": f"{self.message()} ({self})",
+            "stage": self.stage,
+            "history_cleared": self.history_cleared,
+        }
+        if self.stats_restored is not None:
+            detail["stats_restored"] = self.stats_restored
+        return detail
+
+
+def _purge_all_coordinated():
+    """Clear lifetime history and the session together, recoverably.
+
+    ``history.db`` and ``stats.json`` are separate stores, so there is no single
+    transaction across both and none is claimed. Instead the reversible write is
+    done first and kept undoable, and the irreversible one is done last:
+
+    1. snapshot the session stats,
+    2. reset the session — nothing destructive has happened yet, so a failure
+       here simply leaves the pre-operation state,
+    3. purge the database — on failure the snapshot is written back, returning
+       the pre-operation state.
+
+    Every failure therefore lands on one of two self-consistent states: nothing
+    purged, or history intact with the session reset, which is the ordinary
+    "reset session" state the product already supports. A failure never reports
+    success, and the state it left behind is named in the error.
+    """
+    before = stats.snapshot()
+
+    try:
+        s = stats.reset()
+    except Exception as error:
+        # Nothing was deleted: the database has not been touched yet, and the
+        # session was not reset, so no convergence is owed.
+        raise PurgeFailed("session reset", error, history_cleared=False) from error
+
+    try:
+        outcome = store_purge_all()
+    except Exception as error:
+        try:
+            stats.restore(before)
+            restored = True
+        except Exception:
+            restored = False
+        if restored:
+            # The session is back at its pre-operation value and the history
+            # rows it refers to still exist, so the undo identities stay valid.
+            # Republish so a connected client cannot be left showing the zero
+            # this operation briefly wrote.
+            _publish_session(stats.snapshot())
+        else:
+            # The session is reset while lifetime history survives. That is the
+            # ordinary "reset session" state, but only once the rest of that
+            # contract is applied -- above all the undo identities, which would
+            # otherwise let an empty session delete the history this error says
+            # was retained. The history session is advanced here, because the
+            # purge that would have opened a fresh one did not happen.
+            converge_session_reset(s, advance_history=True)
+        raise PurgeFailed(
+            "history purge", error, history_cleared=False, stats_restored=restored
+        ) from error
+
+    # Both stores are now cleared and agree. purge_all opened the fresh session
+    # in the same transaction as the delete, and that session is where the next
+    # result must land -- so it is kept, not advanced a second time. Advancing it
+    # again closed a valid session before opening another, and a failed insert
+    # then left the store with no session at all while this returned success.
+    #
+    # Success therefore has to be proven rather than assumed: the active session
+    # must exist and be open. The rest of the session-reset contract is applied
+    # whatever that proof finds, so no client keeps a stale session, and then the
+    # first failure is reported -- a missing history session first, because that
+    # is the one that would silently drop results.
+    session_error = None
+    try:
+        outcome["session_id"] = require_writable_history_session()
+    except Exception as error:  # noqa: BLE001 - reported below
+        session_error = error
+        history_failure("establish_session", error)
+    sync_error = None
+    try:
+        converge_session_reset(s, advance_history=False)
+    except Exception as error:  # noqa: BLE001 - reported below
+        sync_error = error
+    if session_error is not None:
+        raise PurgeFailed(
+            "history session", session_error, history_cleared=True
+        ) from session_error
+    if sync_error is not None:
+        raise PurgeFailed(
+            "post-purge synchronization", sync_error, history_cleared=True
+        ) from sync_error
+
+    outcome["session_reset"] = True
+    outcome["stats"] = status_payload(s)
+    return outcome
+
+
+def _publish_session(s):
+    """Emit the session stats event, so connected overlays converge."""
+    publish_stats_active(s)
+
+
+def converge_session_reset(s, *, advance_history):
+    """Apply the rest of ``reset_stats``'s contract to an already-reset session.
+
+    ``stats.reset()`` alone only rewrites stats.json. The supported session
+    reset also drops the undo identities, locks the gate, tells the detector,
+    publishes the new session to connected clients, and -- when no fresh history
+    session exists yet -- advances the history session. A purge that ends with
+    the session reset owes every one of those.
+
+    ``advance_history`` is explicit because the two callers differ. A successful
+    purge has already opened a fresh session inside its own transaction and must
+    not replace it; a purge that failed leaves the old session in place, and that
+    one needs advancing.
+
+    The undo identities are dropped first and cannot fail. That ordering is the
+    safety-critical part: ``undo_result`` pops an identity and deletes that
+    history row even when the reset session has nothing to undo, so a stale
+    identity would let an empty session destroy retained history.
+    """
+    history_event_ids.clear()
+
+    # Every remaining step is attempted even if an earlier one fails, so a
+    # broken gate cannot stop connected clients from being told the session is
+    # now zero. The first failure is re-raised once the rest has been applied.
+    failure = None
+
+    def attempt(step):
+        nonlocal failure
+        try:
+            step()
+        except Exception as error:  # noqa: BLE001 - recorded, then re-raised
+            failure = failure or error
+
+    attempt(invalidate_dashboard_summary)
+
+    def synchronize():
+        result_gate.lock_now()
+        with detector_lock:
+            current = detector
+        if current:
+            current.external_mutation()
+
+    attempt(synchronize)
+    attempt(lambda: _publish_session(s))
+
+    if advance_history:
+        # One transaction, and ownership moves only after it commits: a failure
+        # leaves the previous session active and writable instead of leaving no
+        # session at all. It is recorded rather than raised so it cannot mask
+        # the failure that brought the caller here.
+        with history_lock:
+            store = history
+        if store is not None:
+            try:
+                store.establish_session("manual_reset")
+                set_history_health("active")
+            except Exception as e:
+                history_failure("establish_session", e)
+
+    if failure is not None:
+        raise failure
+
+
+def require_writable_history_session():
+    """Prove the next accepted result can be written to history, or raise.
+
+    Called before a purge reports success. If the in-memory owner is missing or
+    points at a closed session, one transactional attempt is made to establish
+    a new one; if that fails too, the caller must not report success.
+    """
+    with history_lock:
+        store = history
+    if store is None:
+        raise RuntimeError("history store is unavailable")
+    session_id = store.confirm_active_session()
+    if session_id is None:
+        store.establish_session("recovered")
+        session_id = store.confirm_active_session()
+        if session_id is None:
+            raise RuntimeError("no active history session after establishing one")
+    return session_id
+
+
+def history_ready_for_result():
+    """Whether an accepted result would reach history as well as stats.
+
+    Stats and history are separate stores. A history store that exists but has
+    no active session would let a result be counted in stats and silently
+    dropped from history. This re-establishes the session once, so a temporary
+    failure does not stop recording once the database is healthy again; if that
+    is impossible it answers False, and the caller refuses the result the way a
+    gate rejection does rather than counting it in stats alone.
+
+    Cheap on the normal path -- an attribute read, no query. A store that could
+    not be opened at startup keeps its existing degraded behaviour.
+    """
+    with history_lock:
+        store = history
+    if store is None or store.current_session_id is not None:
+        return True
+    try:
+        store.establish_session("recovered")
+        set_history_health("active")
+        return True
+    except Exception as error:  # noqa: BLE001 - recorded as history health
+        history_failure("establish_session", error)
+        return False
+
+
+def store_purge_all():
+    with history_lock:
+        store = history
+    if store is None:
+        raise RuntimeError("history store is unavailable")
+    return store.purge_all()
+
+
+def purge_history(mode, cutoff=None):
+    """Delete lifetime history in the owning process, under the result lock.
+
+    The detector is never stopped and the session keeps a valid history row, so
+    a purge cannot leave the Tracker unable to record the next result.
+    """
+    with result_lock:
+        with history_lock:
+            store = history
+        if store is None:
+            raise RuntimeError("history store is unavailable")
+        if mode == "all":
+            try:
+                outcome = _purge_all_coordinated()
+                # Only a purge that proved a writable session reports history as
+                # active. A failure keeps whatever health its own steps recorded,
+                # so a session that could not be established stays degraded.
+                set_history_health("active")
+            finally:
+                # The dashboard must never serve a cached summary that predates
+                # a partially applied purge, whichever way it ended.
+                invalidate_dashboard_summary()
+                publish_lifetime()
+        else:
+            outcome = store.purge_before(cutoff)
+            set_history_health("active")
+            invalidate_dashboard_summary()
+            outcome["session_reset"] = False
+            publish_lifetime()
+        outcome["mode"] = mode
+        return outcome
+
+
+def capture_live_diagnostics():
+    """Persist the live detector picture for a user-requested report.
+
+    The recent-frame ring only lives in this process, and it is normally
+    flushed by a confirmed result. A session that never detects anything would
+    otherwise export an empty report, so the settings window asks for this
+    first. Nothing about detection, the gate or capture is changed.
+    """
+    detector_state = detector_snapshot()
+    with history_lock:
+        health = dict(history_health)
+    try:
+        current = status_payload(stats.snapshot())
+    except Exception as e:
+        current = {"error": f"{type(e).__name__}: {e}"}
+    rows = RECORDER.flush_frame_context("diagnostics_requested")
+    RECORDER.record(
+        "diagnostics_requested",
+        detector=detector_state,
+        stats=current,
+        history_health=health,
+        config_health=get_config_health(),
+        buffered_frames=rows,
+    )
+    return {"buffered_frames": rows, "detector": detector_state}
 
 
 def detector_supervisor():
@@ -623,6 +1003,8 @@ class Handler(BaseHTTPRequestHandler):
                 c = load_config()
                 self.json_response({
                     "stats_enabled": c["stats_enabled"],
+                    "effect_enabled": c["effect_enabled"],
+                    "overlay_stats_scope": c["overlay_stats_scope"],
                     "config_health": get_config_health(),
                 })
             except Exception as e:
@@ -700,6 +1082,17 @@ class Handler(BaseHTTPRequestHandler):
 
         self.json_response({"error": "not found"}, 404)
 
+    def read_json_body(self, limit=MAX_CONTROL_BODY_BYTES):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except (TypeError, ValueError):
+            raise ValueError("invalid Content-Length")
+        if length < 0 or length > limit:
+            raise ValueError("request body is too large")
+        if length == 0:
+            return {}
+        return json.loads(self.rfile.read(length).decode("utf-8"))
+
     def do_POST(self):
         path = urlparse(self.path).path
         supplied_token = self.headers.get("X-Control-Token", "")
@@ -723,6 +1116,28 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/stats/reset":
                 s = reset_stats()
                 self.json_response({"ok": True, "stats": status_payload(s)})
+                return
+            if path == "/api/diagnostics/flush":
+                self.json_response({"ok": True, **capture_live_diagnostics()})
+                return
+            if path == "/api/history/purge":
+                try:
+                    mode, cutoff = validate_purge_request(self.read_json_body())
+                except (ValueError, json.JSONDecodeError) as e:
+                    self.json_response({"error": f"invalid purge request: {e}"}, 400)
+                    return
+                try:
+                    self.json_response({"ok": True, **purge_history(mode, cutoff)})
+                except PurgeFailed as e:
+                    # Never a 200/ok:true. The payload names which consistent
+                    # state the Tracker was actually left in.
+                    self.json_response({"ok": False, **e.payload()}, 500)
+                except ActiveSessionOverlap as e:
+                    # Nothing was deleted: the store refuses before it writes.
+                    self.json_response({
+                        "error": ACTIVE_SESSION_PURGE_MESSAGE,
+                        "active_session_matches": e.matches,
+                    }, 409)
                 return
             self.json_response({"error": "not found"}, 404)
         except StatsCorruptError as e:

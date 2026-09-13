@@ -123,7 +123,7 @@ class LiveServerTests(unittest.TestCase):
             with socket.socket() as reservation:
                 reservation.bind(("127.0.0.1", 0))
                 port = reservation.getsockname()[1]
-            (data / "config.json").write_text(json.dumps({"config_version": 17, "port": port,
+            (data / "config.json").write_text(json.dumps({"config_version": 18, "port": port,
                 "stats_enabled": True, "result_detector_enabled": False, "effect_screenshot_enabled": False}))
             import server
             ready = threading.Event()
