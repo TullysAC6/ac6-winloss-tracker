@@ -536,6 +536,82 @@ class GuardTests(unittest.TestCase):
         self.assertEqual((socket.socket, subprocess.Popen, open, os.open, ctypes.CDLL, list(sys.meta_path)),
                          originals)
 
+    def test_mutation_guards_check_paths_passed_by_position_or_keyword(self):
+        # Named here rather than read from guards, so this test stands on its own.
+        wrapped = ("remove", "unlink", "rmdir", "rename", "replace", "mkdir", "makedirs")
+        originals = {name: getattr(os, name) for name in wrapped}
+        with tempfile.TemporaryDirectory(prefix="ac6-t1-guard-") as name:
+            base = Path(name)
+            owned, outside = base / "owned", base / "outside"
+            owned.mkdir()
+            outside.mkdir()
+            # Everything the refused calls would destroy exists before the guards do.
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_text("sentinel", encoding="utf-8")
+            sentinel_dir = outside / "sentinel_dir"
+            sentinel_dir.mkdir()
+            source = owned / "source.txt"
+            source.write_text("source", encoding="utf-8")
+            restore = guards.install(owned)
+            try:
+                refused = {
+                    "unlink(path=)": lambda: os.unlink(path=sentinel),
+                    "remove(path=)": lambda: os.remove(path=sentinel),
+                    "rmdir(path=)": lambda: os.rmdir(path=sentinel_dir),
+                    "mkdir(path=)": lambda: os.mkdir(path=outside / "new_dir"),
+                    "makedirs(name=)": lambda: os.makedirs(name=outside / "new" / "tree"),
+                    # rename/replace: the destination and the source are each checked.
+                    "rename(src=owned, dst=outside)": lambda: os.rename(src=source, dst=outside / "renamed.txt"),
+                    "replace(src=owned, dst=outside)": lambda: os.replace(src=source, dst=outside / "replaced.txt"),
+                    "rename(src=outside, dst=owned)": lambda: os.rename(src=sentinel, dst=owned / "moved.txt"),
+                    "replace(src=outside, dst=owned)": lambda: os.replace(src=sentinel, dst=owned / "moved.txt"),
+                    "rename(owned, dst=outside)": lambda: os.rename(source, dst=outside / "mixed.txt"),
+                    "replace(outside, dst=owned)": lambda: os.replace(sentinel, dst=owned / "mixed.txt"),
+                    "unlink(owned, path=outside)": lambda: os.unlink(owned / "absent.txt", path=sentinel),
+                    "unlink()": lambda: os.unlink(sentinel),
+                    "remove()": lambda: os.remove(sentinel),
+                    "rmdir()": lambda: os.rmdir(sentinel_dir),
+                    "mkdir()": lambda: os.mkdir(outside / "new_dir", 0o777),
+                    "makedirs()": lambda: os.makedirs(outside / "new" / "tree", 0o777, True),
+                    "rename()": lambda: os.rename(source, outside / "renamed.txt"),
+                    "replace()": lambda: os.replace(sentinel, owned / "moved.txt"),
+                    "open(file=, mode=)": lambda: open(file=outside / "opened.txt", mode="w"),
+                    "os.open(path=, flags=)": lambda: os.open(path=str(outside / "opened.bin"),
+                                                              flags=os.O_CREAT | os.O_WRONLY),
+                }
+                for label, attempt in refused.items():
+                    with self.subTest(label), self.assertRaises(guards.GuardViolation):
+                        attempt()
+                # Inside the owned root the same signatures still work, extra arguments included.
+                os.mkdir(path=owned / "made", mode=0o777)
+                os.makedirs(name=owned / "tree" / "leaf", exist_ok=True)
+                os.makedirs(owned / "tree" / "leaf", 0o777, True)
+                os.rename(src=source, dst=owned / "renamed.txt")
+                os.replace(owned / "renamed.txt", dst=owned / "replaced.txt")
+                os.remove(path=owned / "replaced.txt")
+                os.rmdir(path=owned / "made")
+                (owned / "gone.txt").write_text("gone", encoding="utf-8")
+                os.unlink(owned / "gone.txt")
+                with self.assertRaises(TypeError):
+                    os.unlink(owned / "tree", path=owned / "tree")
+            finally:
+                restore()
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            self.assertTrue(sentinel_dir.is_dir())
+            self.assertEqual(sorted(entry.name for entry in outside.iterdir()), ["sentinel.txt", "sentinel_dir"])
+            self.assertEqual(sorted(entry.name for entry in owned.iterdir()), ["tree"])
+        self.assertEqual({name: getattr(os, name) for name in wrapped}, originals)
+
+    def test_mutation_guard_path_parameters_match_this_interpreter(self):
+        import inspect
+        self.assertEqual(set(guards.MUTATION_PATH_PARAMETERS),
+                         {"remove", "unlink", "rmdir", "rename", "replace", "mkdir", "makedirs"})
+        for name, parameters in guards.MUTATION_PATH_PARAMETERS.items():
+            leading = list(inspect.signature(getattr(os, name)).parameters.values())[:len(parameters)]
+            self.assertEqual([parameter.name for parameter in leading], list(parameters), name)
+            self.assertTrue(all(parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD for parameter in leading),
+                            name)
+
     def test_worker_refuses_production_imported_before_isolation(self):
         from t1 import worker
         sentinel = "pending_history"

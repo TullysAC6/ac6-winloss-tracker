@@ -29,6 +29,19 @@ DENIED_IMPORTS = frozenset((
 ))
 DENIED_DLLS = frozenset(("user32", "gdi32", "dwmapi", "d3d11", "dxgi", "shcore", "winmm",
                          "ws2_32", "wininet", "winhttp", "dnsapi", "iphlpapi", "mswsock"))
+# The path parameters of each guarded os mutation, under the names the functions
+# accept them by. A path is checked whether it is passed by position or by
+# keyword; mode, exist_ok and dir_fd are not paths and pass through unchecked.
+# A T0 test compares these names with inspect.signature on the running Python.
+MUTATION_PATH_PARAMETERS = {
+    "remove": ("path",),
+    "unlink": ("path",),
+    "rmdir": ("path",),
+    "mkdir": ("path",),
+    "makedirs": ("name",),
+    "rename": ("src", "dst"),
+    "replace": ("src", "dst"),
+}
 
 
 class GuardViolation(RuntimeError):
@@ -91,18 +104,23 @@ def install(owned_root, forbidden_roots=()):
         check_path(path, bool(flags & write_flags))
         return original_os_open(path, flags, *args, **kwargs)
 
-    def guarded_mutation(original):
-        def mutation(*paths, **kwargs):
-            for path in paths[:2]:
-                check_path(path, True)
-            return original(*paths, **kwargs)
+    def guarded_mutation(original, parameters):
+        def mutation(*args, **kwargs):
+            for index, parameter in enumerate(parameters):
+                if index < len(args):
+                    check_path(args[index], True)
+                # Checked even alongside a positional value: the original refuses
+                # the duplicate, but only after the guard has seen both.
+                if parameter in kwargs:
+                    check_path(kwargs[parameter], True)
+            return original(*args, **kwargs)
         return mutation
 
     replace(builtins, "open", guarded_open)
     replace(io, "open", guarded_open)
     replace(os, "open", guarded_os_open)
-    for name in ("remove", "unlink", "rmdir", "rename", "replace", "mkdir", "makedirs"):
-        replace(os, name, guarded_mutation(getattr(os, name)))
+    for name, parameters in MUTATION_PATH_PARAMETERS.items():
+        replace(os, name, guarded_mutation(getattr(os, name), parameters))
 
     # Network: refuse to create sockets or resolve names at all.
     class DeniedSocket:
