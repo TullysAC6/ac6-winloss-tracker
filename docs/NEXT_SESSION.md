@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-13 JST
+Last updated: 2026-09-14 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -19,15 +19,15 @@ Issue #6
 
 ## Current handoff
 
-- Public stable is **v1.1.1 — RELEASED**. Tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33`. `main` moved to `a042b18` when PR #5 merged on 2026-09-13, and again when the bookkeeping PR that updates this file merged. Run `git rev-parse origin/main` rather than trusting that.
+- Public stable is **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`. PR #33 merged, [main CI passed](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34792826474), public digests and both README one-liner smokes passed. Release bookkeeping advances `main` again; resolve `origin/main` for the current SHA.
 - **v1.1.0 is superseded.** Its runtime was accepted and it was published, but its formal release acceptance was never completed: the README one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the published Git blob bytes, so the command failed closed. The tag was not moved and the Release was not edited.
-- v1.1.1 ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
+- v1.1.1 (now superseded by v1.2.0) ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
 - T1 remains **N/A / not run** because issue #14's formal fixture/replay harness does not exist. Do not call it PASS.
-- **PR #5 (#8 settings, #9 analytics) is Implemented + Accepted + merged to `main` (`a042b18`), and not released.**
+- **PR #5 (#8 settings, #9 analytics) is Implemented + Accepted + merged to `main` (`a042b18`), and released in v1.2.0.**
   - Focused real-AC6 T3 PASS on the exact head `38a21c2` on 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)). `main` CI is green.
   - #8 and #9 are closed as completed.
-  - v1.1.1 does **not** contain PR #5, so do not describe its settings or analytics as released.
+  - v1.1.1 does **not** contain PR #5; v1.2.0 is the first release containing its settings and analytics.
 - PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`.
   - **Draft PR #31** (Revision 4, docs-only) is the only unmerged generation.
   - Do not treat Revision 4 as canonical until it merges.
@@ -53,6 +53,8 @@ Issue #6
 8. Annotated tag on the exact `main` SHA; assets from `scripts/prepare-release-assets.ps1` in a clean checkout of that tag.
 9. Publish, then verify against the real public URLs, including the tag's own README one-liner.
 
+Release publication and post-release verification are complete. See `PROJECT_STATE.md` for immutable tag, CI, review and digest evidence. No user installation was run during public smoke; installer/uninstaller child execution was stubbed.
+
 ## Required order from here
 
 1. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness.** Not started.
@@ -67,7 +69,7 @@ At most two unmerged generations exist at a time (§4). PR #5 has landed and dra
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.1.1, PR #13 and PR #5 are done; PR #5 is accepted and merged but not released. From here:
+v1.2.0, PR #13 and PR #5 are done; PR #5 is accepted, merged and released in v1.2.0. From here:
 
 ```text
 #14 → #24 → UI-0 → UI-1A → UI-1B
@@ -105,7 +107,7 @@ Four things in there are easy to erode and are the reason they are written down:
 
 Stop before publication on: an unexpected `main`; an existing tag or Release for the version being prepared; CI failure; a Git-blob / raw / README hash mismatch; a tagged-tree or asset mismatch; a checksum or digest mismatch; a High or Release blocker; a required runtime or gameplay change during release prep; user-data damage; or any state that cannot be rolled back.
 
-Never move the `v1.1.0` or `v1.1.1` tag.
+Never move the `v1.1.0`, `v1.1.1` or `v1.2.0` tag.
 
 ## Process safety
 
