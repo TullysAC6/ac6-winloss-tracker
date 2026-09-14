@@ -29,7 +29,7 @@ tests/fixtures/
 
 A reserved family has no recognizer and no replay adapter. A record placed in one fails the run: it is never counted as skipped, and no placeholder PASS exists. New families and categories are added to `families.json` without restructuring what is here. pre-S (UNRANKED through A4) and S rating presentations stay separate categories because the game presents them as different systems.
 
-New images live next to their record under `results/<category>/`. The legacy PPMs stay at the fixture root, byte-for-byte: they are not moved, re-encoded, cropped, resized or colour-adjusted. `.gitattributes` marks fixture images binary, because two of them contain no NUL byte and Git's CRLF conversion would otherwise shift their pixels on a Windows checkout.
+New images live next to their record under `results/<category>/`. The legacy PPMs stay at the fixture root, byte-for-byte: they are not moved, re-encoded, cropped, resized or colour-adjusted. `.gitattributes` marks fixture images binary, because two of them contain no NUL byte and Git's CRLF conversion would otherwise shift their pixels on a Windows checkout. It also keeps fixture JSON at LF on every checkout, because the corpus SHA-256 in a T1 report is taken over the metadata bytes as well.
 
 ## Records (schema version 1)
 

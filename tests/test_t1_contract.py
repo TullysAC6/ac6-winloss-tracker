@@ -316,6 +316,18 @@ class CorpusTests(unittest.TestCase):
         self.assertEqual([case.id for case in corpus.cases], sorted(case.id for case in corpus.cases))
         self.assertEqual(corpus.summary()["families"]["results"], "implemented")
 
+    def test_a_checkout_cannot_change_the_corpus_bytes(self):
+        # The corpus SHA-256 in a report is taken over checked-out bytes, so images
+        # stay binary and metadata stays LF whatever core.autocrlf says.
+        rules = [line.split() for line in (ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")]
+        for rule in (["tests/fixtures/**/*.ppm", "binary"], ["tests/fixtures/**/*.png", "binary"],
+                     ["tests/fixtures/**/*.json", "text", "eol=lf"]):
+            self.assertIn(rule, rules)
+        carriage_returns = sorted(str(path.relative_to(FIXTURES)) for path in FIXTURES.rglob("*.json")
+                                  if b"\r" in path.read_bytes())
+        self.assertEqual(carriage_returns, [], "fixture metadata was not checked out with LF")
+
     def test_a_record_in_a_reserved_family_fails_instead_of_skipping(self):
         target = self.root / "ranks" / "pre_s" / "a4.json"
         target.write_text(IMAGE_RECORD.read_text(encoding="utf-8"), encoding="utf-8")
