@@ -10,9 +10,9 @@ Status vocabulary:
 
 | Status | Meaning |
 |---|---|
-| **DONE** | Shipped in the current public stable release and in use |
+| **DONE** | Accepted and shipped in the current public stable release |
 | **IN PROGRESS** | Being worked on right now |
-| **ACCEPTED** | Automated/review/required real-session acceptance complete; released in v1.1.1 |
+| **ACCEPTED** | Automated/review/required real-session acceptance complete and released |
 | **ACCEPTED — UNRELEASED** | Automated gates, independent review and the required real-session acceptance are complete and the work is merged to `main`, **but it is not in any release yet**. Not the same as `DONE` or `ACCEPTED`: a published install does not have it |
 | **ACCEPTANCE PENDING** | Code exists, CI green, **not released and not confirmed in a real session** |
 | **PLANNED** | Agreed direction, scheduled after the current phases |
@@ -22,9 +22,9 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
-## Release status note — 2026-09-12
+## Release status note — 2026-09-14
 
-Public stable is **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d8476`.
+Public stable is **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`. PR #33, main CI, public hashes/digests and stubbed public install/uninstall smoke all passed. See [PROJECT_STATE.md](PROJECT_STATE.md) for evidence.
 
 **v1.1.0 is superseded.** It was published and its runtime was accepted, including a real-AC6 T3,
 but its formal release acceptance was never completed: the README install one-liner inside the tag
@@ -33,17 +33,17 @@ bytes `raw.githubusercontent.com` serves, so the published command failed closed
 moved and the Release was not edited. v1.1.1 ships the same accepted runtime with corrected
 immutable distribution metadata.
 
-Therefore, in the tables below, `DONE` means shipped in v1.1.1 and in use.
+Therefore, in the tables below, `DONE` means shipped in v1.2.0; local installation is a separate user action.
 [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
 [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against v1.1.1. Neither
-the `v1.1.0` nor the `v1.1.1` tag is ever moved.
+the `v1.1.0` nor the `v1.1.1` tag is ever moved; `v1.2.0` is immutable too.
 
-## Position note — 2026-09-13
+## Position note — 2026-09-14
 
-**PR #5 (#8 settings, #9 analytics) is `ACCEPTED — UNRELEASED`.** It passed a focused real-AC6 T3 on the exact head
+**PR #5 (#8 settings, #9 analytics) is `DONE`, released in v1.2.0.** It passed a focused real-AC6 T3 on the exact head
 `38a21c2` on 2026-09-13 and was merged to `main` as `a042b18`, with green `main` CI.
 
-**v1.1.1 does not contain it.** Shipping it needs a new release and its own release procedure.
+**v1.1.1 does not contain it; v1.2.0 does.** Its accepted runtime is unchanged by release preparation.
 [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8) and
 [#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9) are closed as completed on that basis. The next product
 task is [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14).
@@ -123,8 +123,8 @@ This is the **authoritative order**. The phase tables below describe *what* each
 section describes *when*. Where the two appear to disagree, this section wins and the table is
 corrected.
 
-Completed: **v1.1.1 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
-**PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, not released.
+Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
+**PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14.
 From the current position:
 
 ```text
@@ -261,24 +261,24 @@ Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8).
 | Item | Status | Notes |
 |---|---|---|
 | Screenshot ON / OFF (`effect_screenshot_enabled`) | **DONE** | Config key and launcher settings entry accepted on the RC; released in v1.1.1 |
-| Check for a new version | **DONE** | Metadata-only check introduced on the RC; released in v1.1.1. The PR #5 extension is **ACCEPTED — UNRELEASED** (merged to `main` as `a042b18`, not in v1.1.1) |
-| Milestone effect ON / OFF (`effect_enabled`) | **ACCEPTED — UNRELEASED** | PR #5, merged `a042b18`. Real-AC6 T3 on 2026-09-13: with the effect OFF, the real result and streak were still counted and there were 0 effect events. Milestone suppression itself is proven at T2 |
-| Session / lifetime display switch (`overlay_stats_scope`) | **ACCEPTED — UNRELEASED** | PR #5, merged `a042b18`. Switched on a running Tracker in the real-AC6 T3 |
-| Reset all win/loss history | **ACCEPTED — UNRELEASED** | PR #5, merged `a042b18`. Accepted at T0/T2; deliberately not run on the user's real history |
-| Delete history before a given date | **ACCEPTED — UNRELEASED** | PR #5, merged `a042b18`. Capped at today; refuses a cutoff crossing the open session. Accepted at T0/T2; deliberately not run on the user's real history |
+| Check for a new version | **DONE** | Metadata-only check introduced on the RC; released in v1.1.1. The PR #5 extension is **DONE** (merged to `main` as `a042b18`, released in v1.2.0) |
+| Milestone effect ON / OFF (`effect_enabled`) | **DONE** | PR #5, merged `a042b18`. Real-AC6 T3 on 2026-09-13: with the effect OFF, the real result and streak were still counted and there were 0 effect events. Milestone suppression itself is proven at T2 |
+| Session / lifetime display switch (`overlay_stats_scope`) | **DONE** | PR #5, merged `a042b18`. Switched on a running Tracker in the real-AC6 T3 |
+| Reset all win/loss history | **DONE** | PR #5, merged `a042b18`. Accepted at T0/T2; deliberately not run on the user's real history |
+| Delete history before a given date | **DONE** | PR #5, merged `a042b18`. Capped at today; refuses a cutoff crossing the open session. Accepted at T0/T2; deliberately not run on the user's real history |
 | Automatic update | DEFERRED | Deliberate. See [DECISIONS.md](DECISIONS.md) |
 
 ## Phase 6 — Match analytics
 
-Umbrella issue: [#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9). All items are from PR #5, accepted and merged to `main` as `a042b18` on 2026-09-13, and **not released**.
+Umbrella issue: [#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9). All items are from PR #5, accepted and merged to `main` as `a042b18` on 2026-09-13, and **released in v1.2.0**.
 
 | Item | Status |
 |---|---|
-| Today / this week (Monday) / this month / all time | **ACCEPTED — UNRELEASED** |
-| Recent 10 / 30 / 100 | **ACCEPTED — UNRELEASED** |
-| CSV export (UTF-8 BOM, oldest first) | **ACCEPTED — UNRELEASED** |
-| DB integrity check (`quick_check` / `integrity_check`) | **ACCEPTED — UNRELEASED** |
-| History maintenance (reset all, delete before a date) | **ACCEPTED — UNRELEASED** (T0/T2; not run on the user's real history) |
+| Today / this week (Monday) / this month / all time | **DONE** |
+| Recent 10 / 30 / 100 | **DONE** |
+| CSV export (UTF-8 BOM, oldest first) | **DONE** |
+| DB integrity check (`quick_check` / `integrity_check`) | **DONE** |
+| History maintenance (reset all, delete before a date) | **DONE** (T0/T2; not run on the user's real history) |
 
 Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any new statistic reuses this definition, and always displays its sample size: `80.0% (8W-2L / 10 matches)`.
 
@@ -327,7 +327,7 @@ entry and does not gate the analytics.
 
 | Item | Status | Notes |
 |---|---|---|
-| Recent 10 / 30 / 100 | **ACCEPTED — UNRELEASED** | Already delivered by PR #5 (Phase 6), merged `a042b18`; not released |
+| Recent 10 / 30 / 100 | **DONE** | Already delivered by PR #5 (Phase 6), merged `a042b18`; released in v1.2.0 |
 | Today / this week / **previous week** / this month | PLANNED | Previous-week comparison is new in Revision 2 |
 | Daily win-rate series | PLANNED | Period *aggregates* exist; a per-day *trend* does not |
 | Weekly win-rate series | PLANNED | |
