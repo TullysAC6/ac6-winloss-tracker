@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "id": "result.sequence.garage-menu-after-win-no-second-count",
+  "family": "results",
+  "category": "sequences",
+  "input": {
+    "kind": "sequence",
+    "capture": "frame_source",
+    "processing_ms": 30,
+    "steps": [
+      {
+        "id": "s01",
+        "at_ms": 750,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s02",
+        "at_ms": 1500,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s03",
+        "at_ms": 2250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s04",
+        "at_ms": 3000,
+        "frame": "result.final-win.video-5-9"
+      },
+      {
+        "id": "s05",
+        "at_ms": 3750,
+        "frame": "result.final-win.video-5-9"
+      },
+      {
+        "id": "s06",
+        "at_ms": 17200,
+        "frame": "result.negative.video-garage-20-1"
+      },
+      {
+        "id": "s07",
+        "at_ms": 18500,
+        "frame": "result.negative.video-garage-menu-21-4"
+      },
+      {
+        "id": "s08",
+        "at_ms": 20367,
+        "frame": "result.negative.video-rank-menu-23-267"
+      }
+    ]
+  },
+  "truth": {
+    "scenario": "A real WIN counts once; the later garage, garage-menu and rank frames from the same recording never add a second WIN.",
+    "expected_results": [
+      "win"
+    ],
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_detector_run.v1",
+    "steps": {
+      "s01": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s02": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s03": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "clear_ready": true
+        }
+      },
+      "s04": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": "win",
+          "candidate_hits": 1
+        }
+      },
+      "s05": {
+        "frame_class": "FINAL_WIN",
+        "detection": "win",
+        "gate": "accepted",
+        "state": {
+          "post_result_lock": true
+        }
+      },
+      "s06": {
+        "frame_class": "NON_CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        }
+      },
+      "s07": {
+        "frame_class": "NON_CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        }
+      },
+      "s08": {
+        "frame_class": "NON_CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        }
+      }
+    },
+    "totals": {
+      "accepted": {
+        "win": 1,
+        "loss": 0
+      },
+      "detections": {
+        "win": 1,
+        "loss": 0,
+        "draw": 0
+      },
+      "gate_rejected": 0,
+      "frames_classified": 8,
+      "detector_errors": 0
+    }
+  },
+  "coverage": [
+    "negative.garage_menu",
+    "negative.false_win",
+    "sequence.exactly_once"
+  ],
+  "provenance": {
+    "source_type": "composed_sequence",
+    "reference": "tests/test_detector.py user-video false-WIN regression",
+    "origin": "Composed scenario over reviewed repository fixtures; the frames do not come from one recording. The WIN, garage, garage-menu and rank frames come from one recording and keep their recorded spacing after the WIN."
+  },
+  "review": {
+    "truth": {
+      "status": "contract_scenario_over_reviewed_fixtures",
+      "basis": "Expectations were derived step by step from ResultDetector.run, ResultStateMachine, ResultGate and server.record_result, not copied from a replay; each referenced frame's class is its reviewed truth."
+    },
+    "privacy": {
+      "status": "inherits_referenced_fixtures"
+    },
+    "redistribution": {
+      "status": "inherits_referenced_fixtures"
+    }
+  }
+}

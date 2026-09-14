@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "families": {
+    "results": {
+      "status": "implemented",
+      "categories": ["win", "lose", "draw", "clear", "phase", "negatives", "sequences"],
+      "note": "WIN / LOSS / DRAW result recognition, replayed through ResultClassifier and ResultDetector.run with the real state machine and ResultGate."
+    },
+    "match_metadata": {
+      "status": "reserved",
+      "categories": ["ranked_single", "ranked_team", "custom_single", "custom_team"],
+      "note": "Reserved for #15 match metadata. No recognizer exists, so no record may be added until it does."
+    },
+    "ranks": {
+      "status": "reserved",
+      "categories": ["pre_s", "s_rank", "season_boundaries"],
+      "note": "Reserved for self and opponent rank recognition. pre_s covers UNRANKED through A4; s_rank is a separate presentation."
+    },
+    "season": {
+      "status": "reserved",
+      "categories": ["pre_reset", "transition", "post_reset", "multi_season"],
+      "note": "Reserved for #28 season catalog and assignment (Revision 4, draft PR #31, not canonical). Ambiguous transition records stay unresolved."
+    },
+    "rating": {
+      "status": "reserved",
+      "categories": ["pre_s", "s_rank"],
+      "note": "Reserved for #28 rating progression. The pre-S and S rating presentations are distinct systems and are never one family."
+    },
+    "opponent_builds": {
+      "status": "reserved",
+      "categories": [],
+      "note": "Reserved for #17 opponent build recognition with a normalized full build as truth."
+    },
+    "self_builds": {
+      "status": "reserved",
+      "categories": [],
+      "note": "Reserved for #27 explicit self-build linkage."
+    }
+  }
+}

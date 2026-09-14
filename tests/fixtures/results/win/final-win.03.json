@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "result.final-win.03",
+  "family": "results",
+  "category": "win",
+  "input": {
+    "kind": "roi",
+    "path": "final_win_03.ppm",
+    "format": "ppm",
+    "width": 756,
+    "height": 50,
+    "bytes": 113414,
+    "sha256": "97095a1f6e6f20390374e46b71faf61b95cef7c098fc719f32c5d9047b7a0833"
+  },
+  "truth": {
+    "result": "win",
+    "screen": "final_result",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "FINAL_WIN"
+  },
+  "coverage": [
+    "result.win.positive"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "af06299 initial public release; migrated from tests/manifest.json and tests/test_detector.py at a8c6ee2",
+    "origin": "Cropped result-region ROI of a real AC6 still image.",
+    "synthetic": false,
+    "template_partition": "unmapped",
+    "legacy": {
+      "manifest_key": "fixtures/final_win_03.ppm",
+      "manifest_expected": "FINAL_WIN"
+    }
+  },
+  "review": {
+    "truth": {
+      "status": "legacy_label_visually_confirmed",
+      "basis": "The implementer viewed the full ROI: it shows the cyan text YOU WIN on the dark result band. The checked frame class is the legacy expectation from tests/manifest.json."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "The implementer inspected the full ROI at 2x. No player or opponent name, Steam identifier, notification, third-party overlay, desktop, local path, token or secret is visible, and the PPM header carries no comment field."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Committed by the repository owner in the initial public release (af06299, 2026-08-30) and public since. It contains ARMORED CORE VI game imagery; this records where the asset came from, not a licence determination."
+    }
+  }
+}
