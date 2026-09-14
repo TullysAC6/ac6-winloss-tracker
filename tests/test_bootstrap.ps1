@@ -45,21 +45,36 @@ function New-FixtureRelease {
 }
 
 $script:downloadFailure = $false
+$script:missingRelease = $false
+$script:requestedUris = New-Object 'System.Collections.Generic.List[string]'
 $web = {
     param($Uri, $OutFile)
+    $script:requestedUris.Add([string]$Uri)
     if ($script:downloadFailure) { throw 'mock HTTP failure' }
+    if ($script:missingRelease -and $Uri -match '/releases/tags/') { throw 'mock HTTP 404 Not Found' }
     $name = if ($Uri -match '/releases/') { 'release.json' } else { Split-Path -Leaf $Uri }
     Copy-Item -LiteralPath (Join-Path $fixtureRoot $name) -Destination $OutFile -Force
 }
 $script:childExitCode = 0
 $script:childTag = ''
-$child = { param($Path, $Mode, $Tag) $script:childTag = $Tag; return $script:childExitCode }
+$script:childInvoked = $false
+$child = { param($Path, $Mode, $Tag) $script:childInvoked = $true; $script:childTag = $Tag; return $script:childExitCode }
 
 try {
     New-FixtureRelease
+    $script:requestedUris.Clear()
     $result = Invoke-VerifiedReleaseScript -Mode Install -Repository owner/repo -ReleaseTag v1.0.0 -WebRequestInvoker $web -ChildInvoker $child
     if ($result -ne 0) { throw 'successful verified download failed' }
     if ($script:childTag -cne 'v1.0.0') { throw 'verified release tag was not passed to installer' }
+    # A pinned tag fetches that Release's metadata and its assets, and nothing else.
+    $expectedRequests = @(
+        'https://api.github.com/repos/owner/repo/releases/tags/v1.0.0',
+        'https://github.com/example/install.ps1',
+        'https://github.com/example/install.ps1.sha256'
+    )
+    if (($script:requestedUris -join ' ') -cne ($expectedRequests -join ' ')) {
+        throw "pinned bootstrap requested: $($script:requestedUris -join ', ')"
+    }
 
     if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) {
         $descendantPidPath = Join-Path $testRoot 'descendant.pid'
@@ -113,6 +128,48 @@ exit 0
         $script:downloadFailure = $false
         if (-not $failed) { throw "$case case did not fail closed" }
     }
+
+    # A pinned tag resolves that Release only. An empty tag is the one way to reach
+    # releases/latest, and a published README command always pins its own tag.
+    $pinnedApiUrl = Get-ReleaseApiUrl -Repository 'TullysAC6/ac6-winloss-tracker' -ReleaseTag 'v1.2.0'
+    if ($pinnedApiUrl -cne 'https://api.github.com/repos/TullysAC6/ac6-winloss-tracker/releases/tags/v1.2.0') {
+        throw "pinned release tag resolved to $pinnedApiUrl"
+    }
+    if ((Get-ReleaseApiUrl -Repository owner/repo -ReleaseTag '') -cne 'https://api.github.com/repos/owner/repo/releases/latest') {
+        throw 'unpinned bootstrap no longer resolves releases/latest'
+    }
+    foreach ($badTag in @('latest', 'v1.2', '1.2.0', 'v1.2.0-rc1', 'v1.2.0/../latest')) {
+        $rejected = $false
+        try { [void](Get-ReleaseApiUrl -Repository owner/repo -ReleaseTag $badTag) } catch { $rejected = $true }
+        if (-not $rejected) { throw "malformed release tag was accepted: $badTag" }
+    }
+
+    # A missing pinned Release fails closed in both modes and never falls back to
+    # releases/latest, although this mock would serve a latest Release.
+    New-FixtureRelease
+    foreach ($pinnedMode in @('Install', 'Uninstall')) {
+        $script:requestedUris.Clear()
+        $script:childInvoked = $false
+        $script:missingRelease = $true
+        $failed = $false
+        try {
+            [void](Invoke-VerifiedReleaseScript -Mode $pinnedMode -Repository owner/repo -ReleaseTag v1.2.0 -WebRequestInvoker $web -ChildInvoker $child)
+        } catch { $failed = $true } finally { $script:missingRelease = $false }
+        if (-not $failed) { throw "missing pinned Release did not fail closed ($pinnedMode)" }
+        if ($script:childInvoked) { throw "a release script ran although the pinned Release is missing ($pinnedMode)" }
+        if (($script:requestedUris -join ' ') -cne 'https://api.github.com/repos/owner/repo/releases/tags/v1.2.0') {
+            throw "pinned bootstrap requested $($script:requestedUris -join ', ') ($pinnedMode)"
+        }
+    }
+
+    # Metadata for a different Release is never accepted for a pinned tag.
+    New-FixtureRelease
+    $script:childInvoked = $false
+    $failed = $false
+    try {
+        [void](Invoke-VerifiedReleaseScript -Mode Install -Repository owner/repo -ReleaseTag v1.2.0 -WebRequestInvoker $web -ChildInvoker $child)
+    } catch { $failed = $true }
+    if (-not $failed -or $script:childInvoked) { throw 'metadata for another Release was accepted for a pinned tag' }
 
     $leftovers = @(Get-ChildItem -LiteralPath ([System.IO.Path]::GetTempPath()) -Directory -Filter 'AC6Bootstrap-*' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notin $existingBootstrapDirectories })
     if ($leftovers.Count -ne 0) { throw 'bootstrap temporary directory was not cleaned' }

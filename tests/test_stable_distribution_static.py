@@ -73,6 +73,8 @@ assert "現在のTrackerは変更していません" in installer
 
 assert "Invoke-Expression" not in readme
 assert "refs/tags/v1.2.0/bootstrap.ps1" in readme
+# Both commands pin the bootstrap to its own Release, never releases/latest.
+assert readme.count("-ReleaseTag v1.2.0;") == 2
 assert "Get-FileHash $p -Algorithm SHA256" in readme
 assert "82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B" in readme
 assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
