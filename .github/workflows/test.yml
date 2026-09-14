@@ -135,13 +135,20 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./tests/test_uninstaller.ps1
           if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 uninstaller test failed with exit code $LASTEXITCODE" }
 
-      - name: Run launcher tests
-        if: matrix.python-version != '3.12'
-        run: python tests/test_launcher.py
-
-      - name: Run full regression suite after launcher passes
+      # Gate order T0 -> T1 -> T2. tests/gate_registry.py decides which gate owns
+      # each test, so nothing runs twice (the launcher tests are T2).
+      - name: Run T0 regression suite
         if: matrix.python-version != '3.12'
         run: python tests/run_all_tests.py
+
+      - name: Run T1 fixture replay
+        if: matrix.python-version != '3.12'
+        shell: pwsh
+        run: python tests/run_t1.py --report-dir "$env:RUNNER_TEMP/t1-report"
+
+      - name: Run T2 lifecycle suite
+        if: matrix.python-version != '3.12'
+        run: python tests/run_t2.py --ci
 
       - name: Validate isolated running source install update and uninstall
         if: matrix.python-version != '3.12'

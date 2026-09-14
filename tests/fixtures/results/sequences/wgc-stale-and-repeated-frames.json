@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "id": "result.sequence.wgc-stale-and-repeated-frames",
+  "family": "results",
+  "category": "sequences",
+  "input": {
+    "kind": "sequence",
+    "capture": "wgc_boundary",
+    "processing_ms": 30,
+    "targets": {
+      "primary": {
+        "hwnd": 65537,
+        "pid": 4242
+      }
+    },
+    "steps": [
+      {
+        "id": "s01",
+        "at_ms": 0,
+        "wgc": {
+          "target": "primary",
+          "sample": null
+        }
+      },
+      {
+        "id": "s02",
+        "at_ms": 750,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.clear.normal-01",
+            "captured_ms": 740,
+            "timespan": 1
+          }
+        }
+      },
+      {
+        "id": "s03",
+        "at_ms": 1500,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.clear.normal-01",
+            "captured_ms": 1490,
+            "timespan": 2
+          }
+        }
+      },
+      {
+        "id": "s04",
+        "at_ms": 2250,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.clear.normal-01",
+            "captured_ms": 2240,
+            "timespan": 3
+          }
+        }
+      },
+      {
+        "id": "s05",
+        "at_ms": 3000,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.final-win.01",
+            "captured_ms": 2990,
+            "timespan": 4
+          }
+        }
+      },
+      {
+        "id": "s06",
+        "at_ms": 3750,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.final-win.01",
+            "captured_ms": 3740,
+            "timespan": 4
+          }
+        }
+      },
+      {
+        "id": "s07",
+        "at_ms": 4500,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.final-win.01",
+            "captured_ms": 2500,
+            "timespan": 5
+          }
+        }
+      },
+      {
+        "id": "s08",
+        "at_ms": 5250,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.final-win.01",
+            "captured_ms": 5240,
+            "timespan": 6
+          }
+        }
+      },
+      {
+        "id": "s09",
+        "at_ms": 6000,
+        "wgc": {
+          "target": "primary",
+          "sample": {
+            "frame": "result.final-win.01",
+            "captured_ms": 5990,
+            "timespan": 7
+          }
+        }
+      }
+    ]
+  },
+  "truth": {
+    "scenario": "Through the real GameCapture.grab: a repeated native timestamp and a stale frame are rejected before classification and break confirmation; fresh frames then confirm the WIN once.",
+    "expected_results": [
+      "win"
+    ],
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_detector_run.v1",
+    "steps": {
+      "s01": {
+        "frame_class": null,
+        "detection": null,
+        "gate": null,
+        "capture": {
+          "shot": false,
+          "identity_changed": false
+        }
+      },
+      "s02": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        },
+        "capture": {
+          "shot": true,
+          "discontinuity": true,
+          "status": "WGC window capture",
+          "sample_delivered": true
+        }
+      },
+      "s03": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        },
+        "capture": {
+          "shot": true,
+          "discontinuity": false
+        }
+      },
+      "s04": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true
+        }
+      },
+      "s05": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": "win",
+          "candidate_hits": 1
+        }
+      },
+      "s06": {
+        "frame_class": null,
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": null,
+          "candidate_hits": 0
+        },
+        "capture": {
+          "shot": false,
+          "discontinuity": true,
+          "status": "WGC frame rejected: stale, repeated, or target/geometry mismatch",
+          "sample_delivered": true
+        }
+      },
+      "s07": {
+        "frame_class": null,
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": null,
+          "candidate_hits": 0
+        },
+        "capture": {
+          "shot": false,
+          "discontinuity": true,
+          "status": "WGC frame rejected: stale, repeated, or target/geometry mismatch",
+          "sample_delivered": true
+        }
+      },
+      "s08": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": "win",
+          "candidate_hits": 1
+        },
+        "capture": {
+          "shot": true,
+          "discontinuity": false
+        }
+      },
+      "s09": {
+        "frame_class": "FINAL_WIN",
+        "detection": "win",
+        "gate": "accepted",
+        "state": {
+          "post_result_lock": true
+        }
+      }
+    },
+    "totals": {
+      "accepted": {
+        "win": 1,
+        "loss": 0
+      },
+      "detections": {
+        "win": 1,
+        "loss": 0,
+        "draw": 0
+      },
+      "gate_rejected": 0,
+      "frames_classified": 6,
+      "detector_errors": 0
+    }
+  },
+  "coverage": [
+    "sequence.stale_frame",
+    "sequence.capture_gap"
+  ],
+  "provenance": {
+    "source_type": "composed_sequence",
+    "reference": "tests/test_game_capture.py test_background_new_frames_only (mocked pixels) with real pixels through the detector loop",
+    "origin": "Composed scenario over reviewed repository fixtures; the frames do not come from one recording. Native timestamps and capture times are part of the scenario."
+  },
+  "review": {
+    "truth": {
+      "status": "contract_scenario_over_reviewed_fixtures",
+      "basis": "The 3.75 s sample repeats timespan 4 and the 4.50 s sample was captured 2.03 s earlier, beyond GameCapture.MAX_FRAME_AGE (1.6 s). Expectations were derived step by step from ResultDetector.run, ResultStateMachine, ResultGate and server.record_result, not copied from a replay; each referenced frame's class is its reviewed truth."
+    },
+    "privacy": {
+      "status": "inherits_referenced_fixtures"
+    },
+    "redistribution": {
+      "status": "inherits_referenced_fixtures"
+    }
+  }
+}

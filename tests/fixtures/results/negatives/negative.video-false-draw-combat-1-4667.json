@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "id": "result.negative.video-false-draw-combat-1-4667",
+  "family": "results",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "video_false_draw_combat_1_4667.ppm",
+    "format": "ppm",
+    "width": 544,
+    "height": 40,
+    "bytes": 65294,
+    "sha256": "cf9658585022ce1dd296f6fd133010665179727126e1783b5688cd6fc5811a10"
+  },
+  "truth": {
+    "result": "none",
+    "screen": "gameplay",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "NON_CLEAR",
+    "debug": [
+      {
+        "path": "draw_grid_score",
+        "below": 0.75
+      }
+    ]
+  },
+  "coverage": [
+    "negative.false_draw"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "af06299 initial public release; migrated from tests/manifest.json and tests/test_detector.py at a8c6ee2",
+    "origin": "Combat frame at 1.4667 s of one of the two user screen recordings whose combat frames v21 misclassified as FINAL_DRAW (the v22 regression).",
+    "synthetic": false,
+    "template_partition": "not_applicable",
+    "legacy": {
+      "manifest_key": "fixtures/video_false_draw_combat_1_4667.ppm",
+      "manifest_expected": "NON_CLEAR"
+    }
+  },
+  "review": {
+    "truth": {
+      "status": "legacy_label_visually_confirmed",
+      "basis": "The implementer viewed the full ROI: it shows grey combat structures and HUD brackets and no result text. The checked frame class is the legacy expectation from tests/manifest.json."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "The implementer inspected the full ROI at 2x. No player or opponent name, Steam identifier, notification, third-party overlay, desktop, local path, token or secret is visible, and the PPM header carries no comment field."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Committed by the repository owner in the initial public release (af06299, 2026-08-30) and public since. It contains ARMORED CORE VI game imagery; this records where the asset came from, not a licence determination."
+    }
+  }
+}

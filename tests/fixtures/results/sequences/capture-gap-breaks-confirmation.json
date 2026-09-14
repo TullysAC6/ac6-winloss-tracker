@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "id": "result.sequence.capture-gap-breaks-confirmation",
+  "family": "results",
+  "category": "sequences",
+  "input": {
+    "kind": "sequence",
+    "capture": "frame_source",
+    "processing_ms": 30,
+    "steps": [
+      {
+        "id": "s01",
+        "at_ms": 750,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s02",
+        "at_ms": 1500,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s03",
+        "at_ms": 2250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s04",
+        "at_ms": 3000,
+        "frame": "result.final-win.01"
+      },
+      {
+        "id": "s05",
+        "at_ms": 3750,
+        "gap": "capture_unavailable"
+      },
+      {
+        "id": "s06",
+        "at_ms": 4500,
+        "frame": "result.final-win.01"
+      },
+      {
+        "id": "s07",
+        "at_ms": 5250,
+        "frame": "result.final-win.01"
+      }
+    ]
+  },
+  "truth": {
+    "scenario": "A capture gap between two final hits breaks consecutive confirmation; two fresh hits are needed and the WIN counts once.",
+    "expected_results": [
+      "win"
+    ],
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_detector_run.v1",
+    "steps": {
+      "s01": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s02": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s03": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "clear_ready": true
+        }
+      },
+      "s04": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": "win",
+          "candidate_hits": 1
+        }
+      },
+      "s05": {
+        "frame_class": null,
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "candidate": null,
+          "candidate_hits": 0
+        },
+        "capture": {
+          "shot": false,
+          "status": "replay capture unavailable"
+        },
+        "health": {
+          "status": "waiting"
+        }
+      },
+      "s06": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": "win",
+          "candidate_hits": 1
+        },
+        "health": {
+          "status": "active"
+        }
+      },
+      "s07": {
+        "frame_class": "FINAL_WIN",
+        "detection": "win",
+        "gate": "accepted",
+        "state": {
+          "post_result_lock": true
+        }
+      }
+    },
+    "totals": {
+      "accepted": {
+        "win": 1,
+        "loss": 0
+      },
+      "detections": {
+        "win": 1,
+        "loss": 0,
+        "draw": 0
+      },
+      "gate_rejected": 0,
+      "frames_classified": 6,
+      "detector_errors": 0
+    }
+  },
+  "coverage": [
+    "sequence.capture_gap"
+  ],
+  "provenance": {
+    "source_type": "composed_sequence",
+    "reference": "tests/test_game_capture.py CaptureGapTests (labels) with real pixels",
+    "origin": "Composed scenario over reviewed repository fixtures; the frames do not come from one recording."
+  },
+  "review": {
+    "truth": {
+      "status": "contract_scenario_over_reviewed_fixtures",
+      "basis": "Expectations were derived step by step from ResultDetector.run, ResultStateMachine, ResultGate and server.record_result, not copied from a replay; each referenced frame's class is its reviewed truth."
+    },
+    "privacy": {
+      "status": "inherits_referenced_fixtures"
+    },
+    "redistribution": {
+      "status": "inherits_referenced_fixtures"
+    }
+  }
+}
