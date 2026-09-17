@@ -82,7 +82,11 @@ def derive_totals(observations):
     detections = {name: 0 for name in DETECTIONS}
     rejected = frames = errors = 0
     for observation in observations:
-        for call in observation["gate_calls"]:
+        calls = list(observation["gate_calls"])
+        after_gate = observation.get("after_gate")
+        if after_gate:
+            calls.append(after_gate)
+        for call in calls:
             if call["accepted"]:
                 accepted[call["result"]] = accepted.get(call["result"], 0) + 1
             else:
@@ -149,6 +153,13 @@ def compare_sequence(record, actual):
                 got = observation[group].get(key, "<missing>")
                 if not same_value(value, got):
                     failures.append(failure(group, f"{group}.{key}", value, got, f"{group} differs", step_id))
+        # A manual after-action's own gate call: the result, its source and
+        # whether the real ResultGate accepted it.
+        for key, value in expect.get("after_gate", {}).items():
+            got = (observation.get("after_gate") or {}).get(key, "<missing>")
+            if not same_value(value, got):
+                failures.append(failure("gate", f"after_gate.{key}", value, got,
+                                        "the manual result's gate arbitration differs", step_id))
     totals = derive_totals(observations)
     for key, value in checks["totals"].items():
         if totals[key] != value:

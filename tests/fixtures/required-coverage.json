@@ -22,6 +22,9 @@
     "sequence.dark_gameplay_final_win": "Motion-confirmed dark gameplay arms the detector so the following real WIN counts.",
     "sequence.startup_visible_final": "A final banner already on screen at startup is never counted.",
     "contract.draw_no_count": "DRAW is detected and reported but never reaches the result gate or the WIN/LOSE counts.",
-    "contract.gate_feedback": "An accepted result returns external_mutation to the detector, installing the post-result lock."
+    "contract.gate_feedback": "An accepted result returns external_mutation to the detector, installing the post-result lock.",
+    "contract.undo_feedback": "An undo moves the post-result lock to the undo, so the detector re-arms later than it would have without it.",
+    "contract.gate_rejection": "A manual result inside the cooldown is refused by the shared ResultGate and never mutates the detector.",
+    "contract.processing_time": "The post-result cooldown is measured from processing time, not from capture time."
   }
 }

@@ -22,6 +22,7 @@ from pathlib import Path
 from .clock import ModuleTime, VirtualClock
 from .images import decode_image
 from .paths import resolve_fixture_file
+from .schema import MANUAL_AFTER_ACTIONS
 
 # server.record_result: ``cooldown = 5.0``. A T0 check keeps these in step.
 SERVER_COOLDOWN_SECONDS = 5.0
@@ -106,6 +107,7 @@ class GateSink:
         self.cursor = cursor
         self.detector = None
         self.calls = []
+        self.manual_calls = []
         self.events = []
 
     def on_result(self, result, source):
@@ -114,6 +116,21 @@ class GateSink:
         if accepted:
             self.detector.external_mutation()
         self.calls.append((self.cursor.index, result, source, accepted))
+        return accepted
+
+    def manual_result(self, result):
+        """server.record_result for the gate's other source.
+
+        record_result is source-agnostic: an automatic detection and a manual
+        result share one ResultGate, and a refused duplicate must not touch the
+        detector or extend the cooldown. Only that arbitration is replayed here;
+        history and stats belong to T0/T2.
+        """
+        now = self.clock.processing_now()
+        accepted = self.gate.try_accept(SERVER_COOLDOWN_SECONDS, now=now)
+        if accepted:
+            self.detector.external_mutation()
+        self.manual_calls.append((self.cursor.index, result, "manual", accepted))
         return accepted
 
     def event(self, kind, payload, remember=True):
@@ -475,6 +492,10 @@ def run_sequence(modules, record_input, images, templates_path, case_root):
             sink.reset()
         elif after == "after_undo":
             sink.after_undo()
+        elif after in MANUAL_AFTER_ACTIONS:
+            manual = MANUAL_AFTER_ACTIONS[after]
+            observation["after_gate"] = {"result": manual, "source": "manual",
+                                         "accepted": sink.manual_result(manual)}
         observation["after"] = after
         if after:
             observation["state_after_action"] = json_safe(detector.state.snapshot())

@@ -13,6 +13,7 @@ import importlib.abc
 import io
 import multiprocessing.process
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -41,7 +42,17 @@ MUTATION_PATH_PARAMETERS = {
     "makedirs": ("name",),
     "rename": ("src", "dst"),
     "replace": ("src", "dst"),
+    # Truncating, relinking or restamping a file changes it just as a write
+    # does, and each of these is an ordinary public call.
+    "truncate": ("path",),
+    "chmod": ("path",),
+    "utime": ("path",),
+    "link": ("src", "dst"),
+    "symlink": ("src", "dst"),
 }
+# Copy helpers read their source and write their destination. shutil.copy2 is
+# wrapped as the call itself, not left to whichever primitive it uses inside.
+COPY_PATH_PARAMETERS = ("src", "dst")
 
 
 class GuardViolation(RuntimeError):
@@ -116,11 +127,45 @@ def install(owned_root, forbidden_roots=()):
             return original(*args, **kwargs)
         return mutation
 
+    def guarded_pair(original, reading_first=True):
+        """Check a (source, destination) call: source read, destination write."""
+        def call(*args, **kwargs):
+            source = args[0] if args else kwargs.get(COPY_PATH_PARAMETERS[0])
+            destination = args[1] if len(args) > 1 else kwargs.get(COPY_PATH_PARAMETERS[1])
+            if source is not None and reading_first:
+                check_path(source, False)
+            if destination is not None:
+                check_path(destination, True)
+            return original(*args, **kwargs)
+        return call
+
+    original_file_io = io.FileIO
+
+    class GuardedFileIO(original_file_io):
+        """io.FileIO is a second front door to the same bytes as open()."""
+
+        def __init__(self, file, mode="r", *args, **kwargs):
+            check_path(file, _writes(mode))
+            super().__init__(file, mode, *args, **kwargs)
+
+    import _io
+
     replace(builtins, "open", guarded_open)
     replace(io, "open", guarded_open)
+    replace(_io, "open", guarded_open)
+    replace(io, "FileIO", GuardedFileIO)
+    replace(_io, "FileIO", GuardedFileIO)
     replace(os, "open", guarded_os_open)
     for name, parameters in MUTATION_PATH_PARAMETERS.items():
-        replace(os, name, guarded_mutation(getattr(os, name), parameters))
+        if hasattr(os, name):
+            replace(os, name, guarded_mutation(getattr(os, name), parameters))
+    for name in ("copy2", "copy", "copyfile"):
+        replace(shutil, name, guarded_pair(getattr(shutil, name)))
+    if os.name == "nt":
+        import _winapi
+        if hasattr(_winapi, "CopyFile2"):
+            # shutil.copy2 uses this directly on Windows; guard the primitive too.
+            replace(_winapi, "CopyFile2", guarded_pair(_winapi.CopyFile2))
 
     # Network: refuse to create sockets or resolve names at all.
     class DeniedSocket:

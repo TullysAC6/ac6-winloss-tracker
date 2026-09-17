@@ -36,6 +36,7 @@ FIXTURES = ROOT / "tests" / "fixtures"
 IMAGE_RECORD = FIXTURES / "results" / "win" / "final-win.01.json"
 SEQUENCE_RECORD = FIXTURES / "results" / "sequences" / "two-match-win-then-loss.json"
 WGC_RECORD = FIXTURES / "results" / "sequences" / "wgc-stale-and-repeated-frames.json"
+MANUAL_RECORD = FIXTURES / "results" / "sequences" / "gate-cooldown-rejects-a-manual-result.json"
 
 
 def load(path):
@@ -297,6 +298,22 @@ class SchemaTests(unittest.TestCase):
         self.reject_sequence(small, "minimum height 40", base)
         self.reject_sequence(lambda r: r["input"]["steps"][1]["wgc"].update(target="elsewhere"), "unknown target", base)
 
+    def test_a_manual_after_action_must_assert_its_own_gate_call(self):
+        base = load(MANUAL_RECORD)
+        schema.validate_sequence_record("record", copy.deepcopy(base), self.tags, self.images)
+        self.reject_sequence(lambda r: r["checks"]["steps"]["s06"].pop("after_gate"), "must assert after_gate", base)
+        self.reject_sequence(lambda r: r["checks"]["steps"]["s06"]["after_gate"].update(result="loss"),
+                             "records 'win'", base)
+        self.reject_sequence(lambda r: r["checks"]["steps"]["s06"]["after_gate"].update(source="auto"),
+                             "after_gate.source", base)
+        self.reject_sequence(lambda r: r["checks"]["steps"]["s06"]["after_gate"].update(accepted="no"),
+                             "after_gate.accepted", base)
+        self.reject_sequence(lambda r: r["checks"]["steps"]["s07"].update(
+            after_gate={"result": "win", "source": "manual", "accepted": False}),
+            "only a manual after-action", base)
+        self.reject_sequence(lambda r: r["checks"]["totals"]["accepted"].update(win=3),
+                             "cannot accept more results", base)
+
 
 class CorpusTests(unittest.TestCase):
     def setUp(self):
@@ -430,6 +447,20 @@ class CompareTests(unittest.TestCase):
                                                                     "accepted": True}])
         checks = [item["check"] for item in compare.compare_sequence(record, self.actual(leaked))]
         self.assertIn("gate_calls", checks)
+
+    def test_a_manual_gate_call_is_compared_and_counted(self):
+        record = self.sequence()
+        record["checks"]["steps"]["s01"]["after_gate"] = {"result": "win", "source": "manual", "accepted": False}
+        record["checks"]["totals"]["gate_rejected"] = 1
+        refused = self.observation(after_gate={"result": "win", "source": "manual", "accepted": False})
+        self.assertEqual(compare.compare_sequence(record, self.actual(refused)), [])
+        accepted = self.observation(after_gate={"result": "win", "source": "manual", "accepted": True})
+        checks = {item["check"] for item in compare.compare_sequence(record, self.actual(accepted))}
+        self.assertIn("after_gate.accepted", checks)
+        self.assertIn("gate_rejected", checks)
+        self.assertIn("accepted", checks)
+        absent = {item["check"] for item in compare.compare_sequence(record, self.actual(self.observation()))}
+        self.assertIn("after_gate.accepted", absent)
 
     def test_error_paths_and_cleanup_are_failures(self):
         record = self.sequence()
@@ -603,14 +634,109 @@ class GuardTests(unittest.TestCase):
         self.assertEqual({name: getattr(os, name) for name in wrapped}, originals)
 
     def test_mutation_guard_path_parameters_match_this_interpreter(self):
+        """The mapped names must be the ones this Python actually accepts."""
         import inspect
         self.assertEqual(set(guards.MUTATION_PATH_PARAMETERS),
-                         {"remove", "unlink", "rmdir", "rename", "replace", "mkdir", "makedirs"})
+                         {"remove", "unlink", "rmdir", "rename", "replace", "mkdir", "makedirs",
+                          "truncate", "chmod", "utime", "link", "symlink"})
+        without_signature = []
         for name, parameters in guards.MUTATION_PATH_PARAMETERS.items():
-            leading = list(inspect.signature(getattr(os, name)).parameters.values())[:len(parameters)]
+            try:
+                signature = inspect.signature(getattr(os, name))
+            except ValueError:
+                # Several of these builtins carry no text signature on Windows.
+                without_signature.append(name)
+                continue
+            leading = list(signature.parameters.values())[:len(parameters)]
             self.assertEqual([parameter.name for parameter in leading], list(parameters), name)
             self.assertTrue(all(parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD for parameter in leading),
                             name)
+        with tempfile.TemporaryDirectory(prefix="ac6-t1-signature-") as name:
+            base = Path(name)
+            target = base / "file.txt"
+            target.write_text("x", encoding="utf-8")
+            keyword_calls = {
+                "chmod": lambda: os.chmod(path=str(target), mode=0o666),
+                "utime": lambda: os.utime(path=str(target), times=None),
+                "link": lambda: os.link(src=str(target), dst=str(base / "hardlink.txt")),
+                "symlink": lambda: os.symlink(src=str(target), dst=str(base / "symlink.txt")),
+                "truncate": lambda: os.truncate(path=str(target), length=1),
+            }
+            for function_name in without_signature:
+                with self.subTest(function_name):
+                    try:
+                        keyword_calls[function_name]()
+                    except TypeError as error:
+                        # Positional-only here, so no caller can pass the keyword
+                        # either and the mapped name simply never matches.
+                        self.assertIn("keyword", str(error).lower(), f"{function_name}: {error}")
+                    except OSError:
+                        pass  # the call was understood; the filesystem refused it
+
+    def test_other_public_write_read_and_copy_calls_are_guarded(self):
+        """A second front door to the same bytes must not walk past the tripwire."""
+        import _io
+        import io as io_module
+        import shutil
+        originals = (io_module.FileIO, _io.FileIO, _io.open, shutil.copy2, os.truncate, os.chmod, os.utime, os.link)
+        with tempfile.TemporaryDirectory(prefix="ac6-t1-guard-") as name:
+            base = Path(name)
+            owned, outside, live = base / "owned", base / "outside", base / "AC6WinLossTracker"
+            for directory in (owned, outside, live):
+                directory.mkdir()
+            sentinel = outside / "sentinel.txt"
+            sentinel.write_text("sentinel", encoding="utf-8")
+            (live / "stats.json").write_text("{}", encoding="utf-8")
+            source = owned / "source.txt"
+            source.write_text("source", encoding="utf-8")
+            stamp = sentinel.stat().st_mtime_ns
+            restore = guards.install(owned, forbidden_roots=[live])
+            try:
+                refused = {
+                    "io.FileIO(outside, w)": lambda: io_module.FileIO(outside / "a.bin", "w"),
+                    "io.FileIO(file=, mode=)": lambda: io_module.FileIO(file=outside / "b.bin", mode="w"),
+                    "_io.FileIO(outside, w)": lambda: _io.FileIO(outside / "c.bin", "w"),
+                    "_io.open(outside, w)": lambda: _io.open(outside / "d.txt", "w"),
+                    "os.truncate(outside)": lambda: os.truncate(sentinel, 0),
+                    "os.truncate(path=)": lambda: os.truncate(path=sentinel, length=0),
+                    "os.chmod(outside)": lambda: os.chmod(sentinel, 0o444),
+                    "os.chmod(path=)": lambda: os.chmod(path=sentinel, mode=0o444),
+                    "os.utime(outside)": lambda: os.utime(sentinel, (0, 0)),
+                    "os.utime(path=)": lambda: os.utime(path=sentinel, times=(0, 0)),
+                    "os.link(owned, outside)": lambda: os.link(source, outside / "e.txt"),
+                    "os.link(src=, dst=)": lambda: os.link(src=source, dst=outside / "f.txt"),
+                    "os.symlink(owned, outside)": lambda: os.symlink(source, outside / "g.txt"),
+                    "os.symlink(src=, dst=)": lambda: os.symlink(src=source, dst=outside / "h.txt"),
+                    "shutil.copy2(owned, outside)": lambda: shutil.copy2(source, outside / "i.txt"),
+                    "shutil.copy2(src=, dst=)": lambda: shutil.copy2(src=source, dst=outside / "j.txt"),
+                    "shutil.copy(owned, outside)": lambda: shutil.copy(source, outside / "k.txt"),
+                    "shutil.copyfile(owned, outside)": lambda: shutil.copyfile(source, outside / "l.txt"),
+                    # live Tracker data stays unreadable through the same calls
+                    "io.FileIO(live, r)": lambda: io_module.FileIO(live / "stats.json", "r"),
+                    "_io.open(live, r)": lambda: _io.open(live / "stats.json", "r"),
+                    "shutil.copy2(live, owned)": lambda: shutil.copy2(live / "stats.json", owned / "m.json"),
+                }
+                for label, attempt in refused.items():
+                    with self.subTest(label), self.assertRaises(guards.GuardViolation):
+                        attempt()
+                # Inside the owned root the same calls still work.
+                handle = io_module.FileIO(owned / "inside.bin", "w")
+                handle.write(b"inside")
+                handle.close()
+                os.truncate(owned / "inside.bin", 0)
+                os.chmod(owned / "inside.bin", 0o666)
+                os.utime(owned / "inside.bin", None)
+                os.link(source, owned / "hardlink.txt")
+                shutil.copy2(source, owned / "copy2.txt")
+                shutil.copyfile(source, owned / "copyfile.txt")
+            finally:
+                restore()
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            self.assertEqual(sentinel.stat().st_mtime_ns, stamp, "an outside file was restamped")
+            self.assertEqual(sorted(entry.name for entry in outside.iterdir()), ["sentinel.txt"])
+            self.assertEqual(sorted(entry.name for entry in live.iterdir()), ["stats.json"])
+        self.assertEqual((io_module.FileIO, _io.FileIO, _io.open, shutil.copy2, os.truncate, os.chmod, os.utime,
+                          os.link), originals)
 
     def test_worker_refuses_production_imported_before_isolation(self):
         from t1 import worker
@@ -705,6 +831,17 @@ class ProductionSeamTests(unittest.TestCase):
         reset = reset[:reset.index("\ndef ", 1)]
         self.assertIn("result_gate.lock_now()", reset)
         self.assertIn("current.external_mutation()", reset)
+        # The gate arbitrates between the automatic and the manual source, and
+        # the replay's manual after-action must be that same arbitration.
+        import inspect
+        self.assertIn("def record_result(result, source):", server)
+        self.assertIn("Auto and manual paths share one gate", server)
+        self.assertIn("shared by automatic and manual result sources",
+                      (ROOT / "result_gate.py").read_text(encoding="utf-8"))
+        manual = inspect.getsource(replay.GateSink.manual_result)
+        self.assertIn("self.gate.try_accept(SERVER_COOLDOWN_SECONDS, now=now)", manual)
+        self.assertIn("self.detector.external_mutation()", manual)
+        self.assertEqual(schema.MANUAL_AFTER_ACTIONS, {"manual_win": "win"})
 
     def test_every_asserted_debug_path_exists_in_real_classifier_output(self):
         from result_detector import ResultClassifier

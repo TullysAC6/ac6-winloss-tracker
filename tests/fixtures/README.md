@@ -68,14 +68,18 @@ A sequence references image records by id and never copies pixels. Each step has
 
 - `frame_source` capture: `frame` (an image id) or `gap` (`capture_unavailable`), optionally with `capture: {discontinuity, identity_changed}`.
 - `wgc_boundary` capture: `wgc: {target, sample}`. The sample `{frame, captured_ms, timespan}` is handed to the real `GameCapture.grab` as the capture worker's reply, so production's own freshness, repeated-timestamp, identity and geometry checks decide whether the frame is used. One ROI geometry is replayed per sequence and it must be one `result_region` can produce, so its height is at least 40.
-- optionally `after`: `after_undo` (what `server.undo_result` tells the gate and detector) or `external_mutation` (what `server.reset_stats` tells them).
+- optionally `after`, one of:
+  - `after_undo`: what `server.undo_result` tells the gate and detector;
+  - `external_mutation`: what `server.reset_stats` tells them;
+  - `manual_win`: a manual WIN entered while the detector runs. `server.record_result` is source-agnostic and the ResultGate is "shared by automatic and manual result sources", so the replay performs that one gate arbitration — `try_accept` with the server's 5 s cooldown, and `external_mutation()` only if it is accepted. History and stats are not replayed. This is the only way a gate rejection can be observed at all: the detector's own post-result lock is stronger than the gate cooldown, so an automatic result can never arrive inside it.
 
 Metadata can only name these fixed values. It can never carry code, an expression, a shell command or a process to launch. At most 256 steps.
 
 `checks.adapter` is `result_detector_run.v1`. `checks.steps` must assert every step:
 
 - `frame_class` and `detection` are required;
-- optionally `gate`, `gameplay_activity`, a subset of the state snapshot, capture flags and health.
+- optionally `gate`, `gameplay_activity`, a subset of the state snapshot, capture flags and health;
+- `after_gate` is required exactly on a step whose `after` is a manual result, and is refused anywhere else. It asserts that result, its `source` and whether the real ResultGate accepted it.
 
 `checks.totals` asserts accepted WIN/LOSS, detections, gate rejections, classified frames and `detector_errors: 0`. The detections in `truth.expected_results`, the per-step detections and `totals.detections` must agree.
 

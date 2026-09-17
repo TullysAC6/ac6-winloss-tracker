@@ -40,7 +40,12 @@ SEQUENCE_ADAPTER = "result_detector_run.v1"
 ADAPTERS = (IMAGE_ADAPTER, SEQUENCE_ADAPTER)
 CAPTURE_MODES = ("frame_source", "wgc_boundary")
 GAP_KINDS = ("capture_unavailable",)
-AFTER_ACTIONS = ("external_mutation", "after_undo")
+# What a step may tell the server side once the detector has ended that poll.
+# ``manual_win`` is the gate's second source: server.record_result is shared by
+# automatic and manual results, and only that gate arbitration is replayed.
+AFTER_ACTIONS = ("external_mutation", "after_undo", "manual_win")
+MANUAL_AFTER_ACTIONS = {"manual_win": "win"}
+AFTER_GATE_SOURCES = ("manual",)
 
 # The results family directory names. ``lose`` is the historical directory
 # name; the semantic value the runtime uses is ``loss``.
@@ -88,7 +93,8 @@ STATE_FIELDS = {"armed": bool, "post_result_lock": bool, "clear_ready": bool,
 CAPTURE_FIELDS = {"shot": bool, "discontinuity": bool, "identity_changed": bool, "status": str,
                   "sample_delivered": bool}
 HEALTH_FIELDS = {"status": str, "last_result": (str, type(None))}
-STEP_CHECK_FIELDS = ("frame_class", "gameplay_activity", "detection", "gate", "state", "capture", "health")
+STEP_CHECK_FIELDS = ("frame_class", "gameplay_activity", "detection", "gate", "state", "capture", "health",
+                     "after_gate")
 GATE_OUTCOMES = ("accepted", "rejected")
 TOTAL_FIELDS = ("accepted", "detections", "gate_rejected", "frames_classified", "detector_errors")
 
@@ -270,6 +276,11 @@ def _step_checks(source, check, step, image_ids):
         _bool(f"{source}.gameplay_activity", check["gameplay_activity"])
     if "gate" in check and check["gate"] is not None:
         _enum(f"{source}.gate", check["gate"], GATE_OUTCOMES)
+    if "after_gate" in check:
+        after_gate = _object(f"{source}.after_gate", check["after_gate"], ("result", "source", "accepted"))
+        _enum(f"{source}.after_gate.result", after_gate["result"], DETECTIONS)
+        _enum(f"{source}.after_gate.source", after_gate["source"], AFTER_GATE_SOURCES)
+        _bool(f"{source}.after_gate.accepted", after_gate["accepted"])
     for name, fields in (("state", STATE_FIELDS), ("capture", CAPTURE_FIELDS), ("health", HEALTH_FIELDS)):
         if name not in check:
             continue
@@ -397,6 +408,22 @@ def validate_sequence_record(source, record, known_tags, image_records):
         _fail(f"{source}.checks.steps", f"must assert every step exactly once (missing {missing}, unknown {extra})")
     for step in steps:
         _step_checks(f"{source}.checks.steps.{step['id']}", step_checks[step["id"]], step, image_records)
+    # A manual after-action is the only thing that produces a gate call of its
+    # own, and it must be asserted where it happens.
+    manual_accepted = {name: 0 for name in DETECTIONS}
+    for step in steps:
+        where = f"{source}.checks.steps.{step['id']}"
+        check = step_checks[step["id"]]
+        action = step.get("after")
+        if action in MANUAL_AFTER_ACTIONS:
+            if "after_gate" not in check:
+                _fail(where, f"a step with after {action!r} must assert after_gate")
+            if check["after_gate"]["result"] != MANUAL_AFTER_ACTIONS[action]:
+                _fail(f"{where}.after_gate.result", f"{action} records {MANUAL_AFTER_ACTIONS[action]!r}")
+            if check["after_gate"]["accepted"]:
+                manual_accepted[MANUAL_AFTER_ACTIONS[action]] += 1
+        elif "after_gate" in check:
+            _fail(f"{where}.after_gate", "only a manual after-action produces a gate call of its own")
     totals = _object(f"{source}.checks.totals", checks["totals"], TOTAL_FIELDS)
     accepted = _object(f"{source}.checks.totals.accepted", totals["accepted"], ("win", "loss"))
     detections = _object(f"{source}.checks.totals.detections", totals["detections"], DETECTIONS)
@@ -415,8 +442,9 @@ def validate_sequence_record(source, record, known_tags, image_records):
     if stepwise != detected:
         _fail(f"{source}.checks.steps", "per-step detections disagree with totals.detections")
     for result in ("win", "loss"):
-        if accepted[result] > detections[result]:
-            _fail(f"{source}.checks.totals.accepted", "cannot accept more results than were detected")
+        if accepted[result] > detections[result] + manual_accepted[result]:
+            _fail(f"{source}.checks.totals.accepted",
+                  "cannot accept more results than were detected or entered manually")
     validate_coverage_tags(f"{source}.coverage", record["coverage"], known_tags)
     provenance = _object(f"{source}.provenance", record["provenance"], ("source_type", "reference", "origin"))
     _enum(f"{source}.provenance.source_type", provenance["source_type"], SOURCE_TYPES_SEQUENCE)
