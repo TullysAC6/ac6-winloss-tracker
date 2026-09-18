@@ -1,0 +1,539 @@
+{
+  "schema_version": 1,
+  "source": "tests/test_detector.py and tests/manifest.json at a8c6ee205caf023630618b1104c059e295d5febc",
+  "note": "Every assertion the pre-#14 pixel regression made, and where it is enforced now. t1: encoded at least as strictly in the named T1 case. t0_retained: still asserted by tests/test_detector.py. Nothing is dropped.",
+  "assertions": [
+    {
+      "legacy_id": "manifest.final_win_01",
+      "legacy": "tests/manifest.json fixtures/final_win_01.ppm expected FINAL_WIN, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-win.01",
+      "manifest_key": "fixtures/final_win_01.ppm",
+      "manifest_expected": "FINAL_WIN",
+      "t1_check": {
+        "frame_class": "FINAL_WIN"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.final_win_02",
+      "legacy": "tests/manifest.json fixtures/final_win_02.ppm expected FINAL_WIN, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-win.02",
+      "manifest_key": "fixtures/final_win_02.ppm",
+      "manifest_expected": "FINAL_WIN",
+      "t1_check": {
+        "frame_class": "FINAL_WIN"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.final_win_03",
+      "legacy": "tests/manifest.json fixtures/final_win_03.ppm expected FINAL_WIN, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-win.03",
+      "manifest_key": "fixtures/final_win_03.ppm",
+      "manifest_expected": "FINAL_WIN",
+      "t1_check": {
+        "frame_class": "FINAL_WIN"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.phase_win_01",
+      "legacy": "tests/manifest.json fixtures/phase_win_01.ppm expected PHASE, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.phase.win-01",
+      "manifest_key": "fixtures/phase_win_01.ppm",
+      "manifest_expected": "PHASE",
+      "t1_check": {
+        "frame_class": "PHASE"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.phase_loss_01",
+      "legacy": "tests/manifest.json fixtures/phase_loss_01.ppm expected PHASE, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.phase.loss-01",
+      "manifest_key": "fixtures/phase_loss_01.ppm",
+      "manifest_expected": "PHASE",
+      "t1_check": {
+        "frame_class": "PHASE"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.final_loss_01",
+      "legacy": "tests/manifest.json fixtures/final_loss_01.ppm expected FINAL_LOSS, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-loss.01",
+      "manifest_key": "fixtures/final_loss_01.ppm",
+      "manifest_expected": "FINAL_LOSS",
+      "t1_check": {
+        "frame_class": "FINAL_LOSS"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.final_loss_02",
+      "legacy": "tests/manifest.json fixtures/final_loss_02.ppm expected FINAL_LOSS, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-loss.02",
+      "manifest_key": "fixtures/final_loss_02.ppm",
+      "manifest_expected": "FINAL_LOSS",
+      "t1_check": {
+        "frame_class": "FINAL_LOSS"
+      },
+      "template_partition": "unmapped"
+    },
+    {
+      "legacy_id": "manifest.normal_01",
+      "legacy": "tests/manifest.json fixtures/normal_01.ppm expected CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.clear.normal-01",
+      "manifest_key": "fixtures/normal_01.ppm",
+      "manifest_expected": "CLEAR",
+      "t1_check": {
+        "frame_class": "CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.phase_white_prefix_synthetic",
+      "legacy": "tests/manifest.json fixtures/phase_white_prefix_synthetic.ppm expected PHASE, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.phase.white-prefix-synthetic",
+      "manifest_key": "fixtures/phase_white_prefix_synthetic.ppm",
+      "manifest_expected": "PHASE",
+      "t1_check": {
+        "frame_class": "PHASE"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.false_cyan_hud_synthetic",
+      "legacy": "tests/manifest.json fixtures/false_cyan_hud_synthetic.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.false-cyan-hud-synthetic",
+      "manifest_key": "fixtures/false_cyan_hud_synthetic.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.live_gameplay_6349",
+      "legacy": "tests/manifest.json fixtures/live_gameplay_6349.ppm expected CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.clear.live-gameplay-6349",
+      "manifest_key": "fixtures/live_gameplay_6349.ppm",
+      "manifest_expected": "CLEAR",
+      "t1_check": {
+        "frame_class": "CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_true_final_win_5_9",
+      "legacy": "tests/manifest.json fixtures/video_true_final_win_5_9.ppm expected FINAL_WIN, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-win.video-5-9",
+      "manifest_key": "fixtures/video_true_final_win_5_9.ppm",
+      "manifest_expected": "FINAL_WIN",
+      "t1_check": {
+        "frame_class": "FINAL_WIN"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_false_garage_20_1",
+      "legacy": "tests/manifest.json fixtures/video_false_garage_20_1.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-garage-20-1",
+      "manifest_key": "fixtures/video_false_garage_20_1.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_false_garage_menu_21_4",
+      "legacy": "tests/manifest.json fixtures/video_false_garage_menu_21_4.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-garage-menu-21-4",
+      "manifest_key": "fixtures/video_false_garage_menu_21_4.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_rank_menu_23_267",
+      "legacy": "tests/manifest.json fixtures/video_rank_menu_23_267.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-rank-menu-23-267",
+      "manifest_key": "fixtures/video_rank_menu_23_267.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_draw_1_2",
+      "legacy": "tests/manifest.json fixtures/video_draw_1_2.ppm expected FINAL_DRAW, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.draw.video-1-2",
+      "manifest_key": "fixtures/video_draw_1_2.ppm",
+      "manifest_expected": "FINAL_DRAW",
+      "t1_check": {
+        "frame_class": "FINAL_DRAW"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_draw_1_6",
+      "legacy": "tests/manifest.json fixtures/video_draw_1_6.ppm expected FINAL_DRAW, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.draw.video-1-6",
+      "manifest_key": "fixtures/video_draw_1_6.ppm",
+      "manifest_expected": "FINAL_DRAW",
+      "t1_check": {
+        "frame_class": "FINAL_DRAW"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_draw_2_5",
+      "legacy": "tests/manifest.json fixtures/video_draw_2_5.ppm expected FINAL_DRAW, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.draw.video-2-5",
+      "manifest_key": "fixtures/video_draw_2_5.ppm",
+      "manifest_expected": "FINAL_DRAW",
+      "t1_check": {
+        "frame_class": "FINAL_DRAW"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_dark_gameplay_0_75",
+      "legacy": "tests/manifest.json fixtures/video_dark_gameplay_0_75.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-dark-gameplay-0-75",
+      "manifest_key": "fixtures/video_dark_gameplay_0_75.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_dark_gameplay_1_50",
+      "legacy": "tests/manifest.json fixtures/video_dark_gameplay_1_50.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-dark-gameplay-1-50",
+      "manifest_key": "fixtures/video_dark_gameplay_1_50.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_dark_gameplay_2_25",
+      "legacy": "tests/manifest.json fixtures/video_dark_gameplay_2_25.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-dark-gameplay-2-25",
+      "manifest_key": "fixtures/video_dark_gameplay_2_25.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_missed_final_win_6_00",
+      "legacy": "tests/manifest.json fixtures/video_missed_final_win_6_00.ppm expected FINAL_WIN, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.final-win.video-6-00",
+      "manifest_key": "fixtures/video_missed_final_win_6_00.ppm",
+      "manifest_expected": "FINAL_WIN",
+      "t1_check": {
+        "frame_class": "FINAL_WIN"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_false_draw_combat_1_4667",
+      "legacy": "tests/manifest.json fixtures/video_false_draw_combat_1_4667.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-false-draw-combat-1-4667",
+      "manifest_key": "fixtures/video_false_draw_combat_1_4667.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_false_draw_combat_1_6667",
+      "legacy": "tests/manifest.json fixtures/video_false_draw_combat_1_6667.ppm expected CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-false-draw-combat-1-6667",
+      "manifest_key": "fixtures/video_false_draw_combat_1_6667.ppm",
+      "manifest_expected": "CLEAR",
+      "t1_check": {
+        "frame_class": "CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "manifest.video_false_draw_combat_1_7667",
+      "legacy": "tests/manifest.json fixtures/video_false_draw_combat_1_7667.ppm expected NON_CLEAR, asserted by the classification loop in tests/test_detector.py",
+      "disposition": "t1",
+      "case": "result.negative.video-false-draw-combat-1-7667",
+      "manifest_key": "fixtures/video_false_draw_combat_1_7667.ppm",
+      "manifest_expected": "NON_CLEAR",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      },
+      "template_partition": "not_applicable"
+    },
+    {
+      "legacy_id": "draw_positive.video_draw_1_2",
+      "legacy": "tests/test_detector.py: video_draw_1_2 is FINAL_DRAW, draw_like is true and 0.12 <= draw_cluster.span <= 0.25",
+      "disposition": "t1",
+      "case": "result.draw.video-1-2",
+      "t1_check": {
+        "frame_class": "FINAL_DRAW",
+        "debug": [
+          {
+            "path": "draw_like",
+            "equals": true
+          },
+          {
+            "path": "draw_cluster.span",
+            "at_least": 0.12,
+            "at_most": 0.25
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "draw_positive.video_draw_1_6",
+      "legacy": "tests/test_detector.py: video_draw_1_6 is FINAL_DRAW, draw_like is true and 0.12 <= draw_cluster.span <= 0.25",
+      "disposition": "t1",
+      "case": "result.draw.video-1-6",
+      "t1_check": {
+        "frame_class": "FINAL_DRAW",
+        "debug": [
+          {
+            "path": "draw_like",
+            "equals": true
+          },
+          {
+            "path": "draw_cluster.span",
+            "at_least": 0.12,
+            "at_most": 0.25
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "draw_positive.video_draw_2_5",
+      "legacy": "tests/test_detector.py: video_draw_2_5 is FINAL_DRAW, draw_like is true and 0.12 <= draw_cluster.span <= 0.25",
+      "disposition": "t1",
+      "case": "result.draw.video-2-5",
+      "t1_check": {
+        "frame_class": "FINAL_DRAW",
+        "debug": [
+          {
+            "path": "draw_like",
+            "equals": true
+          },
+          {
+            "path": "draw_cluster.span",
+            "at_least": 0.12,
+            "at_most": 0.25
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "false_draw.video_false_draw_combat_1_4667",
+      "legacy": "tests/test_detector.py: video_false_draw_combat_1_4667 is not FINAL_DRAW and draw_grid_score < 0.75 (T1 asserts the exact class NON_CLEAR, which is stricter)",
+      "disposition": "t1",
+      "case": "result.negative.video-false-draw-combat-1-4667",
+      "t1_check": {
+        "frame_class": "NON_CLEAR",
+        "debug": [
+          {
+            "path": "draw_grid_score",
+            "below": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "false_draw.video_false_draw_combat_1_6667",
+      "legacy": "tests/test_detector.py: video_false_draw_combat_1_6667 is not FINAL_DRAW and draw_grid_score < 0.75 (T1 asserts the exact class CLEAR, which is stricter)",
+      "disposition": "t1",
+      "case": "result.negative.video-false-draw-combat-1-6667",
+      "t1_check": {
+        "frame_class": "CLEAR",
+        "debug": [
+          {
+            "path": "draw_grid_score",
+            "below": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "false_draw.video_false_draw_combat_1_7667",
+      "legacy": "tests/test_detector.py: video_false_draw_combat_1_7667 is not FINAL_DRAW and draw_grid_score < 0.75 (T1 asserts the exact class NON_CLEAR, which is stricter)",
+      "disposition": "t1",
+      "case": "result.negative.video-false-draw-combat-1-7667",
+      "t1_check": {
+        "frame_class": "NON_CLEAR",
+        "debug": [
+          {
+            "path": "draw_grid_score",
+            "below": 0.75
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "false_win.video_true_final_win_5_9",
+      "legacy": "tests/test_detector.py: video_true_final_win_5_9 is FINAL_WIN and win_final_grid_score >= 0.82",
+      "disposition": "t1",
+      "case": "result.final-win.video-5-9",
+      "t1_check": {
+        "frame_class": "FINAL_WIN",
+        "debug": [
+          {
+            "path": "win_final_grid_score",
+            "at_least": 0.82
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "false_win.video_false_garage_20_1",
+      "legacy": "tests/test_detector.py: video_false_garage_20_1 is NON_CLEAR, win_final_grid_score < 0.82 and win_y_cluster.span > 0.70",
+      "disposition": "t1",
+      "case": "result.negative.video-garage-20-1",
+      "t1_check": {
+        "frame_class": "NON_CLEAR",
+        "debug": [
+          {
+            "path": "win_final_grid_score",
+            "below": 0.82
+          },
+          {
+            "path": "win_y_cluster.span",
+            "above": 0.7
+          }
+        ]
+      }
+    },
+    {
+      "legacy_id": "false_win.video_false_garage_menu_21_4",
+      "legacy": "tests/test_detector.py: video_false_garage_menu_21_4 is NON_CLEAR",
+      "disposition": "t1",
+      "case": "result.negative.video-garage-menu-21-4",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      }
+    },
+    {
+      "legacy_id": "false_win.video_rank_menu_23_267",
+      "legacy": "tests/test_detector.py: video_rank_menu_23_267 is NON_CLEAR",
+      "disposition": "t1",
+      "case": "result.negative.video-rank-menu-23-267",
+      "t1_check": {
+        "frame_class": "NON_CLEAR"
+      }
+    },
+    {
+      "legacy_id": "sequence.dark_gameplay_missed_win",
+      "legacy": "tests/test_detector.py: the three dark frames are NON_CLEAR with gameplay activity false, true, true; the state machine arms; video_missed_final_win_6_00 is FINAL_WIN, gives no result at 106.00 and a win at 106.75",
+      "disposition": "t1",
+      "case": "result.sequence.dark-gameplay-final-win",
+      "t1_check": {
+        "steps": {
+          "s01": {
+            "frame_class": "NON_CLEAR",
+            "gameplay_activity": false
+          },
+          "s02": {
+            "frame_class": "NON_CLEAR",
+            "gameplay_activity": true
+          },
+          "s03": {
+            "frame_class": "NON_CLEAR",
+            "gameplay_activity": true,
+            "state": {
+              "armed": true
+            }
+          },
+          "s04": {
+            "frame_class": "FINAL_WIN",
+            "detection": null
+          },
+          "s05": {
+            "frame_class": "FINAL_WIN",
+            "detection": "win"
+          }
+        }
+      }
+    },
+    {
+      "legacy_id": "synthetic.black_frame",
+      "legacy": "tests/test_detector.py: an all-black frame at the normal_01 size is NON_CLEAR",
+      "disposition": "t0_retained",
+      "location": "tests/test_detector.py",
+      "reason": "the input is constructed or transformed in code; T1 metadata can reference stored pixels but cannot carry a transform"
+    },
+    {
+      "legacy_id": "synthetic.disconnected_bright_blocks",
+      "legacy": "tests/test_detector.py: left and right bright blocks with a dark centre are not PHASE",
+      "disposition": "t0_retained",
+      "location": "tests/test_detector.py",
+      "reason": "the input is constructed or transformed in code; T1 metadata can reference stored pixels but cannot carry a transform"
+    },
+    {
+      "legacy_id": "synthetic.bright_center_gap",
+      "legacy": "tests/test_detector.py: broad bright blocks with a dark centre gap are not PHASE",
+      "disposition": "t0_retained",
+      "location": "tests/test_detector.py",
+      "reason": "the input is constructed or transformed in code; T1 metadata can reference stored pixels but cannot carry a transform"
+    },
+    {
+      "legacy_id": "synthetic.phase_shape_on_bright_gameplay",
+      "legacy": "tests/test_detector.py: phase_win_01 with every non-cyan pixel painted grey is not PHASE",
+      "disposition": "t0_retained",
+      "location": "tests/test_detector.py",
+      "reason": "the input is constructed or transformed in code; T1 metadata can reference stored pixels but cannot carry a transform"
+    },
+    {
+      "legacy_id": "synthetic.final_win_with_side_cyan_noise",
+      "legacy": "tests/test_detector.py: final_win_01 with stray cyan pixels far left and right stays FINAL_WIN",
+      "disposition": "t0_retained",
+      "location": "tests/test_detector.py",
+      "reason": "the input is constructed or transformed in code; T1 metadata can reference stored pixels but cannot carry a transform"
+    },
+    {
+      "legacy_id": "templates.invalid_length_rejected",
+      "legacy": "tests/test_detector.py: ResultClassifier refuses a template profile of the wrong length",
+      "disposition": "t0_retained",
+      "location": "tests/test_detector.py",
+      "reason": "template schema validation is not pixel evidence"
+    }
+  ]
+}

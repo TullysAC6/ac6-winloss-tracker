@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "result.negative.false-cyan-hud-synthetic",
+  "family": "results",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "false_cyan_hud_synthetic.ppm",
+    "format": "ppm",
+    "width": 757,
+    "height": 50,
+    "bytes": 113564,
+    "sha256": "d40f9c479a34a26526d14e9edb2748520e74b9ea81beece5825a5e94b9f497f5"
+  },
+  "truth": {
+    "result": "none",
+    "screen": "gameplay",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "NON_CLEAR"
+  },
+  "coverage": [
+    "negative.false_win"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "af06299 initial public release; migrated from tests/manifest.json and tests/test_detector.py at a8c6ee2",
+    "origin": "Synthetic: a flat cyan bar on a dark band, modelling a HUD element in WIN colours without result glyphs.",
+    "synthetic": true,
+    "template_partition": "not_applicable",
+    "legacy": {
+      "manifest_key": "fixtures/false_cyan_hud_synthetic.ppm",
+      "manifest_expected": "NON_CLEAR"
+    }
+  },
+  "review": {
+    "truth": {
+      "status": "legacy_label_visually_confirmed",
+      "basis": "The implementer viewed the full ROI: it shows a single flat cyan bar on a dark band; entirely synthetic. The checked frame class is the legacy expectation from tests/manifest.json."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "The implementer inspected the full ROI at 2x. No player or opponent name, Steam identifier, notification, third-party overlay, desktop, local path, token or secret is visible, and the PPM header carries no comment field."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Committed by the repository owner in the initial public release (af06299, 2026-08-30) and public since. It contains ARMORED CORE VI game imagery; this records where the asset came from, not a licence determination."
+    }
+  }
+}

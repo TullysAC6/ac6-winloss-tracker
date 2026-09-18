@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "id": "result.sequence.draw-confirmed-no-count",
+  "family": "results",
+  "category": "sequences",
+  "input": {
+    "kind": "sequence",
+    "capture": "frame_source",
+    "processing_ms": 30,
+    "steps": [
+      {
+        "id": "s01",
+        "at_ms": 750,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s02",
+        "at_ms": 1500,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s03",
+        "at_ms": 2250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s04",
+        "at_ms": 3000,
+        "frame": "result.draw.video-1-2"
+      },
+      {
+        "id": "s05",
+        "at_ms": 3750,
+        "frame": "result.draw.video-1-6"
+      },
+      {
+        "id": "s06",
+        "at_ms": 4500,
+        "frame": "result.draw.video-2-5"
+      }
+    ]
+  },
+  "truth": {
+    "scenario": "An armed detector sees a real DRAW on two polls: DRAW is reported, never reaches the gate, and the lock keeps the still-visible DRAW from counting again.",
+    "expected_results": [
+      "draw"
+    ],
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_detector_run.v1",
+    "steps": {
+      "s01": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s02": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s03": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "clear_ready": true
+        }
+      },
+      "s04": {
+        "frame_class": "FINAL_DRAW",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "candidate": "draw",
+          "candidate_hits": 1
+        }
+      },
+      "s05": {
+        "frame_class": "FINAL_DRAW",
+        "detection": "draw",
+        "gate": null,
+        "state": {
+          "armed": false,
+          "post_result_lock": true
+        },
+        "health": {
+          "last_result": "draw"
+        }
+      },
+      "s06": {
+        "frame_class": "FINAL_DRAW",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        },
+        "health": {
+          "last_result": "draw"
+        }
+      }
+    },
+    "totals": {
+      "accepted": {
+        "win": 0,
+        "loss": 0
+      },
+      "detections": {
+        "win": 0,
+        "loss": 0,
+        "draw": 1
+      },
+      "gate_rejected": 0,
+      "frames_classified": 6,
+      "detector_errors": 0
+    }
+  },
+  "coverage": [
+    "contract.draw_no_count",
+    "result.draw.positive"
+  ],
+  "provenance": {
+    "source_type": "composed_sequence",
+    "reference": "tests/test_state_machine.py DRAW confirmation scenario; tests/test_game_capture.py DRAW loop check",
+    "origin": "Composed scenario over reviewed repository fixtures; the frames do not come from one recording. The three DRAW frames are from one recording, placed on the replay poll grid."
+  },
+  "review": {
+    "truth": {
+      "status": "contract_scenario_over_reviewed_fixtures",
+      "basis": "Expectations were derived step by step from ResultDetector.run, ResultStateMachine, ResultGate and server.record_result, not copied from a replay; each referenced frame's class is its reviewed truth."
+    },
+    "privacy": {
+      "status": "inherits_referenced_fixtures"
+    },
+    "redistribution": {
+      "status": "inherits_referenced_fixtures"
+    }
+  }
+}

@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "id": "result.sequence.gate-cooldown-rejects-a-manual-result",
+  "family": "results",
+  "category": "sequences",
+  "input": {
+    "kind": "sequence",
+    "capture": "frame_source",
+    "processing_ms": 30,
+    "steps": [
+      {
+        "id": "s01",
+        "at_ms": 750,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s02",
+        "at_ms": 1500,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s03",
+        "at_ms": 2250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s04",
+        "at_ms": 3000,
+        "frame": "result.final-win.01"
+      },
+      {
+        "id": "s05",
+        "at_ms": 3750,
+        "frame": "result.final-win.01"
+      },
+      {
+        "id": "s06",
+        "at_ms": 4500,
+        "frame": "result.final-win.01",
+        "after": "manual_win"
+      },
+      {
+        "id": "s07",
+        "at_ms": 5250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s08",
+        "at_ms": 9000,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s09",
+        "at_ms": 14250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s10",
+        "at_ms": 15000,
+        "frame": "result.final-win.01"
+      },
+      {
+        "id": "s11",
+        "at_ms": 15750,
+        "frame": "result.final-win.01"
+      }
+    ]
+  },
+  "truth": {
+    "scenario": "A WIN is accepted, a manual WIN is entered 0.75 s later and the shared ResultGate refuses it inside the cooldown without touching the detector; the detector re-arms normally and the next WIN is accepted.",
+    "expected_results": [
+      "win",
+      "win"
+    ],
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_detector_run.v1",
+    "steps": {
+      "s01": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s02": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s03": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "clear_ready": true
+        }
+      },
+      "s04": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "candidate": "win",
+          "candidate_hits": 1
+        }
+      },
+      "s05": {
+        "frame_class": "FINAL_WIN",
+        "detection": "win",
+        "gate": "accepted",
+        "state": {
+          "armed": false,
+          "post_result_lock": true
+        }
+      },
+      "s06": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "after_gate": {
+          "result": "win",
+          "source": "manual",
+          "accepted": false
+        },
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        }
+      },
+      "s07": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        }
+      },
+      "s08": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true,
+          "armed": false,
+          "last_reject_reason": "post_result_lock"
+        }
+      },
+      "s09": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": false,
+          "armed": true,
+          "clear_ready": true
+        }
+      },
+      "s10": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "candidate": "win",
+          "candidate_hits": 1
+        }
+      },
+      "s11": {
+        "frame_class": "FINAL_WIN",
+        "detection": "win",
+        "gate": "accepted",
+        "state": {
+          "armed": false,
+          "post_result_lock": true
+        }
+      }
+    },
+    "totals": {
+      "accepted": {
+        "win": 2,
+        "loss": 0
+      },
+      "detections": {
+        "win": 2,
+        "loss": 0,
+        "draw": 0
+      },
+      "gate_rejected": 1,
+      "frames_classified": 11,
+      "detector_errors": 0
+    }
+  },
+  "coverage": [
+    "contract.gate_rejection"
+  ],
+  "provenance": {
+    "source_type": "composed_sequence",
+    "reference": "server.record_result gate arbitration shared by automatic and manual sources (result_gate.ResultGate docstring; server.py \"Auto and manual paths share one gate\")",
+    "origin": "Composed scenario over reviewed repository fixtures; the frames do not come from one recording. The manual entry is the after-action, not a frame."
+  },
+  "review": {
+    "truth": {
+      "status": "contract_scenario_over_reviewed_fixtures",
+      "basis": "The automatic WIN is accepted at 3.78 s processing time. The manual WIN at 4.53 s is 0.75 s later, inside the 5 s cooldown, so ResultGate.try_accept refuses it and the detector is not mutated. The lock releases at 14.25 s and the WIN confirmed at 15.75 s is accepted because 12.0 s have passed. Expectations were derived step by step from ResultDetector.run, ResultStateMachine, ResultGate and server.record_result, not copied from a replay."
+    },
+    "privacy": {
+      "status": "inherits_referenced_fixtures"
+    },
+    "redistribution": {
+      "status": "inherits_referenced_fixtures"
+    }
+  }
+}
