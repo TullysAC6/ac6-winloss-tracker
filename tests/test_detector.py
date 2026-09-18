@@ -141,31 +141,33 @@ if failed:
 
 print("\nAll synthetic-input classifier tests passed.")
 
-# Template schema regression.
-bad_path = Path(tempfile.mkdtemp()) / "bad_templates.json"
-bad_path.write_text(json.dumps({
-    "version": 3,
-    "bins_x": 64,
-    "bins_y": 16,
-    "grid_x": 32,
-    "grid_y": 8,
-    "templates": {
-        "final_win": [0.0],
-        "final_loss": [0.0] * 80,
-        "phase_win": [0.0] * 80,
-        "phase_loss": [0.0] * 80,
-    },
-    "grid_templates": {
-        "final_win": [0.0] * 256,
-        "final_loss": [0.0] * 256,
-        "phase_win": [0.0] * 256,
-        "phase_loss": [0.0] * 256,
-    },
-    "draw_grid_template": [0.0] * 256,
-}), encoding="utf-8")
-try:
-    ResultClassifier(bad_path)
-except TemplateError:
-    print("template schema validation: OK")
-else:
-    raise AssertionError("invalid template length was accepted")
+# Template schema regression. The bad template file lives in a temporary
+# directory that is removed afterwards; a failed removal fails the run.
+with tempfile.TemporaryDirectory() as bad_dir:
+    bad_path = Path(bad_dir) / "bad_templates.json"
+    bad_path.write_text(json.dumps({
+        "version": 3,
+        "bins_x": 64,
+        "bins_y": 16,
+        "grid_x": 32,
+        "grid_y": 8,
+        "templates": {
+            "final_win": [0.0],
+            "final_loss": [0.0] * 80,
+            "phase_win": [0.0] * 80,
+            "phase_loss": [0.0] * 80,
+        },
+        "grid_templates": {
+            "final_win": [0.0] * 256,
+            "final_loss": [0.0] * 256,
+            "phase_win": [0.0] * 256,
+            "phase_loss": [0.0] * 256,
+        },
+        "draw_grid_template": [0.0] * 256,
+    }), encoding="utf-8")
+    try:
+        ResultClassifier(bad_path)
+    except TemplateError:
+        print("template schema validation: OK")
+    else:
+        raise AssertionError("invalid template length was accepted")
