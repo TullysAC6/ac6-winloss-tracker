@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-18 JST
+Last updated: 2026-09-19 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -27,7 +27,8 @@ Issue #6
   - `python tests/run_t1.py`: 42/42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`.
   - **T1 is a real gate now, not N/A.** Every product change runs T0 → T1 → T2, and a T1 regression blocks progression.
   - Production runtime was not changed by #35, so its T3 was N/A. v1.2.0 is unaffected.
-  - #14 stays open only for the §42 *Tracker OFF / accepted / + feature* baseline-capture checklist item ([acceptance record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5731935668)).
+  - **#14 is CLOSED as completed** (2026-09-19, [closure](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5732296924); [acceptance record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5731935668)). Its §42 *Tracker OFF / accepted / + feature* baseline item now belongs to **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**.
+- **The T0 TEMP leak is fixed.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO, and [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) is green. A full T0 run leaves 0 `tmp*` directories (was 12).
   - Non-blocking harness follow-ups: L-A (`_winapi.CopyFile2` by keyword passes the T1 filesystem tripwire) and L-B (the corpus is path-identified, not content-pinned). Recorded; not scheduled.
   - On this cp932 host, run T2 with `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8`. `test_source_install_flow.ps1` needs `-PythonPath`, and `pwsh` is not installed locally (CI uses it).
 - **PR #5 (#8 settings, #9 analytics) is Implemented + Accepted + merged to `main` (`a042b18`), and released in v1.2.0.**
@@ -35,7 +36,7 @@ Issue #6
   - #8 and #9 are closed as completed.
   - v1.1.1 does **not** contain PR #5; v1.2.0 is the first release containing its settings and analytics.
 - PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`.
-  - **Draft PR #31** (Revision 4, docs-only) is the only unmerged generation.
+  - **Draft PR #31** (Revision 4, docs-only) is an unmerged generation, as is this docs-only bookkeeping PR while it is open.
   - Do not treat Revision 4 as canonical until it merges.
 - MASTER_REQUIREMENTS §34 and §36 still describe PR #5 as the next or open item. They are dated snapshots, and `PROJECT_STATE.md` is the live position. Reconcile them explicitly in the next requirements revision.
 
@@ -64,16 +65,14 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 ## Required order from here
 
 1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** Not started.
-   - Cut a fresh branch and worktree from the current `main`, which contains PR #35.
+   - It starts only after this docs-only bookkeeping PR merges.
+   - Cut a fresh branch and worktree from the then-current `main`, which contains PR #35 and PR #38.
    - Then T0 → T1 → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-**Ready to start, and not a product generation:** a test-only cleanup of the pre-existing `tempfile.mkdtemp()` TEMP leak.
-- Scope: `tests/test_stats_manager.py` and `tests/test_detector.py` only.
-- Use `TemporaryDirectory` or an equivalent cleanup, with assertions unchanged.
-- Prove residue 0: a T0 run currently leaves 12 `tmp*` directories.
+The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #35 has landed and draft PR #31 is docs-only, so **#24 may take the product slot**. No third generation starts.
+At most two unmerged generations exist at a time (§4). While this bookkeeping PR is open, it and draft PR #31 are the two. After it merges, only PR #31 remains, and **#24 takes the product slot**. No third generation starts.
 
 ## Order after that — dependency, not preference
 
@@ -94,7 +93,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #35 has merged, so the product slot goes to **#24** next. Draft PR #31 (docs-only) is the other open generation.
+At most two unmerged generations exist at a time (§4). PR #35 and PR #38 have merged, so the product slot goes to **#24** next, once this bookkeeping PR has merged. Draft PR #31 (docs-only) is the other open generation.
 
 ## What is newly recorded and must not be lost
 

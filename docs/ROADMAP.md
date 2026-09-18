@@ -54,9 +54,16 @@ the `v1.1.0` nor the `v1.1.1` tag is ever moved; `v1.2.0` is immutable too.
 - PR #35 was independently reviewed (GO, [5246833703](https://github.com/TullysAC6/ac6-winloss-tracker/pull/35#pullrequestreview-5246833703)) and merged to `main` as `f9f5f0f` with green `main` CI.
 - It is test infrastructure with no production runtime change, so it carries no release payload and needs none. T3 was N/A.
 - `python tests/run_t1.py` passes 42/42 on `main` (25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`). **T1 is no longer N/A**; it is a real gate for every later product change.
-- #14 stays open only for the §42 performance/security baseline-capture item below.
+- #14 stays open only for the §42 performance/security baseline-capture item below. *(Superseded on 2026-09-19; see the next note.)*
 
 The next product task is [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
+
+## Position note — 2026-09-19
+
+- **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed.** Its §42 performance/security baseline item moved to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. The baseline is a reusable development capability, not a T1 concern. #17 and #25 consume it for their own acceptance.
+- **Formal T1 remains available and passing on `main`**: 42/42, 0 skipped, corpus `6cfc4873bd0aa2bd…`.
+- **The T0 TEMP leak is fixed.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` with green `main` CI.
+- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)**. It is **not started** until this docs-only bookkeeping PR merges. Until then, the unmerged generations are draft PR #31 and this PR.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -116,7 +123,7 @@ to verify.
 Not a competitor to the two tracks above; it interleaves with them. Requirements:
 [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-63.
 
-1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), next: the fixture/replay harness it depends on is merged (PR #35)
+1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), next: the fixture/replay harness it depends on is merged (PR #35), and #14 is closed
 2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - documentation only, human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
 4. UI-2 Dashboard / History / Settings shell - **after #15**, so the shell is built once against a settled match-metadata contract
@@ -201,7 +208,7 @@ Implementation
 | Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
 | T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the **PR goes to review**; the affected gates are re-run after review fixes; T3 last |
 | Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
-| Performance / security regression checks | PLANNED | Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists (`tools/Start-RC-Performance-Capture.ps1`). **Not delivered by PR #35**: the #14 design kept it out of T1, and it is the one item that keeps #14 open |
+| Performance / security regression checks | PLANNED | Owned by **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37)** (OPEN, not started) since 2026-09-19. Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists (`tools/Start-RC-Performance-Capture.ps1`). **Not delivered by PR #35**: the #14 design kept it out of T1. #14 is closed; this item no longer lives there |
 
 `ADOPTED (process)` means the rule is in force for future work — a documentation state, not a
 shipped application feature.
@@ -244,7 +251,7 @@ shipped application feature.
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
 | Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
-| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35). v1.1.1 still installs into the user's shared Python environment |
+| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35) and #14 is closed. v1.1.1 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
