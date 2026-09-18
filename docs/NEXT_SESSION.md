@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-14 JST
+Last updated: 2026-09-18 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -23,7 +23,13 @@ Issue #6
 - **v1.1.0 is superseded.** Its runtime was accepted and it was published, but its formal release acceptance was never completed: the README one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the published Git blob bytes, so the command failed closed. The tag was not moved and the Release was not edited.
 - v1.1.1 (now superseded by v1.2.0) ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
-- T1 remains **N/A / not run** because issue #14's formal fixture/replay harness does not exist. Do not call it PASS.
+- **Formal T1 exists and passes on `main`.** PR #35 (#14) is Implemented + Accepted + merged as `f9f5f0f` on 2026-09-18 ([review 5246833703](https://github.com/TullysAC6/ac6-winloss-tracker/pull/35#pullrequestreview-5246833703) GO, [main CI 35336092717](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35336092717) green).
+  - `python tests/run_t1.py`: 42/42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`.
+  - **T1 is a real gate now, not N/A.** Every product change runs T0 → T1 → T2, and a T1 regression blocks progression.
+  - Production runtime was not changed by #35, so its T3 was N/A. v1.2.0 is unaffected.
+  - #14 stays open only for the §42 *Tracker OFF / accepted / + feature* baseline-capture checklist item ([acceptance record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5731935668)).
+  - Non-blocking harness follow-ups: L-A (`_winapi.CopyFile2` by keyword passes the T1 filesystem tripwire) and L-B (the corpus is path-identified, not content-pinned). Recorded; not scheduled.
+  - On this cp932 host, run T2 with `PYTHONUTF8=1` and `PYTHONIOENCODING=utf-8`. `test_source_install_flow.ps1` needs `-PythonPath`, and `pwsh` is not installed locally (CI uses it).
 - **PR #5 (#8 settings, #9 analytics) is Implemented + Accepted + merged to `main` (`a042b18`), and released in v1.2.0.**
   - Focused real-AC6 T3 PASS on the exact head `38a21c2` on 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)). `main` CI is green.
   - #8 and #9 are closed as completed.
@@ -47,7 +53,7 @@ Issue #6
 2. Compute the blob SHA-256 from that commit.
 3. Push, and confirm the same hash from `raw.githubusercontent.com/<repo>/<commit>/bootstrap.ps1` with `-OutFile` + `Get-FileHash`.
 4. Only then write the hash into the README, and re-confirm `bootstrap.ps1`'s blob did not move in any later commit.
-5. T0 → T2 → independent release-diff review → re-run affected gates. T1 stays N/A until #14.
+5. T0 → T1 → T2 → independent release-diff review → re-run affected gates. (T1 was N/A for releases up to v1.2.0; it exists since PR #35.)
 6. PR to `main`, green CI, merge, green `main` CI.
 7. Pre-tag STOP gate: tag and Release absent, versions consistent, and blob == raw == README.
 8. Annotated tag on the exact `main` SHA; assets from `scripts/prepare-release-assets.ps1` in a clean checkout of that tag.
@@ -57,22 +63,26 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 ## Required order from here
 
-1. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), the fixture / replay harness.** Not started.
-   - Cut a fresh branch and worktree from the current `main`, which contains PR #5.
-   - Read its design/readiness comment first. PR #5 has now landed, so resolve that comment's conflict matrix against the merged `main` (for example `CONFIG_VERSION` 18 and the merged `tests/run_all_tests.py` registry).
+1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** Not started.
+   - Cut a fresh branch and worktree from the current `main`, which contains PR #35.
    - Then T0 → T1 → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
-2. Then [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-At most two unmerged generations exist at a time (§4). PR #5 has landed and draft PR #31 is docs-only, so **#14 may take the product slot**. No third generation starts.
+**Ready to start, and not a product generation:** a test-only cleanup of the pre-existing `tempfile.mkdtemp()` TEMP leak.
+- Scope: `tests/test_stats_manager.py` and `tests/test_detector.py` only.
+- Use `TemporaryDirectory` or an equivalent cleanup, with assertions unchanged.
+- Prove residue 0: a T0 run currently leaves 12 `tmp*` directories.
+
+At most two unmerged generations exist at a time (§4). PR #35 has landed and draft PR #31 is docs-only, so **#24 may take the product slot**. No third generation starts.
 
 ## Order after that — dependency, not preference
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.2.0, PR #13 and PR #5 are done; PR #5 is accepted, merged and released in v1.2.0. From here:
+v1.2.0, PR #13, PR #5 and PR #35 are done; PR #5 is accepted, merged and released in v1.2.0, and PR #35 (#14 formal T1) is accepted and merged. From here:
 
 ```text
-#14 → #24 → UI-0 → UI-1A → UI-1B
+#24 → UI-0 → UI-1A → UI-1B
 → #15 → UI-2 → #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B
 → #16-B → #18 → #27 → UI-4
 ```
@@ -84,7 +94,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #5 has merged, so the product slot goes to **#14** next. Draft PR #31 (docs-only) is the other open generation.
+At most two unmerged generations exist at a time (§4). PR #35 has merged, so the product slot goes to **#24** next. Draft PR #31 (docs-only) is the other open generation.
 
 ## What is newly recorded and must not be lost
 

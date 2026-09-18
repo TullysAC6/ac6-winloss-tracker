@@ -45,8 +45,18 @@ the `v1.1.0` nor the `v1.1.1` tag is ever moved; `v1.2.0` is immutable too.
 
 **v1.1.1 does not contain it; v1.2.0 does.** Its accepted runtime is unchanged by release preparation.
 [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8) and
-[#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9) are closed as completed on that basis. The next product
-task is [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14).
+[#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9) are closed as completed on that basis.
+
+## Position note — 2026-09-18
+
+**The formal T1 fixture / replay harness ([#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14)) is `ACCEPTED — UNRELEASED`.**
+
+- PR #35 was independently reviewed (GO, [5246833703](https://github.com/TullysAC6/ac6-winloss-tracker/pull/35#pullrequestreview-5246833703)) and merged to `main` as `f9f5f0f` with green `main` CI.
+- It is test infrastructure with no production runtime change, so it carries no release payload and needs none. T3 was N/A.
+- `python tests/run_t1.py` passes 42/42 on `main` (25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`). **T1 is no longer N/A**; it is a real gate for every later product change.
+- #14 stays open only for the §42 performance/security baseline-capture item below.
+
+The next product task is [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -106,7 +116,7 @@ to verify.
 Not a competitor to the two tracks above; it interleaves with them. Requirements:
 [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-63.
 
-1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), after the fixture/replay harness
+1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), next: the fixture/replay harness it depends on is merged (PR #35)
 2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - documentation only, human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
 4. UI-2 Dashboard / History / Settings shell - **after #15**, so the shell is built once against a settled match-metadata contract
@@ -124,11 +134,11 @@ section describes *when*. Where the two appear to disagree, this section wins an
 corrected.
 
 Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
-**PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14.
+**PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14;
+and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-18.
 From the current position:
 
 ```text
-→ #14                         fixture / replay harness
 → #24                         app-local Python environment
 → UI-0                        design specification, no code change
 → UI-1A                       Player Overlay polish
@@ -187,11 +197,11 @@ Implementation
 
 | Item | Status | Notes |
 |---|---|---|
-| Fixture / replay harness | **PLANNED — HIGH PRIORITY** | `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md). **Its layout must be able to carry the later fixture families without being retrofitted**: season boundaries, and pre-S (UNRANKED through A4) and S rating presentations as distinct cases — see [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) and MASTER_REQUIREMENTS §64. The harness is built once and then extended |
+| Fixture / replay harness | **ACCEPTED — UNRELEASED** (test infrastructure; no release payload) | Merged as `f9f5f0f` (PR #35, 2026-09-18). `python tests/run_t1.py`: 42/42 on `main`; results family implemented, other families reserved. Follow-ups L-A / L-B recorded on [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5731935668). Original scope: `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md). **Its layout must be able to carry the later fixture families without being retrofitted**: season boundaries, and pre-S (UNRANKED through A4) and S rating presentations as distinct cases — see [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) and MASTER_REQUIREMENTS §64. The harness is built once and then extended |
 | Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
 | T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the **PR goes to review**; the affected gates are re-run after review fixes; T3 last |
 | Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
-| Performance / security regression checks | PLANNED | Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists on the RC branch |
+| Performance / security regression checks | PLANNED | Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists (`tools/Start-RC-Performance-Capture.ps1`). **Not delivered by PR #35**: the #14 design kept it out of T1, and it is the one item that keeps #14 open |
 
 `ADOPTED (process)` means the rule is in force for future work — a documentation state, not a
 shipped application feature.
@@ -234,7 +244,7 @@ shipped application feature.
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
 | Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
-| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Scheduled after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). v1.1.1 still installs into the user's shared Python environment |
+| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35). v1.1.1 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -421,7 +431,7 @@ Replaces the former Phases 8 / 9 / 10 as slices of one dataset.
 
 | Item | Status | Notes |
 |---|---|---|
-| Fixture-based recognition regression tests | PLANNED | Built on the Phase D harness. Eventually mandatory for recognition changes. Expected labels are never edited to make a failing test pass |
+| Fixture-based recognition regression tests | PLANNED | Built on the Phase D harness, which now exists (PR #35); T1 already gates result recognition. New recognizers add their own fixture families. Eventually mandatory for recognition changes. Expected labels are never edited to make a failing test pass |
 
 ---
 
@@ -431,7 +441,7 @@ Added 2026-09-12. Umbrella issue: [#24](https://github.com/TullysAC6/ac6-winloss
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §56.
 
 Scheduled **after** [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), so the
-migration has a fixture/replay harness to regress against. Not part of v1.1.x and not part of
+migration has a fixture/replay harness to regress against. That harness is merged (PR #35, 2026-09-18), so this is the next product task. Not part of v1.1.x and not part of
 PR #5.
 
 | Item | Status | Notes |
