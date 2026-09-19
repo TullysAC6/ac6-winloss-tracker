@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "id": "result.final-loss.02",
+  "family": "results",
+  "category": "lose",
+  "input": {
+    "kind": "roi",
+    "path": "final_loss_02.ppm",
+    "format": "ppm",
+    "width": 757,
+    "height": 50,
+    "bytes": 113564,
+    "sha256": "dec41d7a02d390f6f6a357990d56d83897d84607630319db5f888d1264ab8fa8"
+  },
+  "truth": {
+    "result": "loss",
+    "screen": "final_result",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "FINAL_LOSS"
+  },
+  "coverage": [
+    "result.loss.positive"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "af06299 initial public release; migrated from tests/manifest.json and tests/test_detector.py at a8c6ee2",
+    "origin": "Cropped result-region ROI of a real AC6 still image.",
+    "synthetic": false,
+    "template_partition": "unmapped",
+    "legacy": {
+      "manifest_key": "fixtures/final_loss_02.ppm",
+      "manifest_expected": "FINAL_LOSS"
+    }
+  },
+  "review": {
+    "truth": {
+      "status": "legacy_label_visually_confirmed",
+      "basis": "The implementer viewed the full ROI: it shows the red text YOU LOSE on the result band. The checked frame class is the legacy expectation from tests/manifest.json."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "The implementer inspected the full ROI at 2x. No player or opponent name, Steam identifier, notification, third-party overlay, desktop, local path, token or secret is visible, and the PPM header carries no comment field."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Committed by the repository owner in the initial public release (af06299, 2026-08-30) and public since. It contains ARMORED CORE VI game imagery; this records where the asset came from, not a licence determination."
+    }
+  }
+}

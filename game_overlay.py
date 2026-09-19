@@ -107,6 +107,22 @@ def normalize_stats(raw: Any) -> dict[str, Any] | None:
     }
 
 
+def normalize_lifetime(raw: Any) -> dict[str, Any] | None:
+    """Accept only a complete, non-negative lifetime total block."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        wins = int(raw["wins"])
+        losses = int(raw["losses"])
+        best = int(raw["best_streak"])
+        rate = float(raw["win_rate"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if min(wins, losses, best) < 0 or not 0.0 <= rate <= 100.0:
+        return None
+    return {"wins": wins, "losses": losses, "best_streak": best, "win_rate": rate}
+
+
 def read_stats(path: Path = STATS_PATH) -> dict[str, Any] | None:
     try:
         with path.open("r", encoding="utf-8") as f:
@@ -424,6 +440,9 @@ class GameOverlay:
         self._last_heartbeat_at = 0.0
         self._effect_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self._stats_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._lifetime_queue: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._lifetime: dict[str, Any] | None = None
+        self._stats_scope = "session"
         self._sse_connected = threading.Event()
         self._next_stats_fallback_at = time.monotonic() + STATS_FALLBACK_SECONDS
         self._effect_ids: set[str] = set()
@@ -561,23 +580,33 @@ class GameOverlay:
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
         )
 
+    def _display_values(self) -> tuple[int, int, float, int, str]:
+        """Session or lifetime totals. Streak and status stay session-scoped."""
+        s = self.last_stats
+        if self._stats_scope == "lifetime" and self._lifetime is not None:
+            life = self._lifetime
+            return (life["wins"], life["losses"], float(life["win_rate"]),
+                    life["best_streak"], "累計 ")
+        return (s["wins"], s["losses"], float(s["win_rate"]), s["best_streak"], "")
+
     def _render(self) -> None:
         s = self.last_stats
+        wins, losses, rate, best_streak, scope_label = self._display_values()
         key = (
-            s["wins"], s["losses"], s["streak"], s["best_streak"],
-            round(float(s["win_rate"]), 1), s["status"], s["status_level"],
+            wins, losses, s["streak"], best_streak,
+            round(rate, 1), s["status"], s["status_level"], scope_label,
         )
         if key == self._last_render_key:
             return
         self._last_render_key = key
 
         main = (
-            f"WIN {s['wins']}   LOSE {s['losses']}   "
-            f"勝率 {float(s['win_rate']):.1f}%   連勝 {s['streak']}"
+            f"WIN {wins}   LOSE {losses}   "
+            f"勝率 {rate:.1f}%   連勝 {s['streak']}"
         )
         status = str(s.get("status") or "")
         status_text = f"   {status}" if status else ""
-        best = f"最高連勝 {s['best_streak']}"
+        best = f"{scope_label}最高連勝 {best_streak}"
 
         pad_x, pad_y, gap = 10, 6, 2
         main_h = int(self.main_font.metrics("linespace"))
@@ -755,6 +784,11 @@ class GameOverlay:
             if stats_payload is not None:
                 self._stats_queue.put(stats_payload)
             return
+        if event_name == "lifetime":
+            lifetime_payload = normalize_lifetime(payload)
+            if lifetime_payload is not None:
+                self._lifetime_queue.put(lifetime_payload)
+            return
         if event_name != "effect":
             return
         effect_id = str(payload.get("effect_id", ""))
@@ -868,6 +902,24 @@ class GameOverlay:
         user32.ShowWindow(self.effect_hwnd, SW_SHOWNOACTIVATE)
         self._effect_visible = True
 
+    def _drain_display_scope(self) -> None:
+        """Apply a mid-match scope change or new lifetime totals.
+
+        _render() is key-guarded, so this repaints without a new stats event
+        and costs nothing when neither the scope nor the totals moved.
+        """
+        try:
+            scope = load_config().get("overlay_stats_scope", "session")
+            self._stats_scope = "lifetime" if scope == "lifetime" else "session"
+        except Exception:
+            pass
+        try:
+            while True:
+                self._lifetime = self._lifetime_queue.get_nowait()
+        except queue.Empty:
+            pass
+        self._render()
+
     def _drain_effects(self) -> None:
         try:
             while True:
@@ -916,6 +968,7 @@ class GameOverlay:
 
     def _tick(self) -> None:
         self._drain_effects()
+        self._drain_display_scope()
         now = time.monotonic()
         if not self._sse_connected.is_set() and now >= self._next_stats_fallback_at:
             self._next_stats_fallback_at = now + STATS_FALLBACK_SECONDS

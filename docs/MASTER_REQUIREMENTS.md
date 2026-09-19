@@ -980,16 +980,16 @@ Destructive history actions:
 
 # 34. Roadmap
 
-## Current near-term release flow
+## Historical near-term release flow — snapshot of 2026-09-12
 
-Updated 2026-09-12. This is §3 applied to the unit currently in flight.
+Historical snapshot from 2026-09-12, retained for the reasoning and gate order below. Reconciled 2026-09-19: PR #5 is Accepted, merged and released in v1.2.0; #14 is closed after PR #35; PR #38 and #39 are merged; §42 baseline belongs to #37. #24 is IN PROGRESS — design / implementation preparation. The following PR #5 flow is history, not the current next action. See PROJECT_STATE and ROADMAP for the live position.
 
 **Public stable is v1.1.1 — RELEASED.** Tag `v1.1.1` → `e0d8476`, runtime `93d5a57`.
 [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
 [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against it. The live
 position is [`docs/PROJECT_STATE.md`](PROJECT_STATE.md); check GitHub before trusting any SHA here.
 
-The next product generation is **draft PR #5**:
+At that snapshot, the next product generation was **draft PR #5**:
 
 1. Reconcile the Claude settings/analytics branch (draft PR #5) with the current `main` — merge
    only, no reset, rebase or force-push — and confirm **T0-T2** are green on the reconciled branch
@@ -1128,7 +1128,7 @@ As of 2026-09-09:
 
 These are a dated snapshot, not permanent product requirements. Most of them are now closed:
 the coordination docs are canonical on `main`, the Project board exists, and the RC was accepted
-and released as v1.1.0 then v1.1.1. Draft PR #5 is the one item still open.
+and released as v1.1.0 then v1.1.1. At the Revision 3 snapshot, draft PR #5 was the one item still open. Reconciled 2026-09-19: PR #5 is merged and released in v1.2.0, #14 is closed, and #24 is in preparation; the old pending list is historical, not a current blocker.
 
 The live version of this snapshot is [`docs/PROJECT_STATE.md`](PROJECT_STATE.md). When the two
 disagree, `PROJECT_STATE.md` is the newer one — this section records the position as of

@@ -1,22 +1,27 @@
+"""T0 classifier regressions on inputs constructed in code, and template validation.
+
+Stored-pixel expectations that used to live here - tests/manifest.json and the
+user-video regressions (DRAW positives, false DRAW combat frames, garage/menu
+false WINs, the dark-gameplay missed WIN) - are T1 cases now, under
+tests/fixtures/results/. tests/fixtures/legacy-coverage.json maps each one to
+the T1 check that replaced it, and tests/test_t1_legacy_coverage.py keeps that
+mapping honest. What stays here is what T1 metadata cannot express: frames that
+are generated or transformed in code.
+"""
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from result_detector import (
-    CLEAR,
-    PHASE,
     FINAL_WIN,
-    FINAL_LOSS,
-    FINAL_DRAW,
     NON_CLEAR,
+    PHASE,
     ResultClassifier,
-    ResultStateMachine,
-    _motion_signature,
-    _motion_score,
-    _is_gameplay_activity,
+    TemplateError,
 )
 
 
@@ -47,32 +52,8 @@ def read_ppm(path):
     return bytes(bgra), width, height
 
 
-manifest = json.loads(
-    (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
-)
 classifier = ResultClassifier(ROOT / "detector_templates.json")
-
-mapping = {
-    "CLEAR": CLEAR,
-    "PHASE": PHASE,
-    "FINAL_WIN": FINAL_WIN,
-    "FINAL_LOSS": FINAL_LOSS,
-    "FINAL_DRAW": FINAL_DRAW,
-    "NON_CLEAR": NON_CLEAR,
-}
-
 failed = []
-for rel, expected_name in manifest.items():
-    raw, w, h = read_ppm(Path(__file__).parent / rel)
-    got, debug = classifier.classify_bgra(raw, w, h)
-    expected = mapping[expected_name]
-    ok = got == expected
-    print(
-        f"{Path(rel).name:32s} expected={expected:10s} "
-        f"got={got:10s} {'OK' if ok else 'NG'}"
-    )
-    if not ok:
-        failed.append((rel, expected, got, debug))
 
 # Regression: pure black/transition frame must NOT re-arm the state machine.
 _, w, h = read_ppm(Path(__file__).parent / "fixtures" / "normal_01.ppm")
@@ -158,134 +139,35 @@ if failed:
         print(item)
     raise SystemExit(1)
 
-print("\nAll detector classifier tests passed.")
+print("\nAll synthetic-input classifier tests passed.")
 
-# Template schema regression.
-import tempfile
-from result_detector import TemplateError
-bad_path = Path(tempfile.mkdtemp()) / "bad_templates.json"
-bad_path.write_text(json.dumps({
-    "version": 3,
-    "bins_x": 64,
-    "bins_y": 16,
-    "grid_x": 32,
-    "grid_y": 8,
-    "templates": {
-        "final_win": [0.0],
-        "final_loss": [0.0] * 80,
-        "phase_win": [0.0] * 80,
-        "phase_loss": [0.0] * 80,
-    },
-    "grid_templates": {
-        "final_win": [0.0] * 256,
-        "final_loss": [0.0] * 256,
-        "phase_win": [0.0] * 256,
-        "phase_loss": [0.0] * 256,
-    },
-    "draw_grid_template": [0.0] * 256,
-}), encoding="utf-8")
-try:
-    ResultClassifier(bad_path)
-except TemplateError:
-    print("template schema validation: OK")
-else:
-    raise AssertionError("invalid template length was accepted")
-
-
-
-# User-video DRAW regression: the exact supplied DRAW frames must be a
-# terminal no-count class, never FINAL_WIN.
-for fixture in (
-    "video_draw_1_2.ppm",
-    "video_draw_1_6.ppm",
-    "video_draw_2_5.ppm",
-):
-    raw, w, h = read_ppm(Path(__file__).parent / "fixtures" / fixture)
-    got, debug = classifier.classify_bgra(raw, w, h)
-    if got != FINAL_DRAW:
-        raise AssertionError((fixture, FINAL_DRAW, got, debug))
-    assert debug["draw_like"]
-    assert 0.12 <= debug["draw_cluster"]["span"] <= 0.25
-print("user-video DRAW positive-class regression: OK")
-
-# v22 regression: exact combat frames from the two user recordings that v21
-# misclassified as FINAL_DRAW must be rejected. Their neutral-white geometry
-# can look DRAW-like in 1-D, but their 2-D glyph fingerprint is very different.
-for fixture in (
-    "video_false_draw_combat_1_4667.ppm",
-    "video_false_draw_combat_1_6667.ppm",
-    "video_false_draw_combat_1_7667.ppm",
-):
-    raw, w, h = read_ppm(Path(__file__).parent / "fixtures" / fixture)
-    got, debug = classifier.classify_bgra(raw, w, h)
-    if got == FINAL_DRAW:
-        raise AssertionError((fixture, "NOT_FINAL_DRAW", got, debug))
-    assert debug["draw_grid_score"] < 0.75
-print("user-video false-DRAW combat regression: OK")
-
-# User-video regression: preserve the real YOU WIN while rejecting the exact
-# garage/menu frames that caused the observed second WIN count.  This is the
-# primary precision regression for the v19 redesign.
-for fixture, expected in (
-    ("video_true_final_win_5_9.ppm", FINAL_WIN),
-    ("video_false_garage_20_1.ppm", NON_CLEAR),
-    ("video_false_garage_menu_21_4.ppm", NON_CLEAR),
-    ("video_rank_menu_23_267.ppm", NON_CLEAR),
-):
-    raw, w, h = read_ppm(Path(__file__).parent / "fixtures" / fixture)
-    got, debug = classifier.classify_bgra(raw, w, h)
-    if got != expected:
-        raise AssertionError((fixture, expected, got, debug))
-
-raw, w, h = read_ppm(
-    Path(__file__).parent / "fixtures" / "video_true_final_win_5_9.ppm"
-)
-_, true_debug = classifier.classify_bgra(raw, w, h)
-raw, w, h = read_ppm(
-    Path(__file__).parent / "fixtures" / "video_false_garage_20_1.ppm"
-)
-_, false_debug = classifier.classify_bgra(raw, w, h)
-assert true_debug["win_final_grid_score"] >= 0.82
-assert false_debug["win_final_grid_score"] < 0.82
-assert false_debug["win_y_cluster"]["span"] > 0.70
-print("user-video false-WIN regression: OK")
-
-
-# v21 regression from the user's 2026-08-26 missed-WIN recording.
-# The real YOU WIN is classified correctly in v20; the miss happened because
-# the preceding dark combat frames were NON_CLEAR, so the state machine never
-# armed. Motion-confirmed gameplay must now arm without weakening final-result
-# thresholds.
-seq = []
-prev_sig = None
-for fixture in (
-    "video_dark_gameplay_0_75.ppm",
-    "video_dark_gameplay_1_50.ppm",
-    "video_dark_gameplay_2_25.ppm",
-):
-    raw, w, h = read_ppm(Path(__file__).parent / "fixtures" / fixture)
-    state, debug = classifier.classify_bgra(raw, w, h)
-    sig = _motion_signature(raw, w, h)
-    motion = _motion_score(prev_sig, sig)
-    active = _is_gameplay_activity(state, debug, motion)
-    seq.append((state, motion, active))
-    prev_sig = sig
-
-assert seq[0][0] == NON_CLEAR and not seq[0][2]
-assert seq[1][0] == NON_CLEAR and seq[1][2]
-assert seq[2][0] == NON_CLEAR and seq[2][2]
-
-sm = ResultStateMachine()
-# Baseline sample has no previous motion signature.
-sm.observe(NON_CLEAR, 2, 3, 5.0, now=100.75, gameplay_activity=False)
-sm.observe(NON_CLEAR, 2, 3, 5.0, now=101.50, gameplay_activity=True)
-sm.observe(NON_CLEAR, 2, 3, 5.0, now=102.25, gameplay_activity=True)
-assert sm.armed, "dark gameplay activity did not arm detector"
-raw, w, h = read_ppm(
-    Path(__file__).parent / "fixtures" / "video_missed_final_win_6_00.ppm"
-)
-state, debug = classifier.classify_bgra(raw, w, h)
-assert state == FINAL_WIN
-assert sm.observe(state, 2, 3, 5.0, now=106.00, gameplay_activity=False) is None
-assert sm.observe(state, 2, 3, 5.0, now=106.75, gameplay_activity=False) == "win"
-print("user-video dark-gameplay missed-WIN regression: OK")
+# Template schema regression. The bad template file lives in a temporary
+# directory that is removed afterwards; a failed removal fails the run.
+with tempfile.TemporaryDirectory() as bad_dir:
+    bad_path = Path(bad_dir) / "bad_templates.json"
+    bad_path.write_text(json.dumps({
+        "version": 3,
+        "bins_x": 64,
+        "bins_y": 16,
+        "grid_x": 32,
+        "grid_y": 8,
+        "templates": {
+            "final_win": [0.0],
+            "final_loss": [0.0] * 80,
+            "phase_win": [0.0] * 80,
+            "phase_loss": [0.0] * 80,
+        },
+        "grid_templates": {
+            "final_win": [0.0] * 256,
+            "final_loss": [0.0] * 256,
+            "phase_win": [0.0] * 256,
+            "phase_loss": [0.0] * 256,
+        },
+        "draw_grid_template": [0.0] * 256,
+    }), encoding="utf-8")
+    try:
+        ResultClassifier(bad_path)
+    except TemplateError:
+        print("template schema validation: OK")
+    else:
+        raise AssertionError("invalid template length was accepted")

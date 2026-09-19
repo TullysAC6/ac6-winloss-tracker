@@ -90,7 +90,13 @@ try {
     Compress-Archive -LiteralPath $stage -DestinationPath $env:AC6_FLOW_ARCHIVE
     $listener = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,0)
     $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
-    $config = @{config_version=17;port=$port;stats_enabled=$true;result_detector_enabled=$false;effect_screenshot_enabled=$true} | ConvertTo-Json
+    # Seed the schema version the source actually expects: a stale literal
+    # would be migrated on startup and rewrite config.json.
+    $configVersion = [int]([regex]::Match(
+        [IO.File]::ReadAllText((Join-Path $root 'config_utils.py')),
+        '(?m)^CONFIG_VERSION\s*=\s*(\d+)').Groups[1].Value)
+    if ($configVersion -lt 1) { throw 'CONFIG_VERSION could not be read' }
+    $config = @{config_version=$configVersion;port=$port;stats_enabled=$true;result_detector_enabled=$false;effect_screenshot_enabled=$true} | ConvertTo-Json
     [IO.File]::WriteAllText((Join-Path $data 'config.json'),$config,(New-Object System.Text.UTF8Encoding($false)))
     $script:configBefore = Get-Content (Join-Path $data 'config.json') -Raw
     $seed = @'

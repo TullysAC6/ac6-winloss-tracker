@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "id": "result.final-win.video-5-9",
+  "family": "results",
+  "category": "win",
+  "input": {
+    "kind": "roi",
+    "path": "video_true_final_win_5_9.ppm",
+    "format": "ppm",
+    "width": 548,
+    "height": 34,
+    "bytes": 55910,
+    "sha256": "f23b446b59a4fe31d09d146decc375b87b6d3600de7c9c828aa03ffbc2228ffe"
+  },
+  "truth": {
+    "result": "win",
+    "screen": "final_result",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "FINAL_WIN",
+    "debug": [
+      {
+        "path": "win_final_grid_score",
+        "at_least": 0.82
+      }
+    ]
+  },
+  "coverage": [
+    "result.win.positive"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "af06299 initial public release; migrated from tests/manifest.json and tests/test_detector.py at a8c6ee2",
+    "origin": "Frame at 5.9 s of a user screen recording in which a later garage frame was once counted as a second WIN (the v19 precision regression).",
+    "synthetic": false,
+    "template_partition": "not_applicable",
+    "legacy": {
+      "manifest_key": "fixtures/video_true_final_win_5_9.ppm",
+      "manifest_expected": "FINAL_WIN"
+    }
+  },
+  "review": {
+    "truth": {
+      "status": "legacy_label_visually_confirmed",
+      "basis": "The implementer viewed the full ROI: it shows the cyan text YOU WIN. The checked frame class is the legacy expectation from tests/manifest.json."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "The implementer inspected the full ROI at 2x. No player or opponent name, Steam identifier, notification, third-party overlay, desktop, local path, token or secret is visible, and the PPM header carries no comment field."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Committed by the repository owner in the initial public release (af06299, 2026-08-30) and public since. It contains ARMORED CORE VI game imagery; this records where the asset came from, not a licence determination."
+    }
+  }
+}

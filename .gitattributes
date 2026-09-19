@@ -1,0 +1,8 @@
+# T1 fixture pixels are evidence and must be checked out byte-for-byte. Two
+# legacy PPMs contain no NUL byte, so without this Git's text heuristics let
+# core.autocrlf rewrite them on Windows and shift their pixel data.
+tests/fixtures/**/*.ppm binary
+tests/fixtures/**/*.png binary
+# The corpus SHA-256 in a T1 report covers the metadata bytes too, so records
+# keep LF on every checkout and the same commit reports the same corpus.
+tests/fixtures/**/*.json text eol=lf

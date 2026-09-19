@@ -10,9 +10,10 @@ Status vocabulary:
 
 | Status | Meaning |
 |---|---|
-| **DONE** | Shipped in the current public stable release and in use |
+| **DONE** | Accepted and shipped in the current public stable release |
 | **IN PROGRESS** | Being worked on right now |
-| **ACCEPTED** | Automated/review/required real-session acceptance complete; released in v1.1.1 |
+| **ACCEPTED** | Automated/review/required real-session acceptance complete and released |
+| **ACCEPTED — UNRELEASED** | Automated gates, independent review and the required real-session acceptance are complete and the work is merged to `main`, **but it is not in any release yet**. Not the same as `DONE` or `ACCEPTED`: a published install does not have it |
 | **ACCEPTANCE PENDING** | Code exists, CI green, **not released and not confirmed in a real session** |
 | **PLANNED** | Agreed direction, scheduled after the current phases |
 | **BACKLOG** | Agreed direction, not scheduled, no design yet |
@@ -21,9 +22,9 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
-## Release status note — 2026-09-12
+## Release status note — 2026-09-14
 
-Public stable is **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d8476`.
+Public stable is **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`. PR #33, main CI, public hashes/digests and stubbed public install/uninstall smoke all passed. See [PROJECT_STATE.md](PROJECT_STATE.md) for evidence.
 
 **v1.1.0 is superseded.** It was published and its runtime was accepted, including a real-AC6 T3,
 but its formal release acceptance was never completed: the README install one-liner inside the tag
@@ -32,10 +33,37 @@ bytes `raw.githubusercontent.com` serves, so the published command failed closed
 moved and the Release was not edited. v1.1.1 ships the same accepted runtime with corrected
 immutable distribution metadata.
 
-Therefore, in the tables below, `DONE` means shipped in v1.1.1 and in use.
+Therefore, in the tables below, `DONE` means shipped in v1.2.0; local installation is a separate user action.
 [#7](https://github.com/TullysAC6/ac6-winloss-tracker/issues/7) and
 [#4](https://github.com/TullysAC6/ac6-winloss-tracker/issues/4) are closed against v1.1.1. Neither
-the `v1.1.0` nor the `v1.1.1` tag is ever moved.
+the `v1.1.0` nor the `v1.1.1` tag is ever moved; `v1.2.0` is immutable too.
+
+## Position note — 2026-09-14
+
+**PR #5 (#8 settings, #9 analytics) is `DONE`, released in v1.2.0.** It passed a focused real-AC6 T3 on the exact head
+`38a21c2` on 2026-09-13 and was merged to `main` as `a042b18`, with green `main` CI.
+
+**v1.1.1 does not contain it; v1.2.0 does.** Its accepted runtime is unchanged by release preparation.
+[#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8) and
+[#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9) are closed as completed on that basis.
+
+## Position note — 2026-09-18
+
+**The formal T1 fixture / replay harness ([#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14)) is `ACCEPTED — UNRELEASED`.**
+
+- PR #35 was independently reviewed (GO, [5246833703](https://github.com/TullysAC6/ac6-winloss-tracker/pull/35#pullrequestreview-5246833703)) and merged to `main` as `f9f5f0f` with green `main` CI.
+- It is test infrastructure with no production runtime change, so it carries no release payload and needs none. T3 was N/A.
+- `python tests/run_t1.py` passes 42/42 on `main` (25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`). **T1 is no longer N/A**; it is a real gate for every later product change.
+- #14 stays open only for the §42 performance/security baseline-capture item below. *(Superseded on 2026-09-19; see the next note.)*
+
+The next product task is [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
+
+## Position note — 2026-09-19
+
+- **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed.** Its §42 performance/security baseline item moved to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. The baseline is a reusable development capability, not a T1 concern. #17 and #25 consume it for their own acceptance.
+- **Formal T1 remains available and passing on `main`**: 42/42, 0 skipped, corpus `6cfc4873bd0aa2bd…`.
+- **The T0 TEMP leak is fixed.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` with green `main` CI.
+- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** is **IN PROGRESS — design / implementation preparation** from `4cdb730` (PR #39; main CI 35368297347 green). PR #31 is the only open PR. Merge its Revision 4 reconciliation first, require green main CI, then sync the prepared #24 branch and implement.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -95,7 +123,7 @@ to verify.
 Not a competitor to the two tracks above; it interleaves with them. Requirements:
 [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-65.
 
-1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), after the fixture/replay harness
+1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), next: the fixture/replay harness it depends on is merged (PR #35), and #14 is closed
 2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - documentation only, human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
 4. #28-A Season Catalog / Assignment Foundation - after #15 and before UI-2
@@ -113,14 +141,13 @@ This is the **authoritative order**. The phase tables below describe *what* each
 section describes *when*. Where the two appear to disagree, this section wins and the table is
 corrected.
 
-Completed: **v1.1.1 released**, and **PR #13 merged**, which made Revision 3 canonical on `main`.
-Revision 4 is the current docs-only Season requirement generation in draft
-[PR #31](https://github.com/TullysAC6/ac6-winloss-tracker/pull/31) and becomes canonical when merged.
+Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
+**PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14;
+and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-18.
+Revision 4 / §65 is delivered by PR #31 and becomes canonical on main at its merge. Its manual-first Season requirements are not runtime implementation.
 From the current position:
 
 ```text
-→ PR #5                       (#8 settings, #9 analytics)
-→ #14                         fixture / replay harness
 → #24                         app-local Python environment
 → UI-0                        design specification, no code change
 → UI-1A                       Player Overlay polish
@@ -181,11 +208,11 @@ Implementation
 
 | Item | Status | Notes |
 |---|---|---|
-| Fixture / replay harness | **PLANNED — HIGH PRIORITY** | Expected structured truth per fixture; exact paths remain an implementation choice. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md). Its layout must carry Season boundary, transition, missing-Season, multi-season-gap, pre-S and S cases — see [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) and MASTER_REQUIREMENTS §64–§65 |
+| Fixture / replay harness | **ACCEPTED — UNRELEASED** (test infrastructure; no release payload) | Merged as `f9f5f0f` (PR #35, 2026-09-18). `python tests/run_t1.py`: 42/42 on `main`; results family implemented, other families reserved. Follow-ups L-A / L-B recorded on [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5731935668). Original scope: `tests/fixtures/{results,match_metadata,ranks,opponent_builds}/` with expected structured truth per fixture. Replays the real recognition/classification path without AC6 running. Bounded and curated — see [DECISIONS.md](DECISIONS.md). **Its layout must be able to carry the later fixture families without being retrofitted**: season boundaries, and pre-S (UNRANKED through A4) and S rating presentations as distinct cases — see [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) and MASTER_REQUIREMENTS §64. The harness is built once and then extended |
 | Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
 | T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the **PR goes to review**; the affected gates are re-run after review fixes; T3 last |
 | Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
-| Performance / security regression checks | PLANNED | Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists on the RC branch |
+| Performance / security regression checks | PLANNED | Owned by **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37)** (OPEN, not started) since 2026-09-19. Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists (`tools/Start-RC-Performance-Capture.ps1`). **Not delivered by PR #35**: the #14 design kept it out of T1. #14 is closed; this item no longer lives there |
 
 `ADOPTED (process)` means the rule is in force for future work — a documentation state, not a
 shipped application feature.
@@ -228,7 +255,7 @@ shipped application feature.
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
 | Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
-| Dedicated venv isolation | **PLANNED** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Scheduled after [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14). v1.1.1 still installs into the user's shared Python environment |
+| Dedicated venv isolation | **IN PROGRESS — design / implementation preparation** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35) and #14 is closed. Released v1.2.0 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -255,24 +282,24 @@ Umbrella issue: [#8](https://github.com/TullysAC6/ac6-winloss-tracker/issues/8).
 | Item | Status | Notes |
 |---|---|---|
 | Screenshot ON / OFF (`effect_screenshot_enabled`) | **DONE** | Config key and launcher settings entry accepted on the RC; released in v1.1.1 |
-| Check for a new version | **DONE** | Metadata-only check introduced on the RC; released in v1.1.1. Draft PR #5 extensions are not included |
-| Milestone effect ON / OFF (`effect_enabled`) | ACCEPTANCE PENDING | Draft PR #5 |
-| Session / lifetime display switch (`overlay_stats_scope`) | ACCEPTANCE PENDING | Draft PR #5 |
-| Reset all win/loss history | ACCEPTANCE PENDING | Draft PR #5 |
-| Delete history before a given date | ACCEPTANCE PENDING | Draft PR #5. Capped at today; refuses a cutoff crossing the open session |
+| Check for a new version | **DONE** | Metadata-only check introduced on the RC; released in v1.1.1. The PR #5 extension is **DONE** (merged to `main` as `a042b18`, released in v1.2.0) |
+| Milestone effect ON / OFF (`effect_enabled`) | **DONE** | PR #5, merged `a042b18`. Real-AC6 T3 on 2026-09-13: with the effect OFF, the real result and streak were still counted and there were 0 effect events. Milestone suppression itself is proven at T2 |
+| Session / lifetime display switch (`overlay_stats_scope`) | **DONE** | PR #5, merged `a042b18`. Switched on a running Tracker in the real-AC6 T3 |
+| Reset all win/loss history | **DONE** | PR #5, merged `a042b18`. Accepted at T0/T2; deliberately not run on the user's real history |
+| Delete history before a given date | **DONE** | PR #5, merged `a042b18`. Capped at today; refuses a cutoff crossing the open session. Accepted at T0/T2; deliberately not run on the user's real history |
 | Automatic update | DEFERRED | Deliberate. See [DECISIONS.md](DECISIONS.md) |
 
 ## Phase 6 — Match analytics
 
-Umbrella issue: [#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9). All draft PR #5.
+Umbrella issue: [#9](https://github.com/TullysAC6/ac6-winloss-tracker/issues/9). All items are from PR #5, accepted and merged to `main` as `a042b18` on 2026-09-13, and **released in v1.2.0**.
 
 | Item | Status |
 |---|---|
-| Today / this week (Monday) / this month / all time | ACCEPTANCE PENDING |
-| Recent 10 / 30 / 100 | ACCEPTANCE PENDING |
-| CSV export (UTF-8 BOM, oldest first) | ACCEPTANCE PENDING |
-| DB integrity check (`quick_check` / `integrity_check`) | ACCEPTANCE PENDING |
-| History maintenance (reset all, delete before a date) | ACCEPTANCE PENDING |
+| Today / this week (Monday) / this month / all time | **DONE** |
+| Recent 10 / 30 / 100 | **DONE** |
+| CSV export (UTF-8 BOM, oldest first) | **DONE** |
+| DB integrity check (`quick_check` / `integrity_check`) | **DONE** |
+| History maintenance (reset all, delete before a date) | **DONE** (T0/T2; not run on the user's real history) |
 
 Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any new statistic reuses this definition, and always displays its sample size: `80.0% (8W-2L / 10 matches)`.
 
@@ -337,7 +364,7 @@ entry and does not gate the analytics.
 
 | Item | Status | Notes |
 |---|---|---|
-| Recent 10 / 30 / 100 | ACCEPTANCE PENDING | Already in draft PR #5 (Phase 6) |
+| Recent 10 / 30 / 100 | **DONE** | Already delivered by PR #5 (Phase 6), merged `a042b18`; released in v1.2.0 |
 | Today / this week / **previous week** / this month | PLANNED | Previous-week comparison is new in Revision 2 |
 | Daily win-rate series | PLANNED | Period *aggregates* exist; a per-day *trend* does not |
 | Weekly win-rate series | PLANNED | |
@@ -431,7 +458,7 @@ Replaces the former Phases 8 / 9 / 10 as slices of one dataset.
 
 | Item | Status | Notes |
 |---|---|---|
-| Fixture-based recognition regression tests | PLANNED | Built on the Phase D harness. Eventually mandatory for recognition changes. Expected labels are never edited to make a failing test pass |
+| Fixture-based recognition regression tests | PLANNED | Built on the Phase D harness, which now exists (PR #35); T1 already gates result recognition. New recognizers add their own fixture families. Eventually mandatory for recognition changes. Expected labels are never edited to make a failing test pass |
 
 ---
 
@@ -441,8 +468,8 @@ Added 2026-09-12. Umbrella issue: [#24](https://github.com/TullysAC6/ac6-winloss
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §56.
 
 Scheduled **after** [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), so the
-migration has a fixture/replay harness to regress against. Not part of v1.1.x and not part of
-draft PR #5.
+migration has a fixture/replay harness to regress against. That harness is merged (PR #35, 2026-09-18), so this is the next product task. Not part of v1.1.x and not part of
+PR #5.
 
 | Item | Status | Notes |
 |---|---|---|
@@ -502,7 +529,7 @@ Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Dedicated venv isolation | **PLANNED** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
+| Dedicated venv isolation | **IN PROGRESS — design / implementation preparation** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
 | Support for CUSTOM MATCH / RANK MATCH: TEAM | **PLANNED — moved to Phase 7A** | No longer deferred. Revision 2 requires TEAM and CUSTOM to be recorded as normal matches. The README statement stays accurate for the *shipped* release until 7A passes acceptance |
 | Patch / version awareness (`game_version`, `parts_master_version`, `recognition_version`, `analytics_version`) | PLANNED | Leaves room for before/after balance-patch comparison. Existing data is not back-filled with a guessed version |
 | Localisation beyond Japanese | BACKLOG | |

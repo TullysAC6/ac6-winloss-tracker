@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "required": {
+    "result.win.positive": "A genuine YOU WIN final result classifies as FINAL_WIN.",
+    "result.loss.positive": "A genuine YOU LOSE final result classifies as FINAL_LOSS.",
+    "result.draw.positive": "A genuine DRAW result classifies as FINAL_DRAW.",
+    "result.phase.banner": "A PHASE n: YOU WIN / YOU LOSE banner classifies as PHASE.",
+    "result.clear.gameplay": "Bright gameplay classifies as CLEAR, the arming evidence.",
+    "negative.gameplay": "Dark gameplay that is not CLEAR never classifies as a result.",
+    "negative.false_win": "A frame with WIN colours but no result glyphs is not FINAL_WIN.",
+    "negative.false_draw": "A combat frame with neutral-white highlights is not FINAL_DRAW.",
+    "negative.garage_menu": "Garage, menu and rank screens are not results.",
+    "sequence.repeated_final_screen": "A final banner that stays on screen is counted once.",
+    "sequence.exactly_once": "One match produces exactly one accepted result.",
+    "sequence.post_result_clear": "CLEAR during the post-result cooldown is not banked; re-arming needs continuous CLEAR afterwards.",
+    "sequence.rearm": "The detector re-arms for the next match after the post-result CLEAR interval.",
+    "sequence.next_match": "The result of the next match is detected and accepted.",
+    "sequence.two_match": "Two consecutive matches produce two accepted results.",
+    "sequence.capture_gap": "A missing frame breaks consecutive confirmation and is never CLEAR.",
+    "sequence.discontinuity_identity_change": "A capture discontinuity or window identity change drops evidence that belonged to the old capture.",
+    "sequence.stale_frame": "A stale or repeated native capture frame is rejected by the real GameCapture before classification.",
+    "sequence.dark_gameplay_final_win": "Motion-confirmed dark gameplay arms the detector so the following real WIN counts.",
+    "sequence.startup_visible_final": "A final banner already on screen at startup is never counted.",
+    "contract.draw_no_count": "DRAW is detected and reported but never reaches the result gate or the WIN/LOSE counts.",
+    "contract.gate_feedback": "An accepted result returns external_mutation to the detector, installing the post-result lock.",
+    "contract.undo_feedback": "An undo moves the post-result lock to the undo, so the detector re-arms later than it would have without it.",
+    "contract.gate_rejection": "A manual result inside the cooldown is refused by the shared ResultGate and never mutates the detector.",
+    "contract.processing_time": "The post-result cooldown is measured from processing time, not from capture time."
+  }
+}

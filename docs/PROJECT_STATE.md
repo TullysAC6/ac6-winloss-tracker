@@ -1,8 +1,8 @@
 # Project state
 
-Last updated: 2026-09-13 JST
+Last updated: 2026-09-19 JST
 
-Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4 in this docs-only generation; canonical when merged) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main when PR #31 merges) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
@@ -10,13 +10,38 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4 in th
 
 | Item | State |
 |---|---|
-| Public stable | **v1.1.1 — RELEASED**, tag `v1.1.1` → `e0d84768dd739118f4bb9183af3d111041bddf33` |
-| `main` | `59e370b` (PR #13 merge; verify GitHub before relying on this snapshot) |
-| Accepted runtime | `codex/wgc-rc-validation-20260908` at `93d5a57b88a86ec4b8846a3082089ed97f13a818`, shipped unchanged in v1.1.0 and v1.1.1 |
+| Public stable | **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4` |
+| `main` | Reconciliation base `4cdb730` (PR #39), after PR #38 `3bd89a3` and PR #35 `f9f5f0f`. [Base main CI 35368297347](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35368297347) green. PR #31 advances main; resolve `origin/main` for the current SHA |
+| Accepted runtime | PR #5 at `38a21c2`, merged as `a042b18`, now shipped in v1.2.0. Earlier runtime `93d5a57` shipped in v1.1.0 and v1.1.1. **PR #35 and PR #38 do not change it** |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
-| Other product generation | draft PR #5 on `claude/settings-analytics-20260909`; not part of v1.1.1 |
-| Documentation generation | PR #13 — **merged**. Master Requirements Revision 3 is canonical on `main` |
-| Season requirement generation | Draft [PR #31](https://github.com/TullysAC6/ac6-winloss-tracker/pull/31) — **documentation / requirement sync only.** Revision 4 records manual-first Season catalog reconciliation and retrospective assignment; no application code or runtime manifest is implemented |
+| Settings / analytics generation | **PR #5: Implemented + Accepted + merged to `main`** (`a042b18`, 2026-09-13). Focused real-AC6 T3 PASS on the exact head `38a21c2`. **Released in v1.2.0**; not part of v1.1.1 |
+| Test-harness generation | **PR #35 (#14): Implemented + Accepted + merged to `main`** (`f9f5f0f`, 2026-09-18). Test infrastructure only; production runtime unchanged, so it carries no release payload. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed** (2026-09-19) |
+| §42 performance/security baseline | Moved out of #14 to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. #17 and #25 consume it for their own acceptance |
+| T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
+| Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 becomes canonical on main at its merge |
+| Unmerged generations | PR #31 is the only open PR at reconciliation. #24 has an implementation-preparation branch with no production commits. Merge #31 first, then sync #24 with main. At most two generations |
+| Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
+| Next product task | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24): **IN PROGRESS — design / implementation preparation**. Branch `claude/issue-24-app-local-python`, start base `4cdb730`; production implementation follows PR #31 merge and green main CI |
+
+## v1.2.0 published integrity — 2026-09-14
+
+- **RELEASED:** [v1.2.0](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0); PR #33 merged as `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`.
+- Annotated tag object `d2a5c01065c3191c3b7bb3f821452abe518fbdf2` → the same release commit. The tagged tree equals independently reviewed PR head `9cffa5148e785d059049394d7085788a28693b39`.
+- Independent release re-review: [5192880235](https://github.com/TullysAC6/ac6-winloss-tracker/pull/33#pullrequestreview-5192880235), GO. Exact-head push and PR CI passed; [release main CI](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34792826474) passed before tagging.
+- Release T0: 42/42 files; distribution checks passed on PowerShell 7 and Windows PowerShell 5.1. T1 remains **N/A / not run**. Accepted feature T2 (209/209), lifecycle T2 (7 phases) and focused PR #5 T3 on `38a21c2` carry forward: release prep changes no product behaviour.
+- Bootstrap Git blob `7e7f817c9ab8870611aac1cdca2cae18a451a472`, 8619 bytes: SHA-256 `82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B`. Committed blob, public raw and both README literals agree.
+- Assets were generated by `scripts/prepare-release-assets.ps1` in a clean checkout of `v1.2.0`. Script assets retain the Windows checkout bytes, while README bootstrap hashes use the raw Git blob bytes.
+
+| Public asset | Bytes | SHA-256 (also matches GitHub digest) |
+|---|---:|---|
+| `install.ps1` | 57356 | `b803d24bba00f5f55b392d4731f8ea80fc2d500e373963d5c79cd35954347028` |
+| `install.ps1.sha256` | 78 | `932931e18353a026ef414b197debdd03bca3ee139f0770e967a4d2f7c2234d7a` |
+| `uninstall.ps1` | 8831 | `f971c45ae8735b7040a89264f1379dda7c1d98f9402a4881434b2166917e2a00` |
+| `uninstall.ps1.sha256` | 80 | `f00e0d518b4df08c3fabd46c8d8d61649e851e27b4cf10d8d0f4f9cf0e8ee669` |
+
+Both checksum sidecars match. On PowerShell 7 and Windows PowerShell 5.1, the public tag README's unmodified install and uninstall one-liners passed their hash gates, selected only `/releases/tags/v1.2.0`, verified the public assets and reached the stubbed installer/uninstaller boundary with tag `v1.2.0`. Actual installer child execution was disabled: no live installation, history, config, Desktop, port 8765 or Tracker process was modified, and smoke TEMP was empty after each command.
+
+v1.1.1 is superseded by v1.2.0; all published tags and Releases remain immutable. The historical v1.1.0 distribution defect and v1.1.1 repair remain documented below. Future #14 / #24 work has not started in this release task.
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 
@@ -57,10 +82,10 @@ Detector MSS fallback still uses `region_unobscured()`. Screenshot capture still
 
 ## Accepted
 
-Runtime `93d5a57` is accepted and released.
+The earlier runtime `93d5a57` was accepted and released in v1.1.1. Its evidence remains applicable to the unchanged capture paths below; PR #5 acceptance and v1.2.0 release evidence are recorded separately.
 
 - T0: PASS on the runtime, on the v1.1.0 release prep, and again on the v1.1.1 release prep.
-- T1: **N/A / not run**. The formal fixture/replay harness is issue #14 and is not implemented; no T1 PASS is claimed.
+- T1: **N/A / not run** for this runtime. The formal fixture/replay harness (issue #14) did not exist then; no T1 PASS is claimed for it. The harness now exists: see PR #35 below.
 - T2: PASS, including the isolated install → update → injected rollback → abnormal-exit recovery → uninstall → reinstall flow with history/config/Screenshot-setting preservation.
 - Independent runtime review: PASS for PR #20. Independent release-diff review: PASS for PR #29, no High or Release blocker.
 - Focused real-AC6 T3: PASS on 2026-09-11 JST. Five real wins produced exactly one PNG for effect `1m4k1FRsEEoa3U5mqRiDCL51`; the PNG contains the AC6 game, the real `5連勝 激アツ!!` banner, and the user's visible overlay composition. Evidence in issue #7.
@@ -79,7 +104,72 @@ Residual non-blocking risk: rare GPU/compositor/window-manager timing may behave
 
 ## Release scope
 
-Supported mode in v1.1.1 remains **RANK MATCH: SINGLE only**. The broader TEAM/CUSTOM requirements in the master requirements are future requirements, not implemented or released behavior.
+Supported mode in v1.2.0 remains **RANK MATCH: SINGLE only**. The broader TEAM/CUSTOM requirements in the master requirements are future requirements, not implemented or released behavior.
+
+## Accepted and released in v1.2.0 — PR #5 (#8 / #9)
+
+| | |
+|---|---|
+| Implemented | **yes**. The four-tab Settings GUI (表示・演出 / 成績 / メンテナンス / サポート); `effect_enabled` and `overlay_stats_scope` (config 17 → 18); history analytics (today / week / month / all time, recent 10 / 30 / 100); CSV export; DB `quick_check` / `integrity_check`; history purge (all / before a date); the Diagnostic Report from Settings; the update-check extension; and ordered result persistence with `pending-history.json` recovery |
+| Accepted | **yes**. Focused real-AC6 T3 PASS on the exact head `38a21c2`, 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)) |
+| Merged | `main` at `a042b18`, a merge commit whose tree is identical to `38a21c2`. `main` CI is green ([run 34761001222](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34761001222)) |
+| Released | **yes**, [v1.2.0](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0) on 2026-09-14. PR #33 only changes distribution/version metadata; accepted runtime behaviour is retained |
+
+Gates on `38a21c2`:
+
+- **T0:** PASS. The full local suite (42 files) passed, and CI is green.
+- **T1:** **N/A / not run** on `38a21c2`; the #14 harness did not exist then.
+- **T2:** PASS on 209/209 feature checks, and the lifecycle run passed all 7 phases.
+- **Independent review:** five rounds requested changes, then [5190665161](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#pullrequestreview-5190665161) gave GO with no High or Medium findings.
+- **T3:** **PASS**, as an isolated T3:
+  - **Setup.** The exact-head worktree ran against an isolated `LOCALAPPDATA` seeded from a SHA-256-verified copy of the real data root.
+  - **Result.** One real Ranked Single WIN (`auto`, 2026-09-13 22:24:40) took history from 184 → 185 and stats to 1 / 0, streak 1.
+  - **Effect.** `effect_enabled` was `false`, and there were **0 effect events**. No `pending-history.json` remained.
+  - **Exercised.** The Settings tabs, analytics on the real history, `quick_check` / `integrity_check`, CSV export (185 rows), session ↔ lifetime switching and the Diagnostic Report.
+  - **Shutdown.** It returned HTTP 200 and left no process, port, runtime file or mutex behind.
+
+The evidence is split by source on purpose; #8 and #9 name the source of each criterion.
+
+| Source | Covers |
+|---|---|
+| Real T3 | Settings tabs; effect OFF with the result and streak still counted; exactly one real result; session / lifetime display; analytics on the real history; integrity check; CSV; Diagnostic Report |
+| Prior real acceptance (v1.1.1, #7) | Effect Screenshot control and capture path, unchanged by PR #5 |
+| T0 / T2 | Destructive reset / delete-before-date, restart persistence, update-check mechanics, milestone suppression with the effect OFF, and every failure path |
+
+Some checks were **not** run on the user's real history: destructive maintenance, live-DB fault injection, a forced pending-history state and a 5-win milestone replay. They would be irreversible on the only copy, and T2 already drives the same server path. T2 also covers failure boundaries that a live run cannot inject safely.
+
+**Live v1.1.1 data was not changed by the T3.** `history.db`, `stats.json` and `config.json` stayed byte-identical to the pre-T3 baseline. The only live change was a `startup.log` entry: the user accidentally started the normal launcher while the isolated instance owned port 8765, and it failed closed with `ENV-PORT-IN-USE` before taking ownership.
+
+PR #5 (*Known limitations*) lists the known residuals; none of them blocks:
+
+- the abrupt-death window between the history commit and the stats write
+- the missing recovery hint for a corrupt `pending-history.json`
+- the two meanings of `matches`
+
+## Implemented, accepted and merged — PR #35 (#14 formal T1 harness)
+
+| | |
+|---|---|
+| Implemented | **yes**. `python tests/run_t1.py`: stored pixels replayed through the real `ResultDetector.run`, `ResultClassifier`, motion helpers, `ResultStateMachine` and `ResultGate` (and the real `GameCapture.grab` for two WGC-boundary sequences), in isolated, guarded, job-owned workers. A strict schema, loader and path confinement; 25 image records plus 17 sequences; reserved families for match metadata, ranks, season, rating and builds. `tests/gate_registry.py` gives every test exactly one of T0 / T1 / T2; CI runs T0 → T1 → T2 → source install on 3.13 and 3.14 |
+| Accepted | **yes**. Independent review [5246833703](https://github.com/TullysAC6/ac6-winloss-tracker/pull/35#pullrequestreview-5246833703): GO, Critical 0 / High 0 / Medium 0. [Acceptance record on #14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5731935668) |
+| Merged | `main` at `f9f5f0f` (2026-09-18), a merge commit whose tree is identical to the reviewed head `09cd516`. [`main` CI 35336092717](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35336092717) green |
+| Released | not applicable. Test infrastructure only; **production runtime changed: NO**. v1.2.0 is unchanged |
+
+Gates:
+
+- **T0:** PASS.
+- **T1:** **PASS — 42/42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`**, on the exact head, on `main` CI (3.13 and 3.14, read from the job logs) and in the independent local run. This is the first formal T1. From here on **T1 is a real gate, not N/A**, and a T1 regression blocks progression.
+- **T2:** PASS, all 22 Python entries. **Source install flow:** 7/7.
+- **T3:** **N/A**. No production runtime changed, so a real AC6 session could observe nothing new. The earlier T3 on `38a21c2` carries forward.
+- **Non-vacuity:** 18 of 19 independent mutants make T1 fail. All 42 pre-#14 pixel assertions were kept (36 in T1, 6 in T0) and all 25 manifest labels are unchanged.
+
+PR #35 did not deliver one #14 checklist item, which the #14 design explicitly kept out of T1: *Performance/security regression baseline capture (Tracker OFF / current accepted / + feature)*, MASTER_REQUIREMENTS §42. That item has since moved to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) (OPEN, PLANNED)**, and **#14 is CLOSED as completed** (2026-09-19, [closure](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14#issuecomment-5732296924)).
+
+Non-blocking follow-ups, recorded and not implemented:
+
+- **L-A:** `tests/t1/guards.py` `guarded_pair()` binds keyword paths as `src`/`dst`, so `_winapi.CopyFile2(existing_file_name=…, new_file_name=…)` is not refused. It is a private API; the public `shutil.copy2` is guarded.
+- **L-B:** `canonical_corpus` is a path comparison, and the corpus SHA is reported but not pinned. Deleting a redundant sequence still gives T1 PASS.
+- **Pre-existing, not from #35:** the `tempfile.mkdtemp()` TEMP leak in `tests/test_stats_manager.py` and `tests/test_detector.py` (12 `tmp*` per T0 run). **Fixed by PR #38**, merged as `3bd89a3`: each case now owns a `TemporaryDirectory()` context, assertions are unchanged, and residue is 0. On a cp932 host, `tests/test_pending_history_recovery.py` needs `PYTHONUTF8=1` for child output.
 
 ## Requirements added on 2026-09-12 — Revision 3
 
@@ -87,7 +177,7 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 
 | Area | Requirement | Issue | Status |
 |---|---|---|---|
-| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is a known hazard with unmerged historical evidence on `fix/venv-launcher-ownership` and `release/v1.1.0-venv` | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | PLANNED, after #14 |
+| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is a known hazard with unmerged historical evidence on `fix/venv-launcher-ownership` and `release/v1.1.0-venv` | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **IN PROGRESS — design / implementation preparation**; not Implemented / Accepted / Released |
 | UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | PLANNED, UI-0 is documentation only |
 | Tray / Launcher | A process-architecture change, not visual polish. Last phase, own issue and own PR. Not implemented unless its lifecycle safety can be demonstrated | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | BACKLOG |
 | Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
@@ -108,21 +198,23 @@ not yet confirmed. The approximate two-month / Friday cadence is never authorita
 
 ## Next actions
 
-1. Reconcile draft PR #5 with the current `main` — merge only, no reset, rebase or force-push — then T0 → T1 (N/A until #14) → T2 → PR handoff → independent review → required fixes → re-run affected gates → T3 → `main`.
-2. Then issue #14, the fixture / replay harness, on a fresh branch and worktree from the new `main`.
-3. Then #24, and from there the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment. IN PROGRESS — design / implementation preparation.** Merge PR #31 and require green main CI, then fast-forward or merge main into the existing #24 branch (no rebase). Implement and run T0 → **T1 (formal, must pass)** → T2 → independent review → fixes → affected gates → T3 → main.
+2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
-At the start of this work, **PR #5 was the only unmerged product generation**. The Revision 4
-docs-only Season sync is the permitted second generation. No third generation or new feature
-branch starts until one lands (§4).
+**PR #35 (#14 formal T1 harness) has landed** (2026-09-18, `f9f5f0f`), and **#14 is closed**. Its §42 baseline item belongs to **#37** (OPEN, PLANNED), not to #24.
 
+**PR #38 (test-only T0 TEMP-leak cleanup) has landed** (2026-09-19, `3bd89a3`), with green `main` CI.
 
-### Order after PR #5
+PR #31 is the only open PR at reconciliation; #24 is the prepared product generation. After #31 merges, #24 is the only active generation. No third generation starts (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
+
+MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots as historical; this file remains the live position.
+
+### Order from here
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
 ```text
-#14 → #24 → UI-0 → UI-1A → UI-1B → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
+#24 → UI-0 → UI-1A → UI-1B → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
    → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 
@@ -130,7 +222,7 @@ The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROAD
 and History state. **#16 owns the analytics data while UI-3A / UI-3B own the chart
 rendering**.
 
-Never move the `v1.1.0` or `v1.1.1` tag.
+Never move the `v1.1.0`, `v1.1.1` or `v1.2.0` tag.
 
 ## Process safety
 
