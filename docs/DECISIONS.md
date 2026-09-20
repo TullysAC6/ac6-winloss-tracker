@@ -495,3 +495,36 @@ Three supporting rules:
 Gated on self-rank recognition being reliable first ([#15](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15)). A progression chart on unreliable recognition is worse than no chart.
 
 Reaching S is an achievement, **not a feature unlock**: no Tracker capability depends on the user's rank. Every pre-S rank is in scope, because motivation is the purpose and the lower ladder is where it matters most.
+
+---
+
+## Season catalog is manual-first and assignment is retrospective
+
+**Decision (2026-09-13): confirmed Season boundaries come from an AC6tool-managed catalog;
+the first synchronization implementation is manual refresh + local cache + retrospective
+assignment, not weekly automatic polling or cadence inference.**
+
+Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §65. Issue:
+[#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28), slice #28-A.
+
+The approximate two-month / Friday cadence is operational context only. Holidays may move the
+reset in either direction, and reset start is not necessarily next-Season start. In the known seed,
+Season 16 began `2026-07-24 18:00 JST`; reset begins `2026-09-25 16:00 JST`; Season 17 begins only
+after reset completion, at a timestamp not yet confirmed.
+
+Matches and Rating observations are saved even when their Season is unresolved. A later catalog
+refresh may change only derived Season metadata using the saved timestamp. It never changes the
+result, event identity, match time, ResultGate outcome, streak, or the Rating observation itself.
+Transition gaps remain unresolved rather than being forced into an adjacent Season.
+
+Synchronization reconciles the full catalog. After a long absence it fetches every missing Season
+definition; it never manufactures `season_id + 1` or derives boundaries from elapsed time. Applying
+the same catalog repeatedly is idempotent.
+
+Why manual-first: Season communication is optional enrichment. Network, schema or catalog failure
+must retain the last valid cache and never block startup, match persistence or Rating observation
+persistence. A future automatic refresh remains optional and, if adopted, must be transparent,
+non-modal during gameplay and incapable of stealing AC6 focus.
+
+The manifest is bounded, fixed-schema data from a fixed HTTPS GitHub source. It is never evaluated
+or executed, and no match history or personal data is uploaded to fetch it.

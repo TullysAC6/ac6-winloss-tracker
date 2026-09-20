@@ -8,7 +8,7 @@ Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE
 
 ```text
 Issue #6
-→ docs/MASTER_REQUIREMENTS.md   (canonical requirement, Revision 3)
+→ docs/MASTER_REQUIREMENTS.md   (Revision 4; canonical on main when PR #31 merges)
 → docs/PROJECT_STATE.md         (where the project actually is)
 → docs/NEXT_SESSION.md          (this file)
 → docs/ROADMAP.md
@@ -35,10 +35,9 @@ Issue #6
   - Focused real-AC6 T3 PASS on the exact head `38a21c2` on 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)). `main` CI is green.
   - #8 and #9 are closed as completed.
   - v1.1.1 does **not** contain PR #5; v1.2.0 is the first release containing its settings and analytics.
-- PR #13 is **merged**: Master Requirements Revision 3 (§52, §56–§64) is canonical on `main`.
-  - **Draft PR #31** (Revision 4, docs-only) is an unmerged generation, as is this docs-only bookkeeping PR while it is open.
-  - Do not treat Revision 4 as canonical until it merges.
-- MASTER_REQUIREMENTS §34 and §36 still describe PR #5 as the next or open item. They are dated snapshots, and `PROJECT_STATE.md` is the live position. Reconcile them explicitly in the next requirements revision.
+- PR #13 merged Revision 3. PR #31 adds Revision 4 / §65, preserving manual-first Season catalog refresh, local cache, retrospective assignment, unresolved transitions and full multi-season reconciliation. Revision 4 becomes canonical on main at PR #31 merge; no Season runtime feature is implemented.
+- PR #31 was reconciled against `4cdb730` (PR #39), whose [main CI 35368297347](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35368297347) is green. Resolve current main and require exact-main CI before #24 implementation.
+- MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is in progress.
 
 ## The rule that cost a release — do not lose it
 
@@ -64,15 +63,15 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 ## Required order from here
 
-1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** Not started.
-   - It starts only after this docs-only bookkeeping PR merges.
-   - Cut a fresh branch and worktree from the then-current `main`, which contains PR #35 and PR #38.
+1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — design / implementation preparation.
+   - Production implementation starts after PR #31 merges and exact-main CI is green.
+   - Sync the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree (start base `4cdb730`) with the new main using fast-forward or merge, never rebase. Verify ownership and a clean worktree first.
    - Then T0 → T1 → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). While this bookkeeping PR is open, it and draft PR #31 are the two. After it merges, only PR #31 remains, and **#24 takes the product slot**. No third generation starts.
+At most two unmerged generations exist at a time (§4). PR #31 is the only open PR at reconciliation; #24 is prepared with no production commits. Merge #31 first, then continue #24 as the sole active generation.
 
 ## Order after that — dependency, not preference
 
@@ -82,18 +81,18 @@ v1.2.0, PR #13, PR #5 and PR #35 are done; PR #5 is accepted, merged and release
 
 ```text
 #24 → UI-0 → UI-1A → UI-1B
-→ #15 → UI-2 → #16-A / #28 → UI-3A → #17 → #10/#11/#12 → UI-3B
+→ #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12 → UI-3B
 → #16-B → #18 → #27 → UI-4
 ```
 
 Four placements in it are load-bearing and will look wrong to anyone reading only the phase tables:
 
-- **#15 before UI-2.** UI-2 rebuilds the Dashboard and History shell. Doing it before the match-metadata contract is fixed means building that shell twice — once for today's row shape, once for the Ranked/Custom, Single/Team, rank-bearing shape.
+- **#15 → #28-A → UI-2.** #15 supplies match / observation timestamps; #28-A settles catalog reconciliation and derived Season assignment; only then does UI-2 add Settings manual refresh and History Season state.
 - **#16 owns the data, #25 owns the charts.** #16 computes periods, rolling win rate, per-season rank/rating series, deltas and achievements. UI-3A / UI-3B render them. Neither implements the other's half.
-- **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
+- **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #35 and PR #38 have merged, so the product slot goes to **#24** next, once this bookkeeping PR has merged. Draft PR #31 (docs-only) is the other open generation.
+At most two unmerged generations exist at a time (§4). PR #31 is the only open PR at reconciliation; #24 is prepared with no production commits. Merge #31 first, then continue #24 as the sole active generation.
 
 ## What is newly recorded and must not be lost
 
@@ -103,14 +102,16 @@ At most two unmerged generations exist at a time (§4). PR #35 and PR #38 have m
 | UI/UX polish — `Fluent shell × AC6 telemetry × Pachinko celebration`, Player vs Broadcast overlays | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | §57–§63 |
 | Tray / Launcher modernization — lifecycle change, last, own PR | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | §63 |
 | Self-build linkage — `self_build_id`, explicit selection, never inferred | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | §52 |
-| Seasonal rank / rating progression — per season, never carried forward, A/S not one scale | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §64 |
+| Seasonal rank / rating progression — per season, never carried forward, A/S not one scale | [#28-B](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §64 |
+| Season Catalog / Assignment — manual-first, retrospective, multi-season and transition-safe | [#28-A](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §65 |
 
-Four things in there are easy to erode and are the reason they are written down:
+Five things in there are easy to erode and are the reason they are written down:
 
 - **A venv is not a sandbox.** `requirements.lock`, hash pinning and binary-only policy survive the runtime-isolation migration untouched, and `pythonw` worker PID ownership must be re-proved, not assumed.
 - **A UI change may not cost game performance**, and UI polish is never a reason to touch Detector, ResultGate, WGC or process lifecycle.
 - **No framework migration as the opening move** of visual modernisation.
 - **The pre-S → S rating boundary is not one continuous line.** The ladder is `UNRANKED → … → A4 → S`, and the boundary is **pre-S / non-S (through A4) vs S** — A4 is on the pre-S side, so never write "below A" for it. The game presents rating differently on each side, so the obvious-looking single-line chart asserts a comparison the game does not support, and it fails silently. Rank/Rating recognition is event-driven, never a continuous OCR loop, and a failed read is recorded as a failed read — never as a rating change.
+- **Season synchronization is manual-first catalog reconciliation, not cadence inference.** Unknown and transition records stay unresolved; a long absence fetches every missing Season definition; failure keeps cached data and never affects result persistence.
 
 ## STOP conditions
 
