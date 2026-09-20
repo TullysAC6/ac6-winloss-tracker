@@ -21,8 +21,8 @@ assert "$channel = 'stable'" in installer
 assert "$SourceTag = 'v1.2.0'" in installer
 assert "$version = '1.2.0'" in installer
 assert "AC6-WinLoss-Tracker-Installer/1.2.0" in installer
-assert 'https://api.github.com/repos/$repository/commits/$SourceTag' in installer
-assert '^[0-9a-fA-F]{40}$' in installer
+assert 'https://api.github.com/repos/$repository/commits/$sourceRef' in installer
+assert r'\A[0-9a-fA-F]{40}\z' in installer
 assert 'archive/$resolvedCommit.zip' in installer
 assert "archive/refs/heads/main.zip" not in installer
 assert "test/python-source-install" not in installer

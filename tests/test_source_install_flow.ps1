@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory=$true)][string]$PythonPath)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -71,7 +71,7 @@ function Check-Rollback {
     Set-Content (Join-Path $installed 'rollback-sentinel.txt') 'previous-source'
     $env:AC6_FLOW_FAIL_STAGE = $Stage
     try {
-        & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') *> (Join-Path $fixture "rollback-$Stage.log")
+        & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') -SourceCommit $commit *> (Join-Path $fixture "rollback-$Stage.log")
         if ($LASTEXITCODE -eq 0) { throw "Injected $Stage failure was accepted" }
     } finally { $env:AC6_FLOW_FAIL_STAGE = '' }
     if (-not (Test-Path (Join-Path $installed 'rollback-sentinel.txt'))) { throw "$Stage lost source" }
@@ -85,7 +85,9 @@ function Check-Rollback {
     Write-Output "Rollback $Stage / source / environment / shortcut / metadata / running state: PASS"
 }
 function Run-Installer {
-    & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') *> (Join-Path $fixture 'last-install.log')
+    param([switch]$Stable)
+    $sourceArgs = if ($Stable) { @() } else { @('-SourceCommit', $commit) }
+    & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') @sourceArgs *> (Join-Path $fixture 'last-install.log')
     if ($LASTEXITCODE -ne 0) {
         Get-Content (Join-Path $fixture 'last-install.log') -Tail 20 | ForEach-Object { Write-Host $_ }
         if (Test-Path (Join-Path $data 'source-install.log')) { Get-Content (Join-Path $data 'source-install.log') -Tail 12 | ForEach-Object { Write-Host $_ } }
@@ -97,6 +99,11 @@ function Run-Installer {
     if ((Get-Content (Join-Path $data 'config.json') -Raw) -ne $script:configBefore) { throw 'Config changed' }
     if (Test-Path "$installed.previous") { throw 'Backup source remains after successful install' }
     if (Test-Path (Join-Path $fixture 'forbidden-pip-target')) { throw 'Host pip configuration escaped the owned environment' }
+    $metadata = Get-Content (Join-Path $data 'installed-version.json') -Raw | ConvertFrom-Json
+    if ($metadata.resolved_commit -ne $commit -or $metadata.version -ne '1.2.0') { throw 'Installed source identity incorrect' }
+    if ($Stable) {
+        if ($metadata.channel -ne 'stable' -or $metadata.PSObject.Properties['source_kind']) { throw 'Stable metadata changed' }
+    } elseif ($metadata.channel -ne 'candidate' -or $metadata.source_kind -ne 'commit' -or $metadata.source_ref -ne $commit) { throw 'Candidate source identity missing' }
     return $r
 }
 function Run-Uninstaller {
@@ -184,7 +191,7 @@ for i,result in enumerate(('win','win','win','loss')): h.record_result(str(i),re
     # preselected test Python discovery, and the OS Desktop path. pip, COM .lnk,
     # stop/swap/rollback/start/readiness/metadata/cleanup remain production code.
     $overrides = @'
-function Resolve-StableCommit { return 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }
+
 function Set-InstallStage {
     param([string]$Name)
     Set-InstallStageReal -Name $Name
@@ -209,6 +216,9 @@ function Wait-AppRuntimeReady {
 }
 function Invoke-WebRequest {
     [CmdletBinding()]param($Uri,$OutFile,$Method,$Headers,[switch]$UseBasicParsing,$TimeoutSec)
+    if ($Uri -in @('https://api.github.com/repos/TullysAC6/ac6-winloss-tracker/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'https://api.github.com/repos/TullysAC6/ac6-winloss-tracker/commits/v1.2.0')) {
+        return [PSCustomObject]@{ Content = '{"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' }
+    }
     if ($Uri -eq 'https://github.com/TullysAC6/ac6-winloss-tracker/archive/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.zip') {
         Copy-Item -LiteralPath $env:AC6_FLOW_ARCHIVE -Destination $OutFile
         return
@@ -226,7 +236,7 @@ function Invoke-WebRequest {
     [IO.File]::WriteAllText((Join-Path $fixture 'install-fixture.ps1'),$installer,$utf8)
     $uninstaller = [IO.File]::ReadAllText((Join-Path $root 'uninstall.ps1')).Replace("[Environment]::GetFolderPath('Desktop')", '$env:AC6_FLOW_DESKTOP').Replace('AC6WinLossTrackerInstaller', $fixtureMutex)
     [IO.File]::WriteAllText((Join-Path $fixture 'uninstall-fixture.ps1'),$uninstaller,$utf8)
-    $first = Run-Installer
+    $first = Run-Installer -Stable
     Check-Report
     Write-Output 'Fresh source install / preserved existing data: PASS'
     $overlayPid = (Get-Content (Join-Path $data '.overlay-runtime.json') -Raw | ConvertFrom-Json).pid
@@ -271,7 +281,7 @@ function Invoke-WebRequest {
     # Hold the real first installer after mutex acquisition. A competing one
     # must fail without even changing the installation log.
     $env:AC6_FLOW_HOLD = '1'
-    $firstInstaller = Start-Process -FilePath $shellPath -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f (Join-Path $fixture 'install-fixture.ps1')) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $fixture 'concurrent-first.log') -RedirectStandardError (Join-Path $fixture 'concurrent-first.err')
+    $firstInstaller = Start-Process -FilePath $shellPath -ArgumentList ('-NoProfile -ExecutionPolicy Bypass -File "{0}" -SourceCommit {1}' -f (Join-Path $fixture 'install-fixture.ps1'), $commit) -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $fixture 'concurrent-first.log') -RedirectStandardError (Join-Path $fixture 'concurrent-first.err')
     # Start-Process releases its handle, so pin one before the process can
     # exit. Without it ExitCode reads back empty and a success looks failed.
     $null = $firstInstaller.Handle
@@ -283,7 +293,7 @@ function Invoke-WebRequest {
             Start-Sleep -Milliseconds 100
         }
         $logHash = (Get-FileHash (Join-Path $data 'source-install.log')).Hash
-        & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') *> (Join-Path $fixture 'concurrent-second.log')
+        & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') -SourceCommit $commit *> (Join-Path $fixture 'concurrent-second.log')
         if ($LASTEXITCODE -eq 0 -or (Get-FileHash (Join-Path $data 'source-install.log')).Hash -ne $logHash) { throw 'Concurrent installer did not fail before mutation' }
         [IO.File]::WriteAllText((Join-Path $fixture 'release'), 'go')
         # The released installer still runs a whole transaction, including
@@ -302,7 +312,7 @@ function Invoke-WebRequest {
     Set-Content -LiteralPath $sentinel -Value 'previous-source'
     $shortcutHash = (Get-FileHash (Join-Path $env:AC6_FLOW_DESKTOP 'AC6 WinLoss Tracker.lnk')).Hash
     $env:AC6_FLOW_FAIL_READY = '1'
-    & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') *> (Join-Path $fixture 'rollback.log')
+    & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') -SourceCommit $commit *> (Join-Path $fixture 'rollback.log')
     if ($LASTEXITCODE -eq 0) { throw 'Injected readiness failure was accepted' }
     $env:AC6_FLOW_FAIL_READY = '0'
     if (-not (Test-Path $sentinel)) { throw 'Previous source not restored' }
@@ -354,7 +364,7 @@ function Invoke-WebRequest {
     try {
         $null = Wait-Healthy
         $env:AC6_FLOW_FAIL_READY = '1'
-        & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') *> (Join-Path $fixture 'legacy-rollback.log')
+        & $shellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $fixture 'install-fixture.ps1') -SourceCommit $commit *> (Join-Path $fixture 'legacy-rollback.log')
         if ($LASTEXITCODE -eq 0) { throw 'Legacy readiness failure was accepted' }
         $env:AC6_FLOW_FAIL_READY = '0'
         if (-not (Test-Path $legacy) -or (Test-Path $installed)) { throw 'Legacy rollback source boundary failed' }

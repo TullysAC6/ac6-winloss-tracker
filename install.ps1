@@ -1,6 +1,9 @@
-﻿[CmdletBinding()]
+﻿[CmdletBinding(DefaultParameterSetName = 'Stable')]
 param(
-    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.2.0'
+    [Parameter(ParameterSetName = 'Stable')]
+    [ValidatePattern('^v\d+\.\d+\.\d+$')][string]$SourceTag = 'v1.2.0',
+    [Parameter(Mandatory = $true, ParameterSetName = 'Candidate')]
+    [ValidatePattern('\A[0-9a-fA-F]{40}\z')][string]$SourceCommit
 )
 
 Set-StrictMode -Version Latest
@@ -11,7 +14,14 @@ $appName = 'AC6 WinLoss Tracker'
 $channel = 'stable'
 $version = '1.2.0'
 $repository = 'TullysAC6/ac6-winloss-tracker'
-$releaseCommitUrl = "https://api.github.com/repos/$repository/commits/$SourceTag"
+$sourceKind = 'tag'
+$sourceRef = $SourceTag
+if ($PSCmdlet.ParameterSetName -eq 'Candidate') {
+    $channel = 'candidate'
+    $sourceKind = 'commit'
+    $sourceRef = $SourceCommit.ToLowerInvariant()
+}
+$releaseCommitUrl = "https://api.github.com/repos/$repository/commits/$sourceRef"
 $resolvedCommit = $null
 $archiveUrl = $null
 $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
@@ -119,7 +129,7 @@ function Get-InstalledRevision {
 }
 
 function Resolve-StableCommit {
-    Write-Step "GitHub Stable $SourceTag の固定リビジョンを確認しています。"
+    Write-Step "GitHub $channel $sourceRef の固定リビジョンを確認しています。"
     try {
         # Exactly one unauthenticated API request is used per installer run.
         $response = Invoke-WebRequest -Uri $releaseCommitUrl -UseBasicParsing -TimeoutSec 15 `
@@ -127,8 +137,11 @@ function Resolve-StableCommit {
             -ErrorAction Stop
         $payload = $response.Content | ConvertFrom-Json
         $sha = [string]$payload.sha
-        if ($sha -notmatch '^[0-9a-fA-F]{40}$') {
+        if ($sha -notmatch '\A[0-9a-fA-F]{40}\z') {
             throw 'GitHubから受信したcommit SHAの形式が正しくありません。現在のTrackerは変更していません。'
+        }
+        if ($sourceKind -eq 'commit' -and $sha -ine $sourceRef) {
+            throw 'GitHub returned a different commit from the requested candidate.'
         }
         return $sha.ToLowerInvariant()
     } catch {
@@ -157,7 +170,7 @@ function Resolve-StableCommit {
             Write-InstallLog "GitHub rate limit: HTTP $statusCode; $detail"
             throw "GitHubの更新確認リクエスト制限に達しています。現在のTrackerは変更していません。しばらく待ってから同じコマンドを再実行してください。`n$detail"
         }
-        throw "GitHub Stable $SourceTag の確認に失敗しました。現在のTrackerは変更していません。インターネット接続とGitHubの状態を確認してください。"
+        throw "GitHub $channel $sourceRef の確認に失敗しました。現在のTrackerは変更していません。インターネット接続とGitHubの状態を確認してください。"
     }
 }
 
@@ -178,7 +191,12 @@ function Write-InstalledMetadata {
         environment_path = $script:activeEnvironment
         base_python_path = [string]$Python.BasePythonPath
         requirements_sha256 = $script:lockHash
-    } | ConvertTo-Json
+    }
+    if ($sourceKind -eq 'commit') {
+        $metadata['source_kind'] = $sourceKind
+        $metadata['source_ref'] = $sourceRef
+    }
+    $metadata = $metadata | ConvertTo-Json
     [System.IO.File]::WriteAllText(
         $temporaryPath, $metadata, (New-Object System.Text.UTF8Encoding($false))
     )
@@ -1190,7 +1208,7 @@ function New-AppShortcut {
         $shortcut.TargetPath = $PythonwPath
         $shortcut.Arguments = '"{0}"' -f $LauncherPath
         $shortcut.WorkingDirectory = $installPath
-        $shortcut.Description = 'AC6 Win/Loss Tracker Stable'
+        $shortcut.Description = if ($channel -eq 'candidate') { 'AC6 Win/Loss Tracker Candidate' } else { 'AC6 Win/Loss Tracker Stable' }
         $script:shortcutChanged = $true
         $shortcut.Save()
     } finally {
@@ -1247,8 +1265,8 @@ try {
     Set-InstallStage -Name 'revision-resolve'
     $resolvedCommit = Resolve-StableCommit
     $archiveUrl = "https://github.com/$repository/archive/$resolvedCommit.zip"
-    Write-InstallLog "resolved Stable tag: $SourceTag"
-    Write-InstallLog "resolved Stable revision: $resolvedCommit"
+    Write-InstallLog "resolved $channel $sourceKind`: $sourceRef"
+    Write-InstallLog "resolved $channel revision: $resolvedCommit"
 
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('AC6WinLossTrackerSource-' + [Guid]::NewGuid().ToString('N'))
     $zipPath = Join-Path $tempRoot 'source.zip'
@@ -1256,7 +1274,7 @@ try {
     New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
 
     Set-InstallStage -Name 'source-download'
-    Write-Step 'GitHubからStableソースをHTTPSで取得し、内容を確認しています。'
+    Write-Step "GitHubから$channel ソースをHTTPSで取得し、内容を確認しています。"
     try {
         Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath -UseBasicParsing -TimeoutSec 60 `
             -Headers @{ 'User-Agent' = 'AC6-WinLoss-Tracker-Installer/1.2.0' }

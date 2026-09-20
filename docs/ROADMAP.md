@@ -63,7 +63,7 @@ The next product task is [#24](https://github.com/TullysAC6/ac6-winloss-tracker/
 - **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed.** Its §42 performance/security baseline item moved to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. The baseline is a reusable development capability, not a T1 concern. #17 and #25 consume it for their own acceptance.
 - **Formal T1 remains available and passing on `main`**: 42/42, 0 skipped, corpus `6cfc4873bd0aa2bd…`.
 - **The T0 TEMP leak is fixed.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` with green `main` CI.
-- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** is **IN PROGRESS — implementation / validation** on the existing branch synchronized to `e214ae0` (PR #31 merged; main CI 35479744429 green). App-owned venv, verified actual-PID spawn, installer transaction and migration tests are under implementation/validation. Acceptance, independent review, T3 and merge remain pending.
+- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** is **IN PROGRESS** in [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40). App-local isolation is implemented; exact-commit candidate installation is being validated to unblock real migration T3. New gates/CI and fresh independent Codex review precede user T3. Not Accepted, Released or merged; no later feature starts.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
