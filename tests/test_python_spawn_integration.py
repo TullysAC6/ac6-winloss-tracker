@@ -22,9 +22,11 @@ def worker(output):
     kernel.GetCurrentProcess.restype = wintypes.HANDLE
     kernel.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
     contained = wintypes.BOOL()
+    # A NULL job handle only proves membership of *some* job, which an ambient
+    # job already satisfies. Containment of the owned job is proven by the
+    # parent, which is the only side holding that job handle.
     assert kernel.IsProcessInJob(kernel.GetCurrentProcess(), None, ctypes.byref(contained))
-    assert contained.value, 'worker entered target before job containment'
-    Path(output).write_text(json.dumps({'pid': os.getpid(), 'job': bool(contained.value)}))
+    Path(output).write_text(json.dumps({'pid': os.getpid(), 'in_any_job': bool(contained.value)}))
 
 
 def probe(output):
@@ -41,12 +43,23 @@ def probe(output):
     job = None
     try:
         job = KillOnCloseJob(child.pid)
+        assert job.handle, 'containment was not installed'
+        # The parent owns a handle to the actual child, so this cannot be
+        # satisfied by a recycled PID, and naming the job handle cannot be
+        # satisfied by an inherited ambient job.
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        kernel.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
+        owned = wintypes.BOOL()
+        queried = kernel.IsProcessInJob(child.sentinel, job.handle, ctypes.byref(owned))
+        assert queried, ctypes.WinError(ctypes.get_last_error())
+        assert owned.value, 'child is not contained by the owned job before native work'
         assert not Path(output + '.worker').exists(), 'worker escaped the readiness barrier'
+        result['worker_in_owned_job'] = bool(owned.value)
         ready.set()
         child.join(10)
         assert child.exitcode == 0
         evidence = json.loads(Path(output + '.worker').read_text())
-        assert evidence['pid'] == child.pid and evidence['job']
+        assert evidence['pid'] == child.pid
         result['worker'] = evidence
     finally:
         if job:
@@ -94,7 +107,7 @@ assert p.poll() is not None
                     env['__PYVENV_LAUNCHER__'] = str(venv / 'Scripts/python.exe')
                     subprocess.run([sys._base_executable, str(parent), str(ROOT), __file__,
                                     str(output), str(int(windowless))], env=env, check=True, timeout=30)
-                    self.assertTrue(json.loads(output.read_text())['worker']['job'])
+                    self.assertTrue(json.loads(output.read_text())['worker_in_owned_job'])
 
 
 if __name__ == '__main__':
