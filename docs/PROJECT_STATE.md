@@ -19,9 +19,9 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | §42 performance/security baseline | Moved out of #14 to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. #17 and #25 consume it for their own acceptance |
 | T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
 | Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0` |
-| Unmerged generations | PR #31 is merged. #24 is the active product generation, based on `e214ae0`; its acceptance and merge are pending. At most two generations |
+| Unmerged generations | PR #31 is merged. **[PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) (#24) is open** at `161e1b2`, based on `e214ae0`. T0/T1/T2 are green on it; independent review, required fixes, affected-gate rerun and real-AC6 T3 remain. At most two generations |
 | Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
-| Next product task | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24): **IN PROGRESS — implementation / validation**. Branch `claude/issue-24-app-local-python`, worktree `ac6-wt-issue24-app-local-python`, synchronized to `e214ae0`. Implementation and migration tests are in progress; independent review and real-AC6 T3 remain required |
+| Next product task | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24): **IN PROGRESS — PR open, awaiting independent review**. [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40), branch `claude/issue-24-app-local-python` at `161e1b2`, based on `e214ae0`. T0 PASS, T1 42/42 0 skipped corpus `6cfc4873bd0aa2bd…` unchanged, T2 lifecycle/migration matrix PASS on Python 3.13 and 3.14. **Not Accepted, not Released** |
 
 ## v1.2.0 published integrity — 2026-09-14
 
@@ -198,14 +198,14 @@ not yet confirmed. The approximate two-month / Friday cadence is never authorita
 
 ## Next actions
 
-1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment. IN PROGRESS — implementation / validation.** PR #31 and its main CI are complete. Continue the existing #24 implementation and run T0 → **T1 (formal, must pass)** → T2 → independent review → fixes → affected gates → T3 → main.
+1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment. IN PROGRESS — [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) open, awaiting independent review.** Implementation is complete and T0 → **T1 (formal, PASS)** → T2 are green on `161e1b2`. Next: independent Codex/Astra review → required fixes → re-run the affected gates → focused real-AC6 T3 → merge. Do not merge before T3.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
 **PR #35 (#14 formal T1 harness) has landed** (2026-09-18, `f9f5f0f`), and **#14 is closed**. Its §42 baseline item belongs to **#37** (OPEN, PLANNED), not to #24.
 
 **PR #38 (test-only T0 TEMP-leak cleanup) has landed** (2026-09-19, `3bd89a3`), with green `main` CI.
 
-PR #31 is merged. #24 is the sole active product generation in this handoff; recheck GitHub before opening or merging a PR. No third generation starts (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
+PR #31 is merged. PR #40 (#24) is the sole active product generation; recheck GitHub before merging it. No third generation starts (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
 
 MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots as historical; this file remains the live position.
 

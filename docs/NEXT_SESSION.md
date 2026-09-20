@@ -63,15 +63,15 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 ## Required order from here
 
-1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — implementation / validation.
-   - Production implementation is underway. Finish migration/rollback tests, then T0 → T1 → T2 → independent review → fixes/affected gates → focused real-AC6 T3. Do not mark Accepted or merge before required evidence.
-   - Use the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree, already synchronized to `e214ae0`. Read and preserve the local diff first; never reset, recreate, or rebase this worktree. Baseline live data and inspect owned processes before resuming tests.
-   - Then T0 → T1 → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
+1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — **[PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) is open at `161e1b2`**, awaiting independent review.
+   - Implementation is complete. T0 PASS, formal T1 42/42 with 0 skipped and corpus `6cfc4873bd0aa2bd…` unchanged, and the full T2 lifecycle/migration matrix PASS, all on Python 3.13 and 3.14.
+   - Next: independent Codex/Astra review → required fixes → **re-run the affected T0–T2 gates afterwards** → focused real-AC6 T3 → merge. Do not mark Accepted or Released, and do not merge before T3.
+   - Keep using the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree. Never reset, recreate or rebase it.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #31 is merged. Continue the existing #24 worktree as the sole active product generation; preserve its local changes and recheck GitHub before opening or merging a PR.
+At most two unmerged generations exist at a time (§4). PR #31 is merged. PR #40 (#24) is the sole active product generation; recheck GitHub before merging it.
 
 ## Order after that — dependency, not preference
 
@@ -92,7 +92,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #31 is merged. Continue the existing #24 worktree as the sole active product generation; preserve its local changes and recheck GitHub before opening or merging a PR.
+At most two unmerged generations exist at a time (§4). PR #31 is merged. PR #40 (#24) is the sole active product generation; recheck GitHub before merging it.
 
 ## What is newly recorded and must not be lost
 
