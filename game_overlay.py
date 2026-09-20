@@ -952,8 +952,10 @@ class GameOverlay:
         if now - self._last_heartbeat_at < HEARTBEAT_SECONDS:
             return
         first_heartbeat = self._last_heartbeat_at == 0.0
+        from python_spawn import launch_nonce
         write_overlay_runtime({
             "pid": os.getpid(),
+            "launch_nonce": launch_nonce(),
             "server_pid": self._server_pid,
             "started_at": self._overlay_started_at,
             "heartbeat_at": now,

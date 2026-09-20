@@ -16,7 +16,9 @@ $resolvedCommit = $null
 $archiveUrl = $null
 $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
 $script:logPath = Join-Path $dataPath 'source-install.log'
-$installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
+$ownedRoot = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTracker'
+$legacyPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
+$installPath = Join-Path $ownedRoot 'app'
 $installParent = Split-Path -Parent $installPath
 $tempRoot = $null
 $python = $null
@@ -33,6 +35,55 @@ $script:shortcutBackupPath = $null
 $script:shortcutExisted = $false
 $script:shortcutChanged = $false
 $script:previousPythonwPath = $null
+$script:previousLauncherPath = $null
+$script:previousRunning = $false
+$script:stopAttempted = $false
+$script:committed = $false
+$script:newEnvironment = $null
+$script:activeEnvironment = $null
+$script:installerMutex = $null
+$script:ownsInstallerMutex = $false
+$script:metadataBackup = $null
+$script:metadataExisted = $false
+$script:metadataCaptured = $false
+$script:rollbackUnsafe = $false
+$script:installNonce = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
+$script:launcherProcess = $null
+
+function Assert-InstallPath {
+    param([string]$Path)
+    $full = [IO.Path]::GetFullPath($Path)
+    $owned = [IO.Path]::GetFullPath($ownedRoot)
+    $legacy = [IO.Path]::GetFullPath($legacyPath)
+    if ($full -ne $owned -and -not $full.StartsWith($owned + '\', [StringComparison]::OrdinalIgnoreCase) -and
+        $full -ne $legacy -and $full -ne "$legacy.previous") { throw 'Unsafe installation path' }
+    $cursor = $full
+    while ($cursor) {
+        if (Test-Path -LiteralPath $cursor) {
+            if ((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw "Installation path traverses a reparse point: $cursor"
+            }
+        }
+        $cursor = Split-Path -Parent $cursor
+    }
+    return $full
+}
+
+function Remove-OwnedInstallPath {
+    param([string]$Path)
+    $full = Assert-InstallPath $Path
+    if (Test-Path -LiteralPath $full) {
+        if (@(Get-ChildItem -LiteralPath $full -Recurse -Force | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw 'Unsafe reparse point inside installation' }
+        Remove-Item -LiteralPath $full -Recurse -Force
+    }
+}
+
+function Enter-InstallerMutex {
+    $script:installerMutex = New-Object Threading.Mutex($false, 'Local\AC6WinLossTrackerInstaller')
+    try { $script:ownsInstallerMutex = $script:installerMutex.WaitOne(0) }
+    catch [Threading.AbandonedMutexException] { $script:ownsInstallerMutex = $true }
+    if (-not $script:ownsInstallerMutex) { throw '[ENV-INSTALL-BUSY] Another installer or uninstaller is running. Retry after it exits.' }
+}
 
 function Write-InstallLog {
     param([Parameter(Mandatory = $true)][string]$Message)
@@ -124,6 +175,9 @@ function Write-InstalledMetadata {
         installed_at = [DateTimeOffset]::UtcNow.ToString('o')
         python_version = [string]$Python.Version
         python_role = [string]$Python.Role
+        environment_path = $script:activeEnvironment
+        base_python_path = [string]$Python.BasePythonPath
+        requirements_sha256 = $script:lockHash
     } | ConvertTo-Json
     [System.IO.File]::WriteAllText(
         $temporaryPath, $metadata, (New-Object System.Text.UTF8Encoding($false))
@@ -205,7 +259,8 @@ function ConvertTo-NativeArgument {
 function Invoke-NativeCommand {
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
-        [string[]]$ArgumentList = @()
+        [string[]]$ArgumentList = @(),
+        [int]$TimeoutSeconds = 300
     )
 
     $nativeArguments = @($ArgumentList | ForEach-Object { ConvertTo-NativeArgument -Argument ([string]$_) })
@@ -224,6 +279,25 @@ function Invoke-NativeCommand {
         $startInfo.CreateNoWindow = $true
         $startInfo.RedirectStandardOutput = $true
         $startInfo.RedirectStandardError = $true
+        foreach ($name in @('PYTHONPATH','PYTHONHOME','PYTHONUSERBASE','PYTHONSTARTUP','PYTHONOPTIMIZE','PYTHONINSPECT','PYTHONEXECUTABLE','PYTHONPLATLIBDIR','__PYVENV_LAUNCHER__','AC6_LAUNCH_NONCE')) {
+            $startInfo.EnvironmentVariables.Remove($name)
+        }
+        $startInfo.EnvironmentVariables['PYTHONUTF8'] = '1'
+        $startInfo.EnvironmentVariables['PYTHONIOENCODING'] = 'utf-8'
+        # --isolated alone still reads global/site pip.ini. Never allow a host
+        # target/prefix/index configuration to redirect the locked install.
+        $startInfo.EnvironmentVariables['PIP_CONFIG_FILE'] = 'nul'
+        # Bypass the Windows redirector so the timeout handle owns Python.
+        $cfgPath = Join-Path (Split-Path -Parent (Split-Path -Parent $FilePath)) 'pyvenv.cfg'
+        if ((Split-Path -Leaf (Split-Path -Parent $FilePath)) -eq 'Scripts' -and (Test-Path -LiteralPath $cfgPath)) {
+            $cfg = Get-Content -LiteralPath $cfgPath -Raw
+            $match = [regex]::Match($cfg, '(?m)^home\s*=\s*(.+)\s*$')
+            if (-not $match.Success) { throw '[ENV-VENV-BROKEN] Missing base Python. Re-run the installer.' }
+            $baseExe = Join-Path $match.Groups[1].Value.Trim() (Split-Path -Leaf $FilePath)
+            if (-not (Test-Path -LiteralPath $baseExe -PathType Leaf)) { throw '[ENV-VENV-BROKEN] Missing base Python. Re-run the installer.' }
+            $startInfo.FileName = $baseExe
+            $startInfo.EnvironmentVariables['__PYVENV_LAUNCHER__'] = $FilePath
+        }
 
         $process = New-Object System.Diagnostics.Process
         $process.StartInfo = $startInfo
@@ -234,7 +308,12 @@ function Invoke-NativeCommand {
         # Read both streams asynchronously so neither pipe can block the process.
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
-        $process.WaitForExit()
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            $process.Kill()
+            [void]$process.WaitForExit(5000)
+            throw "Native command exceeded ${TimeoutSeconds}s"
+        }
+        if (-not $stdoutTask.Wait(5000) -or -not $stderrTask.Wait(5000)) { throw 'Native output pipes did not close' }
         $stdout = $stdoutTask.GetAwaiter().GetResult()
         $stderr = $stderrTask.GetAwaiter().GetResult()
         $nativeExitCode = $process.ExitCode
@@ -632,37 +711,104 @@ function Install-PythonWithWinget {
     }
 }
 
+function Test-AppEnvironment {
+    param([string]$EnvironmentPath, [string]$RequirementsPath)
+    [void](Assert-InstallPath $EnvironmentPath)
+    $envPython = Join-Path $EnvironmentPath 'Scripts\python.exe'
+    $code = @'
+import sys,site,re,json,importlib,importlib.metadata
+from pathlib import Path
+root=Path(sys.argv[1]).resolve()
+assert Path(sys.prefix).resolve()==root and sys.prefix!=sys.base_prefix
+assert site.ENABLE_USER_SITE is False
+assert sys.version_info[:2] in ((3,13),(3,14))
+assert not any('site-packages' in p.lower() and not Path(p).resolve().is_relative_to(root) for p in sys.path)
+modules={'mss':'mss','pillow':'PIL','ttkbootstrap':'ttkbootstrap','windows-capture':'windows_capture','numpy':'numpy','opencv-python':'cv2'}
+for name,version in re.findall(r'^([a-zA-Z0-9_-]+)==([^\s;]+)',Path(sys.argv[2]).read_text(),re.M):
+ assert importlib.metadata.version(name)==version,(name,version)
+ module=importlib.import_module(modules[name.lower()])
+ assert Path(module.__file__).resolve().is_relative_to(root),name
+import tkinter,sqlite3
+print(json.dumps({'prefix':sys.prefix,'base_prefix':sys.base_prefix,'version':sys.version}))
+'@
+    $check = Invoke-NativeCommand -FilePath $envPython -ArgumentList @('-c',$code,$EnvironmentPath,$RequirementsPath)
+    if ($check.ExitCode -ne 0) { throw "[ENV-VENV-BROKEN] Environment verification failed. Re-run the installer. $($check.StdErr)" }
+    $pipCheck = Invoke-NativeCommand -FilePath $envPython -ArgumentList @('-m','pip','--isolated','check')
+    if ($pipCheck.ExitCode -ne 0) { throw '[ENV-DEPENDENCY-MISSING] pip check failed.' }
+    Write-InstallLog "app-local environment verified: $($check.StdOut.Trim())"
+}
+
+function New-AppEnvironment {
+    param($BasePython, [string]$RequirementsPath)
+    $script:lockHash = (Get-FileHash -LiteralPath $RequirementsPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $canonicalEnvironmentPath = Join-Path $ownedRoot ('venv\' + $script:lockHash)
+    $environmentPath = $canonicalEnvironmentPath
+    # A repaired environment has its own final path. Reuse the committed choice
+    # on the next same-lock update instead of rebuilding the canonical folder.
+    try {
+        $installed = Get-Content -LiteralPath (Join-Path $dataPath 'installed-version.json') -Raw | ConvertFrom-Json
+        if ($installed.PSObject.Properties['environment_path'] -and $installed.PSObject.Properties['requirements_sha256'] -and
+            $installed.requirements_sha256 -eq $script:lockHash) {
+            $candidate = [IO.Path]::GetFullPath([string]$installed.environment_path)
+            if ($candidate -eq $canonicalEnvironmentPath -or $candidate -match ('^' + [regex]::Escape($canonicalEnvironmentPath) + '-[0-9a-f]{32}$')) {
+                [void](Assert-InstallPath $candidate)
+                if (Test-Path -LiteralPath $candidate -PathType Container) { $environmentPath = $candidate }
+            }
+        }
+    } catch { Write-InstallLog 'No reusable committed environment choice' }
+    [void](Assert-InstallPath $environmentPath)
+    if (Test-Path -LiteralPath $environmentPath) {
+        try {
+            $marker = Get-Content -LiteralPath (Join-Path $environmentPath '.ac6-environment.json') -Raw | ConvertFrom-Json
+            if ($marker.lock_sha256 -ne $script:lockHash -or $marker.base_python -ne $BasePython.PythonPath) { throw 'Environment identity differs' }
+            Test-AppEnvironment -EnvironmentPath $environmentPath -RequirementsPath $RequirementsPath
+            $script:activeEnvironment = $environmentPath
+            return $environmentPath
+        } catch {
+            # Do not mutate or relocate a potentially active environment. Build
+            # a replacement in its permanent path and retain rollback choice.
+            Write-InstallLog 'Existing environment not reusable; building a separate repair environment'
+            $environmentPath = $canonicalEnvironmentPath + '-' + [Guid]::NewGuid().ToString('N')
+        }
+    }
+    [void](Assert-InstallPath $environmentPath)
+    New-Item -ItemType Directory -Path $environmentPath -ErrorAction Stop | Out-Null
+    $script:newEnvironment = $environmentPath
+    Set-InstallStage -Name 'venv-create'
+    $created = Invoke-NativeCommand -FilePath $BasePython.PythonPath -ArgumentList @('-m','venv',$environmentPath)
+    if ($created.ExitCode -ne 0) { throw "[ENV-VENV-CREATE] App-local environment creation failed. $($created.StdErr)" }
+    Set-InstallStage -Name 'pip-install'
+    Invoke-PipInstall -PythonPath (Join-Path $environmentPath 'Scripts\python.exe') -RequirementsPath $RequirementsPath
+    Set-InstallStage -Name 'venv-verify'
+    Test-AppEnvironment -EnvironmentPath $environmentPath -RequirementsPath $RequirementsPath
+    $marker = @{lock_sha256=$script:lockHash;base_python=$BasePython.PythonPath} | ConvertTo-Json
+    [IO.File]::WriteAllText((Join-Path $environmentPath '.ac6-environment.json'),$marker,(New-Object Text.UTF8Encoding($false)))
+    $script:activeEnvironment = $environmentPath
+    return $environmentPath
+}
+
 function Invoke-PipInstall {
     param(
         [Parameter(Mandatory = $true)][string]$PythonPath,
         [Parameter(Mandatory = $true)][string]$RequirementsPath
     )
 
-    Write-Step 'Python依存ライブラリを確認しています。'
+    [void](Assert-InstallPath $PythonPath)
+    $cfg = Join-Path (Split-Path -Parent (Split-Path -Parent $PythonPath)) 'pyvenv.cfg'
+    if (-not (Test-Path -LiteralPath $cfg -PathType Leaf)) { throw 'Refusing pip outside an app-owned venv' }
+    Write-Step '専用Python環境の依存ライブラリを確認しています。'
     $pipCheck = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-m', 'pip', '--version')
     Write-InstallLog "pip version command: $($pipCheck.Command)"
     Write-InstallLog "pip version exit code: $($pipCheck.ExitCode)"
     Write-InstallLog "pip version stdout:`n$($pipCheck.StdOut)"
     Write-InstallLog "pip version stderr:`n$($pipCheck.StdErr)"
     if ($pipCheck.ExitCode -ne 0) {
-        Write-Host 'pipが見つからないため、Python標準のensurepipを実行します。'
-        $ensureResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @('-m', 'ensurepip', '--upgrade')
-        Write-InstallLog "ensurepip command: $($ensureResult.Command)"
-        Write-InstallLog "ensurepip exit code: $($ensureResult.ExitCode)"
-        Write-InstallLog "ensurepip stdout:`n$($ensureResult.StdOut)"
-        Write-InstallLog "ensurepip stderr:`n$($ensureResult.StdErr)"
-        if (-not [string]::IsNullOrWhiteSpace($ensureResult.StdOut)) {
-            Write-Host $ensureResult.StdOut
-        }
-        if ($ensureResult.ExitCode -ne 0) {
-            Write-InstallLog "pip install result: failed (ensurepip exit code $($ensureResult.ExitCode))"
-            throw '[ENV-DEPENDENCY-MISSING] pipの準備に失敗しました。Pythonを再インストールしてから、もう一度お試しください。'
-        }
+        throw '[ENV-DEPENDENCY-MISSING] The new venv has no pip. Repair base Python and re-run the installer.'
     }
 
     $pipResult = Invoke-NativeCommand -FilePath $PythonPath -ArgumentList @(
-        '-m', 'pip', 'install', '--user', '--no-warn-script-location', '--require-hashes',
-        '--only-binary=:all:', '-r', $RequirementsPath
+        '-m', 'pip', '--isolated', 'install', '--no-warn-script-location', '--require-hashes',
+        '--only-binary=:all:', '--no-deps', '--disable-pip-version-check', '-r', $RequirementsPath
     )
     Write-InstallLog "pip command: $($pipResult.Command)"
     Write-InstallLog "pip exit code: $($pipResult.ExitCode)"
@@ -726,7 +872,7 @@ function Test-TrackerCommandLine {
     if ([string]::IsNullOrWhiteSpace($CommandLine)) {
         return $false
     }
-    $trackerEntryPattern = '(?i){0}[\\/](app\.py|launcher\.pyw|dashboard\.py)(?="|\s|$)' -f [Regex]::Escape($installPath)
+    $trackerEntryPattern = '(?i)(?:{0}|{1})[\\/](app\.py|launcher\.pyw|dashboard\.py)(?="|\s|$)' -f [Regex]::Escape($installPath),[Regex]::Escape($legacyPath)
     return $CommandLine -match $trackerEntryPattern
 }
 
@@ -743,6 +889,7 @@ function Get-TrackerProcesses {
         }
     } catch {
         Write-InstallLog "Tracker process enumeration failed: $($_.Exception.Message)"
+        throw
     }
 
     # A port alone is never trusted. Its owner must pass the same executable
@@ -815,6 +962,25 @@ function Wait-TrackerStopped {
     return $false
 }
 
+function Stop-VerifiedTrackerProcess {
+    param($ProcessInfo)
+    # Pin the process handle before re-reading identity. Kill uses that handle,
+    # never a PID that could have been recycled since enumeration.
+    $process = $null
+    try {
+        $process = [Diagnostics.Process]::GetProcessById([int]$ProcessInfo.ProcessId)
+        $null = $process.Handle
+        $fresh = Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $ProcessInfo.ProcessId)
+        if (-not $fresh -or -not $ProcessInfo.CreationDate -or
+            $fresh.CreationDate -ne $ProcessInfo.CreationDate -or
+            -not (Test-TrackerCommandLine -Name $fresh.Name -CommandLine $fresh.CommandLine)) {
+            throw 'Tracker process identity changed; refusing termination'
+        }
+        if (-not $process.HasExited) { $process.Kill() }
+        if (-not $process.WaitForExit(5000)) { throw 'Tracker process did not exit' }
+    } finally { if ($process) { $process.Dispose() } }
+}
+
 function Stop-RunningTracker {
     $runtimePath = Join-Path $dataPath '.runtime.json'
     $runtime = Get-TrackerRuntime
@@ -833,7 +999,7 @@ function Stop-RunningTracker {
 
     Write-Step '更新のため実行中のアプリを終了しています。'
     $gracefulRequested = $false
-    if ($runtime -and $httpAlive -and -not [string]::IsNullOrWhiteSpace($runtime.Token)) {
+    if ($runtime -and ($trackerProcesses.ProcessId -contains $runtime.Pid) -and $httpAlive -and -not [string]::IsNullOrWhiteSpace($runtime.Token)) {
         try {
             $headers = @{ 'X-Control-Token' = [string]$runtime.Token }
             $shutdownResponse = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/api/system/shutdown" -f $runtime.Port) -Method Post -Headers $headers -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
@@ -857,7 +1023,7 @@ function Stop-RunningTracker {
         $processId = [int]$processInfo.ProcessId
         Write-InstallLog "fallback stopping Tracker PID ${processId}: $($processInfo.CommandLine)"
         try {
-            Stop-Process -Id $processId -Force -ErrorAction Stop
+            Stop-VerifiedTrackerProcess -ProcessInfo $processInfo
         } catch {
             Write-InstallLog "fallback stop failed for Tracker PID ${processId}: $($_.Exception.Message)"
         }
@@ -873,9 +1039,11 @@ function Stop-RunningTracker {
 function Install-SourceTree {
     param([Parameter(Mandatory = $true)][string]$SourcePath)
 
+    [void](Assert-InstallPath $installPath)
+    [void](Assert-InstallPath $script:backupPath)
     New-Item -ItemType Directory -Path $installParent -Force | Out-Null
     if (Test-Path -LiteralPath $script:backupPath) {
-        Remove-Item -LiteralPath $script:backupPath -Recurse -Force
+        throw 'Previous transaction backup exists. Preserve it and repair the installation before retrying.'
     }
 
     $script:hadPreviousInstall = Test-Path -LiteralPath $installPath
@@ -884,26 +1052,39 @@ function Install-SourceTree {
     }
 
     try {
-        Move-Item -LiteralPath $SourcePath -Destination $installPath
+        # Move across volumes may leave a partial destination before failing.
+        # Register rollback ownership before the first destination mutation.
         $script:sourceSwapped = $true
+        Move-Item -LiteralPath $SourcePath -Destination $installPath
     } catch {
-        if ($script:hadPreviousInstall -and -not (Test-Path -LiteralPath $installPath) -and (Test-Path -LiteralPath $script:backupPath)) {
-            Move-Item -LiteralPath $script:backupPath -Destination $installPath
+        try { Restore-PreviousSource } catch {
+            $script:rollbackUnsafe = $true
+            throw
         }
         throw
     }
 }
 
 function Complete-SourceInstall {
-    if (Test-Path -LiteralPath $script:backupPath) {
-        Remove-Item -LiteralPath $script:backupPath -Recurse -Force
-    }
+    # Metadata is durable and readiness passed. Cleanup cannot roll back a
+    # committed installation after a previous tree has been partly removed.
+    $script:committed = $true
     $script:sourceSwapped = $false
+    foreach ($path in @($script:backupPath,$legacyPath,"$legacyPath.previous")) {
+        try { Remove-OwnedInstallPath $path } catch { Write-InstallLog "post-commit cleanup deferred: $path" }
+    }
+    foreach ($envDir in @(Get-ChildItem -LiteralPath (Join-Path $ownedRoot 'venv') -Directory)) {
+        if ($envDir.FullName -ne $script:activeEnvironment -and (Test-Path -LiteralPath (Join-Path $envDir.FullName '.ac6-environment.json'))) {
+            try { Remove-OwnedInstallPath $envDir.FullName } catch { Write-InstallLog "old environment cleanup deferred: $($envDir.FullName)" }
+        }
+    }
 }
 
 function Restore-PreviousSource {
     if (-not $script:sourceSwapped) { return }
     Write-InstallLog 'transaction rollback started'
+    [void](Assert-InstallPath $installPath)
+    [void](Assert-InstallPath $script:backupPath)
     if (Test-Path -LiteralPath $installPath) {
         Remove-Item -LiteralPath $installPath -Recurse -Force
     }
@@ -927,6 +1108,10 @@ function Wait-AppRuntimeReady {
                 $runtime = Get-Content -LiteralPath $runtimePath -Raw -ErrorAction Stop | ConvertFrom-Json
                 $runtimePid = [int]$runtime.pid
                 $runtimePort = [int]$runtime.port
+                if (-not $runtime.PSObject.Properties['install_nonce'] -or $runtime.install_nonce -cne $script:installNonce) {
+                    Start-Sleep -Milliseconds 100
+                    continue
+                }
                 if ($runtimePid -gt 0 -and $runtimePort -ge 1 -and $runtimePort -le 65535) {
                     $runtimeProcess = Get-Process -Id $runtimePid -ErrorAction Stop
                     if ($runtimeProcess -and -not $runtimeProcess.HasExited) {
@@ -1006,8 +1191,8 @@ function New-AppShortcut {
         $shortcut.Arguments = '"{0}"' -f $LauncherPath
         $shortcut.WorkingDirectory = $installPath
         $shortcut.Description = 'AC6 Win/Loss Tracker Stable'
-        $shortcut.Save()
         $script:shortcutChanged = $true
+        $shortcut.Save()
     } finally {
         if ($shortcut) {
             [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shortcut)
@@ -1015,6 +1200,30 @@ function New-AppShortcut {
         [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell)
     }
     return $shortcutPath
+}
+
+function Start-TrackerLauncher {
+    param([string]$PythonwPath, [string]$LauncherPath)
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = $PythonwPath
+    $info.Arguments = '"{0}"' -f $LauncherPath
+    $info.WorkingDirectory = Split-Path -Parent $LauncherPath
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    foreach ($name in @('PYTHONPATH','PYTHONHOME','PYTHONUSERBASE','PYTHONSTARTUP','PYTHONOPTIMIZE','PYTHONINSPECT','PYTHONEXECUTABLE','PYTHONPLATLIBDIR','__PYVENV_LAUNCHER__','AC6_LAUNCH_NONCE')) { $info.EnvironmentVariables.Remove($name) }
+    $info.EnvironmentVariables['AC6_INSTALL_NONCE'] = $script:installNonce
+    $info.EnvironmentVariables['PYTHONUTF8'] = '1'
+    $info.EnvironmentVariables['PYTHONIOENCODING'] = 'utf-8'
+    $cfgPath = Join-Path (Split-Path -Parent (Split-Path -Parent $PythonwPath)) 'pyvenv.cfg'
+    if ((Split-Path -Leaf (Split-Path -Parent $PythonwPath)) -eq 'Scripts' -and (Test-Path -LiteralPath $cfgPath)) {
+        $cfg = Get-Content -LiteralPath $cfgPath -Raw
+        $match = [regex]::Match($cfg, '(?m)^home\s*=\s*(.+)\s*$')
+        if (-not $match.Success) { throw '[ENV-VENV-BROKEN] Re-run the installer to repair base Python.' }
+        $info.FileName = Join-Path $match.Groups[1].Value.Trim() 'pythonw.exe'
+        if (-not (Test-Path -LiteralPath $info.FileName)) { throw '[ENV-VENV-BROKEN] Re-run the installer to repair base Python.' }
+        $info.EnvironmentVariables['__PYVENV_LAUNCHER__'] = $PythonwPath
+    }
+    return [Diagnostics.Process]::Start($info)
 }
 
 try {
@@ -1025,6 +1234,9 @@ try {
         throw 'WindowsのLOCALAPPDATAフォルダーを確認できませんでした。Windowsへサインインし直してからお試しください。'
     }
 
+    Enter-InstallerMutex
+    [void](Assert-InstallPath $ownedRoot)
+    [void](Assert-InstallPath $legacyPath)
     New-Item -ItemType Directory -Path $dataPath -Force | Out-Null
     Write-InstallLog '------------------------------------------------------------'
     Write-InstallLog "Installer channel: $channel"
@@ -1062,7 +1274,7 @@ try {
         throw '取得したZIPの内容を確認できませんでした。現在のTrackerは変更していません。'
     }
     $sourceRoot = Get-Item -LiteralPath $expectedSourceRoot
-    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'requirements.lock', 'uninstall.ps1')) {
+    foreach ($requiredFile in @('app.py', 'app_paths.py', 'launcher.pyw', 'dashboard.py', 'python_spawn.py', 'requirements.lock', 'uninstall.ps1')) {
         if (-not (Test-Path -LiteralPath (Join-Path $sourceRoot.FullName $requiredFile) -PathType Leaf)) {
             throw "取得したZIPに必要なファイル $requiredFile がありません。現在のTrackerは変更していません。"
         }
@@ -1107,8 +1319,8 @@ try {
     Write-InstallLog "selected Python free-threaded: $($python.FreeThreaded)"
     Write-InstallLog "selected Python architecture: $($python.Architecture)"
 
-    Set-InstallStage -Name 'pip-install'
-    Invoke-PipInstall -PythonPath $python.PythonPath -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.lock')
+    Set-InstallStage -Name 'venv-prepare'
+    $environmentPath = New-AppEnvironment -BasePython $python -RequirementsPath (Join-Path $sourceRoot.FullName 'requirements.lock')
     Set-InstallStage -Name 'python-verification'
     $confirmedPython = Find-SupportedPython
     if (-not $confirmedPython -or
@@ -1118,12 +1330,31 @@ try {
         $confirmedPython.Role -ne $python.Role) {
         throw '[ENV-PYTHON-UNSUPPORTED] 依存確認後にselected Python Runtimeの完全性を再確認できませんでした。現在のTrackerは変更していません。'
     }
-    $python = $confirmedPython
+    $python = [PSCustomObject]@{
+        PythonPath=(Join-Path $environmentPath 'Scripts\python.exe')
+        PythonwPath=(Join-Path $environmentPath 'Scripts\pythonw.exe')
+        BasePythonPath=$confirmedPython.PythonPath
+        Version=$confirmedPython.Version
+        Role=$confirmedPython.Role
+    }
     Write-InstallLog 'selected Python post-dependency validation: success'
     Backup-AppShortcut
+    $metadataPath = Join-Path $dataPath 'installed-version.json'
+    $script:metadataBackup = Join-Path $tempRoot 'installed-version.previous.json'
+    $script:metadataExisted = Test-Path -LiteralPath $metadataPath
+    if ($script:metadataExisted) { Copy-Item -LiteralPath $metadataPath -Destination $script:metadataBackup }
+    $script:metadataCaptured = $true
+    $script:previousRunning = @(Get-TrackerProcesses).Count -gt 0
+    $script:previousLauncherPath = if (Test-Path -LiteralPath (Join-Path $installPath 'launcher.pyw')) {
+        Join-Path $installPath 'launcher.pyw'
+    } else { Join-Path $legacyPath 'launcher.pyw' }
+    if ($script:previousRunning -and (-not $script:previousPythonwPath -or -not (Test-Path -LiteralPath $script:previousPythonwPath))) {
+        throw 'Cannot prove the previous running environment. Restore its shortcut before updating.'
+    }
 
-    if (Test-Path -LiteralPath $installPath -PathType Container) {
+    if ((Test-Path -LiteralPath $installPath -PathType Container) -or (Test-Path -LiteralPath $legacyPath -PathType Container)) {
         Set-InstallStage -Name 'stop-running-app'
+        $script:stopAttempted = $true
         Stop-RunningTracker
     }
 
@@ -1154,14 +1385,16 @@ try {
     Set-InstallStage -Name 'launch'
     Write-Step 'ショートカットと同じ方法でアプリを起動しています。'
     $launcherArguments = '"{0}"' -f $launcherPath
-    Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments -WorkingDirectory $installPath | Out-Null
+    $script:launcherProcess = Start-TrackerLauncher -PythonwPath $python.PythonwPath -LauncherPath $launcherPath
     if (-not (Wait-AppRuntimeReady -TimeoutSeconds 15)) {
         throw 'アプリの起動を確認できませんでした。startup.logを確認してください。'
     }
 
     Write-InstallLog 'application launch result: success'
+    Set-InstallStage -Name 'metadata'
     Write-InstalledMetadata -Commit $resolvedCommit -Python $python
     Write-InstallLog "installed revision: $resolvedCommit"
+    Set-InstallStage -Name 'commit'
     Complete-SourceInstall
     Write-Host "`nセットアップが完了しました。" -ForegroundColor Green
     Write-Host "デスクトップの「AC6 WinLoss Tracker」から次回以降も起動できます。"
@@ -1169,35 +1402,42 @@ try {
 } catch {
     $exitCode = 1
     $errorRecord = $_
-    if ($script:sourceSwapped) {
+    if ($script:sourceSwapped -and -not $script:committed) {
         try {
             Stop-RunningTracker
         } catch {
             try { Write-InstallLog "rollback shutdown warning: $($_.Exception.Message)" } catch {}
+            $script:rollbackUnsafe = $true
         }
-        try {
-            Restore-PreviousSource
-        } catch {
-            try { Write-InstallLog "source rollback failed: $($_.Exception.Message)" } catch {}
+        if (-not $script:rollbackUnsafe) {
+            try { Restore-PreviousSource } catch {
+                $script:rollbackUnsafe = $true
+                try { Write-InstallLog "source rollback failed: $($_.Exception.Message)" } catch {}
+            }
         }
         try {
             Restore-AppShortcut
         } catch {
             try { Write-InstallLog "shortcut rollback failed: $($_.Exception.Message)" } catch {}
         }
-        try {
-            if ($script:hadPreviousInstall -and $python -and (Test-Path -LiteralPath (Join-Path $installPath 'launcher.pyw'))) {
-                $previousLauncher = Join-Path $installPath 'launcher.pyw'
-                $rollbackPythonw = if ($script:previousPythonwPath -and (Test-Path -LiteralPath $script:previousPythonwPath -PathType Leaf)) { $script:previousPythonwPath } else { $python.PythonwPath }
-                Start-Process -FilePath $rollbackPythonw -ArgumentList ('"{0}"' -f $previousLauncher) -WorkingDirectory $installPath | Out-Null
-                Write-InstallLog 'transaction rollback restarted previous source'
-            }
-        } catch {
-            try { Write-InstallLog "transaction rollback restart failed: $($_.Exception.Message)" } catch {}
-        }
     } elseif ($script:shortcutChanged) {
         try { Restore-AppShortcut } catch {
             try { Write-InstallLog "shortcut rollback failed: $($_.Exception.Message)" } catch {}
+        }
+    }
+    if ($script:metadataCaptured -and -not $script:committed -and -not $script:rollbackUnsafe) {
+        try {
+            $metadataPath = Join-Path $dataPath 'installed-version.json'
+            if ($script:metadataExisted) { Copy-Item -LiteralPath $script:metadataBackup -Destination $metadataPath -Force }
+            elseif (Test-Path -LiteralPath $metadataPath) { Remove-Item -LiteralPath $metadataPath -Force }
+            if ($script:stopAttempted -and $script:previousRunning -and (Test-Path -LiteralPath $script:previousLauncherPath)) {
+                $restoredLauncher = Start-TrackerLauncher -PythonwPath $script:previousPythonwPath -LauncherPath $script:previousLauncherPath
+                $restoredLauncher.Dispose()
+                Write-InstallLog 'transaction rollback restarted previous environment and source'
+            }
+        } catch {
+            $script:rollbackUnsafe = $true
+            try { Write-InstallLog "rollback restore failed: $($_.Exception.Message)" } catch {}
         }
     }
     $friendlyMessage = [string]$errorRecord.Exception.Message
@@ -1205,7 +1445,7 @@ try {
         $friendlyMessage = 'セットアップ中に問題が発生しました。インターネット接続を確認して、もう一度お試しください。'
     }
     try {
-        if (Test-Path -LiteralPath $dataPath) {
+        if ($script:ownsInstallerMutex -and (Test-Path -LiteralPath $dataPath)) {
             Write-InstallLog "stage: $script:currentStage"
             Write-InstallLog "exception type: $($errorRecord.Exception.GetType().FullName)"
             Write-InstallLog "message: $friendlyMessage"
@@ -1219,8 +1459,26 @@ try {
     Write-Host $friendlyMessage -ForegroundColor Red
     Write-Host '問題が続く場合は、source-install.logを添えて報告してください。' -ForegroundColor Yellow
 } finally {
-    if ($tempRoot -and (Test-Path -LiteralPath $tempRoot)) {
+    try {
+    if ($script:launcherProcess) {
+        if (-not $script:committed -and -not $script:launcherProcess.HasExited) {
+            $script:launcherProcess.Kill()
+            [void]$script:launcherProcess.WaitForExit(5000)
+        }
+        $script:launcherProcess.Dispose()
+    }
+    if ($script:newEnvironment -and -not $script:committed -and -not $script:rollbackUnsafe) {
+        try { Remove-OwnedInstallPath $script:newEnvironment } catch { Write-Warning 'Incomplete environment retained for inspection.' }
+    }
+    if ($script:rollbackUnsafe) { Write-Warning "Rollback needs repair; source/environment and transaction evidence retained at $tempRoot" }
+    if ($tempRoot -and -not $script:rollbackUnsafe -and (Test-Path -LiteralPath $tempRoot)) {
+        $expectedTemp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+        if (-not ([IO.Path]::GetFullPath($tempRoot)).StartsWith($expectedTemp, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe temporary root' }
         Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    } finally {
+        if ($script:ownsInstallerMutex) { $script:installerMutex.ReleaseMutex() }
+        if ($script:installerMutex) { $script:installerMutex.Dispose() }
     }
 }
 

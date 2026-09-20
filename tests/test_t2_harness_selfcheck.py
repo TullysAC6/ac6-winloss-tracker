@@ -44,6 +44,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from python_spawn import spawn_python
 
 _spec = importlib.util.spec_from_file_location(
     "t2_harness", ROOT / "tests" / "t2_settings_analytics_e2e.py")
@@ -151,8 +152,10 @@ class GateCase(unittest.TestCase):
     # without a console, reports its pid, and exits once told to.
     FAMILY = (
         "import pathlib, subprocess, sys, time\n"
+        f"sys.path.insert(0, {str(ROOT)!r})\n"
+        "from python_spawn import spawn_python\n"
         "work = pathlib.Path(sys.argv[1])\n"
-        "grandchild = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'],\n"
+        "grandchild = spawn_python(['-c', 'import time; time.sleep(60)'],\n"
         "                              creationflags=getattr(subprocess, 'DETACHED_PROCESS', 0))\n"
         "(work / 'grandchild.tmp').write_text(str(grandchild.pid))\n"
         "(work / 'grandchild.tmp').replace(work / 'grandchild.pid')\n"
@@ -235,7 +238,7 @@ class GateCase(unittest.TestCase):
 
     def spawn_bounded(self, code, extra=(), baseline=None):
         """A real child that exits on its own, and is reaped whatever happens."""
-        child = subprocess.Popen([sys.executable, "-c", code, *extra], creationflags=NO_CONSOLE)
+        child = spawn_python(["-c", code, *extra], creationflags=NO_CONSOLE)
         self.addCleanup(self.reap, child)
         child.pinned = self.identify(child.pid, baseline) if os.name == "nt" else None
         deadline = time.monotonic() + 10

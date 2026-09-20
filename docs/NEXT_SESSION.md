@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-19 JST
+Last updated: 2026-09-20 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -8,7 +8,7 @@ Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE
 
 ```text
 Issue #6
-→ docs/MASTER_REQUIREMENTS.md   (Revision 4; canonical on main when PR #31 merges)
+→ docs/MASTER_REQUIREMENTS.md   (Revision 4; canonical on main since PR #31 merged as e214ae0)
 → docs/PROJECT_STATE.md         (where the project actually is)
 → docs/NEXT_SESSION.md          (this file)
 → docs/ROADMAP.md
@@ -35,8 +35,8 @@ Issue #6
   - Focused real-AC6 T3 PASS on the exact head `38a21c2` on 2026-09-13 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/5#issuecomment-5653677193)). `main` CI is green.
   - #8 and #9 are closed as completed.
   - v1.1.1 does **not** contain PR #5; v1.2.0 is the first release containing its settings and analytics.
-- PR #13 merged Revision 3. PR #31 adds Revision 4 / §65, preserving manual-first Season catalog refresh, local cache, retrospective assignment, unresolved transitions and full multi-season reconciliation. Revision 4 becomes canonical on main at PR #31 merge; no Season runtime feature is implemented.
-- PR #31 was reconciled against `4cdb730` (PR #39), whose [main CI 35368297347](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35368297347) is green. Resolve current main and require exact-main CI before #24 implementation.
+- PR #13 merged Revision 3. PR #31 adds Revision 4 / §65, preserving manual-first Season catalog refresh, local cache, retrospective assignment, unresolved transitions and full multi-season reconciliation. Revision 4 is canonical on main after PR #31 merged as `e214ae0`; no Season runtime feature is implemented.
+- PR #31 merged as `e214ae0` after independent review GO. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) is green. Its reconciliation and merge are complete; do not redo them.
 - MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is in progress.
 
 ## The rule that cost a release — do not lose it
@@ -63,15 +63,15 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 ## Required order from here
 
-1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — design / implementation preparation.
-   - Production implementation starts after PR #31 merges and exact-main CI is green.
-   - Sync the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree (start base `4cdb730`) with the new main using fast-forward or merge, never rebase. Verify ownership and a clean worktree first.
+1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — implementation / validation.
+   - Production implementation is underway. Finish migration/rollback tests, then T0 → T1 → T2 → independent review → fixes/affected gates → focused real-AC6 T3. Do not mark Accepted or merge before required evidence.
+   - Use the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree, already synchronized to `e214ae0`. Read and preserve the local diff first; never reset, recreate, or rebase this worktree. Baseline live data and inspect owned processes before resuming tests.
    - Then T0 → T1 → T2 → PR handoff (§40) → independent review → required fixes → re-run the affected gates → T3 → merge.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #31 is the only open PR at reconciliation; #24 is prepared with no production commits. Merge #31 first, then continue #24 as the sole active generation.
+At most two unmerged generations exist at a time (§4). PR #31 is merged. Continue the existing #24 worktree as the sole active product generation; preserve its local changes and recheck GitHub before opening or merging a PR.
 
 ## Order after that — dependency, not preference
 
@@ -92,7 +92,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #31 is the only open PR at reconciliation; #24 is prepared with no production commits. Merge #31 first, then continue #24 as the sole active generation.
+At most two unmerged generations exist at a time (§4). PR #31 is merged. Continue the existing #24 worktree as the sole active product generation; preserve its local changes and recheck GitHub before opening or merging a PR.
 
 ## What is newly recorded and must not be lost
 

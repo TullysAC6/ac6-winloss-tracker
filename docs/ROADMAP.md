@@ -63,7 +63,7 @@ The next product task is [#24](https://github.com/TullysAC6/ac6-winloss-tracker/
 - **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed.** Its §42 performance/security baseline item moved to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. The baseline is a reusable development capability, not a T1 concern. #17 and #25 consume it for their own acceptance.
 - **Formal T1 remains available and passing on `main`**: 42/42, 0 skipped, corpus `6cfc4873bd0aa2bd…`.
 - **The T0 TEMP leak is fixed.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` with green `main` CI.
-- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** is **IN PROGRESS — design / implementation preparation** from `4cdb730` (PR #39; main CI 35368297347 green). PR #31 is the only open PR. Merge its Revision 4 reconciliation first, require green main CI, then sync the prepared #24 branch and implement.
+- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** is **IN PROGRESS — implementation / validation** on the existing branch synchronized to `e214ae0` (PR #31 merged; main CI 35479744429 green). App-owned venv, verified actual-PID spawn, installer transaction and migration tests are under implementation/validation. Acceptance, independent review, T3 and merge remain pending.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -144,7 +144,7 @@ corrected.
 Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
 **PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14;
 and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-18.
-Revision 4 / §65 is delivered by PR #31 and becomes canonical on main at its merge. Its manual-first Season requirements are not runtime implementation.
+Revision 4 / §65 was merged in PR #31 as `e214ae0`; exact-main CI 35479744429 passed. Its manual-first Season requirements are not runtime implementation.
 From the current position:
 
 ```text
@@ -255,7 +255,7 @@ shipped application feature.
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
 | Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
-| Dedicated venv isolation | **IN PROGRESS — design / implementation preparation** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35) and #14 is closed. Released v1.2.0 still installs into the user's shared Python environment |
+| Dedicated venv isolation | **IN PROGRESS — implementation / validation** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35) and #14 is closed. Released v1.2.0 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -529,7 +529,7 @@ Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Dedicated venv isolation | **IN PROGRESS — design / implementation preparation** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
+| Dedicated venv isolation | **IN PROGRESS — implementation / validation** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
 | Support for CUSTOM MATCH / RANK MATCH: TEAM | **PLANNED — moved to Phase 7A** | No longer deferred. Revision 2 requires TEAM and CUSTOM to be recorded as normal matches. The README statement stays accurate for the *shipped* release until 7A passes acceptance |
 | Patch / version awareness (`game_version`, `parts_master_version`, `recognition_version`, `analytics_version`) | PLANNED | Leaves room for before/after balance-patch comparison. Existing data is not back-filled with a guessed version |
 | Localisation beyond Japanese | BACKLOG | |

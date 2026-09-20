@@ -75,3 +75,57 @@ $pip = $installer.IndexOf('Invoke-PipInstall', $runtimeCheck)
 $shutdown = $installer.IndexOf('Stop-RunningTracker', $pip)
 if ($signatureCheck -lt 0 -or $runtimeCheck -le $signatureCheck -or $pip -le $runtimeCheck -or $shutdown -le $pip) { throw 'Installer validation/shutdown ordering is unsafe' }
 Write-Host 'Simple Python selection and installer safety ordering: OK'
+
+# Exercise the actual filesystem transaction without launching or downloading.
+foreach ($name in @('Assert-InstallPath','Remove-OwnedInstallPath','Install-SourceTree','Restore-PreviousSource')) {
+    $functionAst = $ast.Find({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
+    Invoke-Expression $functionAst.Extent.Text
+}
+function Write-InstallLog { param($Message) }
+$contractRoot = Join-Path ([IO.Path]::GetTempPath()) ('ac6-install-contract-' + [guid]::NewGuid().ToString('N'))
+$contractRoot = [IO.Path]::GetFullPath($contractRoot)
+if (-not $contractRoot.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()), [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe test root' }
+try {
+    $ownedRoot = Join-Path $contractRoot 'Programs\AC6WinLossTracker'
+    $legacyPath = Join-Path $contractRoot 'Programs\AC6WinLossTrackerSource'
+    $installPath = Join-Path $ownedRoot 'app'
+    $installParent = $ownedRoot
+    $script:backupPath = "$installPath.previous"
+    $script:sourceSwapped = $false
+    New-Item -ItemType Directory -Path $installPath -Force | Out-Null
+    Set-Content (Join-Path $installPath 'sentinel') 'old'
+    foreach ($bad in @($contractRoot,($ownedRoot + '-similar'),(Join-Path $ownedRoot '..\other'))) {
+        $refused = $false
+        try { Remove-OwnedInstallPath $bad } catch { $refused = $true }
+        if (-not $refused -or -not (Test-Path (Join-Path $installPath 'sentinel'))) { throw 'Path ownership guard failed' }
+    }
+    $failed = $false
+    try { Install-SourceTree -SourcePath (Join-Path $contractRoot 'missing-source') } catch { $failed = $true }
+    if (-not $failed -or -not (Test-Path (Join-Path $installPath 'sentinel')) -or (Test-Path $script:backupPath)) { throw 'Failure after old-tree rename lost original source' }
+    $source = Join-Path $contractRoot 'new-source'
+    New-Item -ItemType Directory -Path $source | Out-Null
+    Set-Content (Join-Path $source 'new') 'new'
+    Install-SourceTree -SourcePath $source
+    if (-not $script:sourceSwapped -or -not (Test-Path (Join-Path $script:backupPath 'sentinel'))) { throw 'Swap did not retain rollback source' }
+    Restore-PreviousSource
+    if ($script:sourceSwapped -or -not (Test-Path (Join-Path $installPath 'sentinel')) -or (Test-Path (Join-Path $installPath 'new'))) { throw 'Source rollback failed' }
+    # A cross-volume move can create only part of the new tree before failing.
+    # Inject that condition after the old tree has actually been renamed.
+    function Move-Item {
+        param($LiteralPath,$Destination)
+        if ($LiteralPath -eq $source) {
+            New-Item -ItemType Directory -Path $Destination | Out-Null
+            Set-Content (Join-Path $Destination 'partial') 'partial'
+            throw 'Injected partial move'
+        }
+        Microsoft.PowerShell.Management\Move-Item -LiteralPath $LiteralPath -Destination $Destination
+    }
+    $failed = $false
+    try { Install-SourceTree -SourcePath $source } catch { $failed = $true }
+    finally { Remove-Item Function:\Move-Item }
+    if (-not $failed -or -not (Test-Path (Join-Path $installPath 'sentinel')) -or (Test-Path $script:backupPath) -or (Test-Path (Join-Path $installPath 'partial'))) { throw 'Partial move did not restore original source' }
+    Write-Host 'Installer path guards / failure after rename / source rollback: OK'
+} finally {
+    if (Test-Path -LiteralPath $contractRoot) { Remove-Item -LiteralPath $contractRoot -Recurse -Force }
+}
+if (Test-Path -LiteralPath $contractRoot) { throw 'Installer test TEMP residue' }

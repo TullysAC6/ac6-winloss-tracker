@@ -7,7 +7,11 @@ $ProgressPreference = 'SilentlyContinue'
 
 $appName = 'AC6 WinLoss Tracker'
 $dataPath = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
-$installPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
+$ownedRoot = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTracker'
+$legacyPath = Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'
+$installPath = Join-Path $ownedRoot 'app'
+$installerMutex = $null
+$ownsInstallerMutex = $false
 $runtimePath = Join-Path $dataPath '.runtime.json'
 $logPath = Join-Path $dataPath 'source-uninstall.log'
 $runtimeFileNames = @(
@@ -47,7 +51,7 @@ function Get-TrackerRuntime {
 function Test-TrackerCommandLine {
     param([string]$Name, [string]$CommandLine)
     if ($Name -notmatch '(?i)^pythonw?\.exe$' -or [string]::IsNullOrWhiteSpace($CommandLine)) { return $false }
-    $entry = '(?i){0}[\\/](app\.py|launcher\.pyw|dashboard\.py)(?="|\s|$)' -f [Regex]::Escape($installPath)
+    $entry = '(?i)(?:{0}|{1})[\\/](app\.py|launcher\.pyw|dashboard\.py)(?="|\s|$)' -f [Regex]::Escape($installPath),[Regex]::Escape($legacyPath)
     return $CommandLine -match $entry
 }
 
@@ -61,6 +65,7 @@ function Get-TrackerProcesses {
         }
     } catch {
         Write-UninstallLog "Tracker process enumeration failed: $($_.Exception.Message)"
+        throw
     }
     return @($found.Values)
 }
@@ -87,6 +92,25 @@ function Wait-TrackerStopped {
     return $false
 }
 
+function Stop-VerifiedTrackerProcess {
+    param($ProcessInfo)
+    # Pin the process handle before re-reading identity. Kill uses that handle,
+    # never a PID that could have been recycled since enumeration.
+    $process = $null
+    try {
+        $process = [Diagnostics.Process]::GetProcessById([int]$ProcessInfo.ProcessId)
+        $null = $process.Handle
+        $fresh = Get-CimInstance Win32_Process -Filter ("ProcessId={0}" -f $ProcessInfo.ProcessId)
+        if (-not $fresh -or -not $ProcessInfo.CreationDate -or
+            $fresh.CreationDate -ne $ProcessInfo.CreationDate -or
+            -not (Test-TrackerCommandLine -Name $fresh.Name -CommandLine $fresh.CommandLine)) {
+            throw 'Tracker process identity changed; refusing termination'
+        }
+        if (-not $process.HasExited) { $process.Kill() }
+        if (-not $process.WaitForExit(5000)) { throw 'Tracker process did not exit' }
+    } finally { if ($process) { $process.Dispose() } }
+}
+
 function Stop-TrackerSafely {
     $runtime = Get-TrackerRuntime
     $port = if ($runtime) { [int]$runtime.Port } else { 0 }
@@ -107,7 +131,7 @@ function Stop-TrackerSafely {
     # entry point inside the exact Tracker installation directory.
     foreach ($processInfo in @(Get-TrackerProcesses)) {
         try {
-            Stop-Process -Id ([int]$processInfo.ProcessId) -Force -ErrorAction Stop
+            Stop-VerifiedTrackerProcess -ProcessInfo $processInfo
             Write-UninstallLog "Tracker-only fallback stopped PID $($processInfo.ProcessId)"
         } catch {
             Write-UninstallLog "Tracker fallback stop failed for PID $($processInfo.ProcessId): $($_.Exception.Message)"
@@ -161,15 +185,35 @@ function Remove-TrackerShortcut {
 }
 
 function Remove-TrackerSource {
-    $expected = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'))
+    $expected = [System.IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTracker\app'))
     $actual = [System.IO.Path]::GetFullPath($installPath)
     if ($actual -ne $expected) { throw 'アプリのインストール先を安全に確認できないため、削除を中止しました。' }
-    if (Test-Path -LiteralPath $actual -PathType Container) { Remove-Item -LiteralPath $actual -Recurse -Force }
-    $previous = "$actual.previous"
-    if (Test-Path -LiteralPath $previous -PathType Container) { Remove-Item -LiteralPath $previous -Recurse -Force }
+    $expectedRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTracker'))
+    $expectedLegacy = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'Programs\AC6WinLossTrackerSource'))
+    if ([IO.Path]::GetFullPath($ownedRoot) -ne $expectedRoot -or [IO.Path]::GetFullPath($legacyPath) -ne $expectedLegacy) { throw 'Unsafe owned root' }
+    $targets = @($expectedRoot,$expectedLegacy,"$expectedLegacy.previous")
+    # Validate every target before deleting any. Never follow a junction into
+    # another application's files, even when its lexical path looks owned.
+    foreach ($target in $targets) {
+        $cursor = $target
+        while ($cursor) {
+            if ((Test-Path -LiteralPath $cursor) -and ((Get-Item -LiteralPath $cursor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unsafe reparse-point installation' }
+            $cursor = Split-Path -Parent $cursor
+        }
+        if (Test-Path -LiteralPath $target) {
+            if (@(Get-ChildItem -LiteralPath $target -Recurse -Force | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) { throw 'Unsafe reparse point inside installation' }
+        }
+    }
+    foreach ($target in $targets) {
+        if (Test-Path -LiteralPath $target -PathType Container) { Remove-Item -LiteralPath $target -Recurse -Force }
+    }
 }
 
 try {
+    $installerMutex = New-Object Threading.Mutex($false, 'Local\AC6WinLossTrackerInstaller')
+    try { $ownsInstallerMutex = $installerMutex.WaitOne(0) }
+    catch [Threading.AbandonedMutexException] { $ownsInstallerMutex = $true }
+    if (-not $ownsInstallerMutex) { throw '[ENV-INSTALL-BUSY] Another installer or uninstaller is running.' }
     Write-Host "[$appName] アンインストールを開始します。" -ForegroundColor Cyan
     Write-UninstallLog "uninstall started; remove user data=$RemoveUserData"
     $stoppedPort = Stop-TrackerSafely
@@ -190,8 +234,11 @@ try {
     Write-Host 'Pythonは削除していません。'
     exit 0
 } catch {
-    try { Write-UninstallLog "ERROR: $($_.Exception.Message)" } catch {}
+    if ($ownsInstallerMutex) { try { Write-UninstallLog "ERROR: $($_.Exception.Message)" } catch {} }
     Write-Host "`nアンインストールを完了できませんでした。" -ForegroundColor Red
     Write-Host $_.Exception.Message
     exit 1
+} finally {
+    if ($ownsInstallerMutex) { $installerMutex.ReleaseMutex() }
+    if ($installerMutex) { $installerMutex.Dispose() }
 }

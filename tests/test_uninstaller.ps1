@@ -23,7 +23,9 @@ $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('ac6-uninstall-test-' +
 try {
     $env:LOCALAPPDATA = $testRoot
     $dataPath = Join-Path $testRoot 'AC6WinLossTracker'
-    $installPath = Join-Path $testRoot 'Programs\AC6WinLossTrackerSource'
+    $ownedRoot = Join-Path $testRoot 'Programs\AC6WinLossTracker'
+    $legacyPath = Join-Path $testRoot 'Programs\AC6WinLossTrackerSource'
+    $installPath = Join-Path $ownedRoot 'app'
     $runtimeFileNames = @('.runtime.json', '.runtime.json.tmp', '.overlay-runtime.json', '.overlay-runtime.json.tmp', '.dashboard-runtime.json', '.dashboard-runtime.json.tmp')
     New-Item -ItemType Directory -Path $installPath -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dataPath 'diagnostics') -Force | Out-Null
@@ -32,6 +34,7 @@ try {
     Set-Content -LiteralPath (Join-Path $dataPath '.overlay-runtime.json.4242.tmp') -Value '{}'
     Set-Content -LiteralPath (Join-Path $installPath 'app.py') -Value '# fixture'
     New-Item -ItemType Directory -Path "$installPath.previous" -Force | Out-Null
+    New-Item -ItemType Directory -Path $legacyPath,"$legacyPath.previous",(Join-Path $ownedRoot 'venv\fixture') -Force | Out-Null
 
     if (-not (Test-TrackerCommandLine 'python.exe' ('"C:\Python314\python.exe" "' + $installPath + '\app.py"'))) { throw 'owned app process rejected' }
     if (-not (Test-TrackerCommandLine 'pythonw.exe' ('"C:\Python314\pythonw.exe" "' + $installPath + '\dashboard.py"'))) { throw 'owned dashboard process rejected' }
@@ -42,9 +45,16 @@ try {
     Remove-TrackerRuntimeFiles
     foreach ($name in $runtimeFileNames) { if (Test-Path -LiteralPath (Join-Path $dataPath $name)) { throw "runtime file remains: $name" } }
     if (Test-Path -LiteralPath (Join-Path $dataPath '.overlay-runtime.json.4242.tmp')) { throw 'PID-qualified overlay runtime tmp remains' }
+    $savedRoot = $ownedRoot
+    $ownedRoot = Join-Path $testRoot 'unrelated'
+    $refused = $false
+    try { Remove-TrackerSource } catch { $refused = $true }
+    $ownedRoot = $savedRoot
+    if (-not $refused -or -not (Test-Path $installPath)) { throw 'Uninstaller root equality guard failed' }
     Remove-TrackerSource
     if (Test-Path -LiteralPath $installPath) { throw 'application source remains' }
     if (Test-Path -LiteralPath "$installPath.previous") { throw 'previous application source remains' }
+    if ((Test-Path -LiteralPath $ownedRoot) -or (Test-Path -LiteralPath $legacyPath)) { throw 'owned environment or legacy source remains' }
     foreach ($name in @('history.db', 'config.json', 'stats.json', 'diagnostics')) { if (-not (Test-Path -LiteralPath (Join-Path $dataPath $name))) { throw "user data removed: $name" } }
 
     New-Item -ItemType Directory -Path $installPath -Force | Out-Null
@@ -73,7 +83,7 @@ function Get-TrackerRuntime { [PSCustomObject]@{ Pid=4242; Port=8765; Token='uni
 function Get-TrackerProcesses { if ($script:mockRunning) { @([PSCustomObject]@{ ProcessId=4242 }) } else { @() } }
 function Invoke-WebRequest { param($Uri, $Method, $Headers, [switch]$UseBasicParsing, $TimeoutSec, $ErrorAction); if ($Headers['X-Control-Token'] -ne 'unit-test-token') { throw 'missing token' }; $script:mockRunning=$false }
 function Wait-TrackerStopped { return -not $script:mockRunning }
-function Stop-Process { param($Id, [switch]$Force, $ErrorAction); $script:fallbackCalls++ }
+function Stop-VerifiedTrackerProcess { param($ProcessInfo); $script:fallbackCalls++ }
 function Write-UninstallLog { param($Message) }
 if ((Stop-TrackerSafely) -ne 8765 -or $script:fallbackCalls -ne 0) { throw 'graceful running-Tracker shutdown failed' }
 
@@ -82,12 +92,12 @@ $script:mockRunning = $true
 $script:waitCalls = 0
 function Invoke-WebRequest { throw 'mock graceful failure' }
 function Wait-TrackerStopped { $script:waitCalls++; return $script:waitCalls -ge 2 }
-function Stop-Process { param($Id, [switch]$Force, $ErrorAction); if ($Id -ne 4242) { throw 'unrelated process targeted' }; $script:fallbackCalls++; $script:mockRunning=$false }
+function Stop-VerifiedTrackerProcess { param($ProcessInfo); if ($ProcessInfo.ProcessId -ne 4242) { throw 'unrelated process targeted' }; $script:fallbackCalls++; $script:mockRunning=$false }
 [void](Stop-TrackerSafely)
 if ($script:fallbackCalls -ne 1) { throw 'Tracker-only fallback was not used exactly once' }
 
 $source = Get-Content -LiteralPath $uninstallerPath -Raw
-foreach ($required in @('X-Control-Token', '/api/system/shutdown', '/health', '/stats', 'Stop-Process', 'AC6 WinLoss Tracker.lnk', 'Confirm-UserDataRemoval', "-ceq 'YES'", 'RemoveUserData')) {
+foreach ($required in @('X-Control-Token', '/api/system/shutdown', '/health', '/stats', 'Stop-VerifiedTrackerProcess', 'AC6 WinLoss Tracker.lnk', 'Confirm-UserDataRemoval', "-ceq 'YES'", 'RemoveUserData')) {
     if (-not $source.Contains($required)) { throw "Uninstaller safety behavior missing: $required" }
 }
 if ($source -match '(?i)winget\s+uninstall|Python\.Python.*uninstall') { throw 'Uninstaller must not remove Python' }

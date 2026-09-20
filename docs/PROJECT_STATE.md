@@ -1,8 +1,8 @@
 # Project state
 
-Last updated: 2026-09-19 JST
+Last updated: 2026-09-20 JST
 
-Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main when PR #31 merges) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
+Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
@@ -11,17 +11,17 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | Item | State |
 |---|---|
 | Public stable | **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4` |
-| `main` | Reconciliation base `4cdb730` (PR #39), after PR #38 `3bd89a3` and PR #35 `f9f5f0f`. [Base main CI 35368297347](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35368297347) green. PR #31 advances main; resolve `origin/main` for the current SHA |
+| `main` | PR #31 merged as `e214ae0c4d045743bb7b20edb1319460ae4ec230`. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) SUCCESS. Resolve `origin/main` again before merge |
 | Accepted runtime | PR #5 at `38a21c2`, merged as `a042b18`, now shipped in v1.2.0. Earlier runtime `93d5a57` shipped in v1.1.0 and v1.1.1. **PR #35 and PR #38 do not change it** |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Settings / analytics generation | **PR #5: Implemented + Accepted + merged to `main`** (`a042b18`, 2026-09-13). Focused real-AC6 T3 PASS on the exact head `38a21c2`. **Released in v1.2.0**; not part of v1.1.1 |
 | Test-harness generation | **PR #35 (#14): Implemented + Accepted + merged to `main`** (`f9f5f0f`, 2026-09-18). Test infrastructure only; production runtime unchanged, so it carries no release payload. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed** (2026-09-19) |
 | §42 performance/security baseline | Moved out of #14 to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. #17 and #25 consume it for their own acceptance |
 | T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
-| Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 becomes canonical on main at its merge |
-| Unmerged generations | PR #31 is the only open PR at reconciliation. #24 has an implementation-preparation branch with no production commits. Merge #31 first, then sync #24 with main. At most two generations |
+| Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0` |
+| Unmerged generations | PR #31 is merged. #24 is the active product generation, based on `e214ae0`; its acceptance and merge are pending. At most two generations |
 | Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
-| Next product task | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24): **IN PROGRESS — design / implementation preparation**. Branch `claude/issue-24-app-local-python`, start base `4cdb730`; production implementation follows PR #31 merge and green main CI |
+| Next product task | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24): **IN PROGRESS — implementation / validation**. Branch `claude/issue-24-app-local-python`, worktree `ac6-wt-issue24-app-local-python`, synchronized to `e214ae0`. Implementation and migration tests are in progress; independent review and real-AC6 T3 remain required |
 
 ## v1.2.0 published integrity — 2026-09-14
 
@@ -177,7 +177,7 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 
 | Area | Requirement | Issue | Status |
 |---|---|---|---|
-| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is a known hazard with unmerged historical evidence on `fix/venv-launcher-ownership` and `release/v1.1.0-venv` | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **IN PROGRESS — design / implementation preparation**; not Implemented / Accepted / Released |
+| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is a known hazard with unmerged historical evidence on `fix/venv-launcher-ownership` and `release/v1.1.0-venv` | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **IN PROGRESS — implementation / validation**; not Implemented / Accepted / Released |
 | UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | PLANNED, UI-0 is documentation only |
 | Tray / Launcher | A process-architecture change, not visual polish. Last phase, own issue and own PR. Not implemented unless its lifecycle safety can be demonstrated | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | BACKLOG |
 | Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
@@ -198,14 +198,14 @@ not yet confirmed. The approximate two-month / Friday cadence is never authorita
 
 ## Next actions
 
-1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment. IN PROGRESS — design / implementation preparation.** Merge PR #31 and require green main CI, then fast-forward or merge main into the existing #24 branch (no rebase). Implement and run T0 → **T1 (formal, must pass)** → T2 → independent review → fixes → affected gates → T3 → main.
+1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment. IN PROGRESS — implementation / validation.** PR #31 and its main CI are complete. Continue the existing #24 implementation and run T0 → **T1 (formal, must pass)** → T2 → independent review → fixes → affected gates → T3 → main.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
 **PR #35 (#14 formal T1 harness) has landed** (2026-09-18, `f9f5f0f`), and **#14 is closed**. Its §42 baseline item belongs to **#37** (OPEN, PLANNED), not to #24.
 
 **PR #38 (test-only T0 TEMP-leak cleanup) has landed** (2026-09-19, `3bd89a3`), with green `main` CI.
 
-PR #31 is the only open PR at reconciliation; #24 is the prepared product generation. After #31 merges, #24 is the only active generation. No third generation starts (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
+PR #31 is merged. #24 is the sole active product generation in this handoff; recheck GitHub before opening or merging a PR. No third generation starts (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
 
 MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots as historical; this file remains the live position.
 

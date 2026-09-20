@@ -6,17 +6,18 @@ import time
 import traceback
 
 from app_paths import DISPLAY_NAME
+from python_spawn import spawn_python
 
 
 def _launch_overlay():
     if getattr(sys, "frozen", False):
-        cmd = [sys.executable, "--overlay"]
+        cmd = ["--overlay"]
     else:
-        cmd = [sys.executable, __file__, "--overlay"]
+        cmd = [__file__, "--overlay"]
     flags = 0
     if sys.platform == "win32":
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    process = subprocess.Popen(cmd, creationflags=flags)
+    process = spawn_python(cmd, creationflags=flags)
     print(f"[lifecycle] overlay command: {cmd!r}")
     print(f"[lifecycle] overlay PID: {process.pid}")
     return process
@@ -72,6 +73,7 @@ def main():
         def launch_overlay_after_ownership():
             nonlocal overlay
             overlay = _launch_overlay()
+            server.owned_overlay = overlay
             time.sleep(0.25)
             if overlay.poll() is not None:
                 print(f"[lifecycle] overlay exited during startup: PID {overlay.pid}, exit {overlay.returncode}")
