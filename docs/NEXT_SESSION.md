@@ -63,9 +63,11 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 ## Required order from here
 
-1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — **[PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) is open at `161e1b2`**, awaiting independent review.
-   - Implementation is complete. T0 PASS, formal T1 42/42 with 0 skipped and corpus `6cfc4873bd0aa2bd…` unchanged, and the full T2 lifecycle/migration matrix PASS, all on Python 3.13 and 3.14.
-   - Next: independent Codex/Astra review → required fixes → **re-run the affected T0–T2 gates afterwards** → focused real-AC6 T3 → merge. Do not mark Accepted or Released, and do not merge before T3.
+1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — **[PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) is open on `claude/issue-24-app-local-python`; resolve the current head on GitHub.** Independent review is complete and its fixes are applied.
+   - Implementation is complete. T0 PASS, formal T1 42/42 with 0 skipped and corpus `6cfc4873bd0aa2bd…` unchanged, and the full T2 lifecycle/migration matrix PASS, all on Python 3.13 and 3.14. That pre-review evidence was produced on implementation commit `161e1b2`; documentation-only commits since did not alter the tested implementation.
+   - The review required one test-only fix: the new containment test proved membership of *any* job rather than of the job the parent owns, so it could not fail. Repaired and re-verified by mutation on review-fix commit `c5f0767`, passing on Python 3.13 and 3.14. No production defect was found and no production file changed.
+   - The review was performed by Claude Code as a one-time exception the user authorised for PR #40 only. MASTER_REQUIREMENTS §40 still names Codex/Astra as the independent reviewer and is deliberately unchanged; this is not a policy change.
+   - Next: focused real-AC6 T3 → merge. Do not mark Accepted or Released, and do not merge before T3.
    - Keep using the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree. Never reset, recreate or rebase it.
 2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
 
