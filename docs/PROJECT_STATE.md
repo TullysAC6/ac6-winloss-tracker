@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-20 JST
+Last updated: 2026-09-21 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
@@ -11,17 +11,17 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | Item | State |
 |---|---|
 | Public stable | **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4` |
-| `main` | PR #31 merged as `e214ae0c4d045743bb7b20edb1319460ae4ec230`. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) SUCCESS. Resolve `origin/main` again before merge |
-| Accepted runtime | PR #5 at `38a21c2`, merged as `a042b18`, now shipped in v1.2.0. Earlier runtime `93d5a57` shipped in v1.1.0 and v1.1.1. **PR #35 and PR #38 do not change it** |
+| `main` product baseline | PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) SUCCESS. Resolve `origin/main` again before later work |
+| Accepted runtime | PR #40 exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`, merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; **accepted but not released**. Public stable v1.2.0 still contains the earlier PR #5 runtime (`38a21c2`, merged as `a042b18`) |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Settings / analytics generation | **PR #5: Implemented + Accepted + merged to `main`** (`a042b18`, 2026-09-13). Focused real-AC6 T3 PASS on the exact head `38a21c2`. **Released in v1.2.0**; not part of v1.1.1 |
 | Test-harness generation | **PR #35 (#14): Implemented + Accepted + merged to `main`** (`f9f5f0f`, 2026-09-18). Test infrastructure only; production runtime unchanged, so it carries no release payload. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed** (2026-09-19) |
 | §42 performance/security baseline | Moved out of #14 to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. #17 and #25 consume it for their own acceptance |
 | T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
 | Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0` |
-| Unmerged generations | PR #31 is merged. **[PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) (#24) is the sole open product generation**, on `claude/issue-24-app-local-python`, based on `e214ae0`; resolve the current head on GitHub. At most two generations |
+| Unmerged generations | **No product generation is active.** [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) is merged. The post-merge bookkeeping PR is documentation-only and starts from the new `main` |
 | Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
-| Next product task | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24): **IN PROGRESS — exact-commit T3 install support implemented in PR #40**. The original T0/T1/T2 and Claude review are historical evidence, not approval of this new installer change. Local T0 (3.13/3.14 + PowerShell), T1 (both: 42/42, skip 0, unchanged corpus), full T2 and candidate installer matrix (3.13) PASS. Final-head CI supplies the full 3.13/3.14 matrix; a fresh independent Codex review follows. Resolve the latest gate/review record on PR #40 before user T3. **Not Accepted, not Released, not merged** |
+| Current position | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is **ACCEPTED — UNRELEASED**. UI-0 is next in the roadmap, but has not started; this bookkeeping does not authorize or begin it |
 
 ## v1.2.0 published integrity — 2026-09-14
 
@@ -41,7 +41,7 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 
 Both checksum sidecars match. On PowerShell 7 and Windows PowerShell 5.1, the public tag README's unmodified install and uninstall one-liners passed their hash gates, selected only `/releases/tags/v1.2.0`, verified the public assets and reached the stubbed installer/uninstaller boundary with tag `v1.2.0`. Actual installer child execution was disabled: no live installation, history, config, Desktop, port 8765 or Tracker process was modified, and smoke TEMP was empty after each command.
 
-v1.1.1 is superseded by v1.2.0; all published tags and Releases remain immutable. The historical v1.1.0 distribution defect and v1.1.1 repair remain documented below. Future #14 / #24 work has not started in this release task.
+v1.1.1 is superseded by v1.2.0; all published tags and Releases remain immutable. The historical v1.1.0 distribution defect and v1.1.1 repair remain documented below. #14 / #24 were not part of this release task; their later states are recorded separately.
 
 ## Release history and the v1.1.0 → v1.1.1 distinction
 
@@ -146,6 +146,28 @@ PR #5 (*Known limitations*) lists the known residuals; none of them blocks:
 - the missing recovery hint for a corrupt `pending-history.json`
 - the two meanings of `matches`
 
+## Implemented, accepted and merged — PR #40 (#24 app-local Python environment)
+
+| | |
+|---|---|
+| Implemented | **yes**, on exact candidate `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`. The Tracker now owns an app-local environment and supports verified exact-commit candidate installation and migration from the legacy shared-Python layout |
+| Reviewed | **yes**. Fresh independent Codex Sol review: GO, Critical 0 / High 0 / Medium 0 / Low 0 ([PR record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40#issuecomment-5755487286), [issue record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24#issuecomment-5755487353)) |
+| Accepted | **yes**. Real-machine T3 PASS on the exact candidate ([PR evidence](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40#issuecomment-5755833997), [issue evidence](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24#issuecomment-5755833964)) |
+| Merged | `main` as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; the merge preserves exact tested head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) SUCCESS |
+| Released | **no**. Public stable v1.2.0 does not contain #24 |
+
+Acceptance evidence:
+
+- T0, formal T1, full T2, lifecycle and candidate-installer matrices passed before T3; exact-head CI was green.
+- The T3 installer was 72,457 bytes with SHA-256 `623FD96A3CD4965151392BA06DD77AA4588A83ACE912EEEE45408C794E462AF2`; downloaded raw bytes matched the committed/raw hash and installation exited 0.
+- Migration from stable v1.2.0 preserved 246 logical history rows (172 wins / 74 losses / 0 draws) and the exact `config.json` hash. The legacy source was removed only after success, and the shortcut moved to the app-owned `pythonw` and launcher.
+- Four real candidate-session matches were recorded once with distinct event IDs. The scripted pair changed 248 / 173 W / 75 L to 249 / 174 W / 75 L, then 250 / 174 W / 76 L.
+- Health, HTTP, overlay and port ownership passed. Normal shutdown, shortcut relaunch, and final shutdown left zero Tracker processes, port listeners, runtime files and named mutexes.
+- The Effect Screenshot milestone was not naturally reached because the best streak was 1. No history or statistics were manipulated; this was allowed by the approved T3 plan.
+- One earlier cleanup check ran before the user selected **Trackerを終了**. After normal exit was requested, lifecycle cleanup passed; this was operator sequencing, not a product failure.
+
+Known non-blocking residuals remain bounded: shared user-site packages are deliberately not deleted; removal of the shared base Python can invalidate a venv and is detected; a post-commit cleanup failure is deferred rather than corrupting the committed install; and rare native process timing remains covered by bounded ownership and cleanup checks.
+
 ## Implemented, accepted and merged — PR #35 (#14 formal T1 harness)
 
 | | |
@@ -177,7 +199,7 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 
 | Area | Requirement | Issue | Status |
 |---|---|---|---|
-| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is a known hazard with unmerged historical evidence on `fix/venv-launcher-ownership` and `release/v1.1.0-venv` | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **IN PROGRESS — implementation / validation**; not Implemented / Accepted / Released |
+| Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is covered by automated and real-machine lifecycle evidence | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **ACCEPTED — UNRELEASED**; PR #40 merged, but v1.2.0 does not contain it |
 | UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | PLANNED, UI-0 is documentation only |
 | Tray / Launcher | A process-architecture change, not visual polish. Last phase, own issue and own PR. Not implemented unless its lifecycle safety can be demonstrated | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | BACKLOG |
 | Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
@@ -198,14 +220,14 @@ not yet confirmed. The approximate two-month / Friday cadence is never authorita
 
 ## Next actions
 
-1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment. IN PROGRESS — [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) open; independent review complete, review fixes applied.** T0/T1/T2 pre-review evidence was produced on implementation commit `161e1b2`; subsequent documentation-only commits did not alter that tested implementation. The independent review's focused containment re-test passed on Python 3.13 and 3.14 on review-fix commit `c5f0767`. The review was performed by Claude Code as a one-time exception the user authorised for PR #40 only; §40 continues to name Codex/Astra as the independent reviewer and is unchanged. Next: focused real-AC6 T3 → merge. Do not merge before T3.
-2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment: ACCEPTED — UNRELEASED.** Fresh independent Codex Sol review gave GO with zero findings; real-machine T3 passed on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`; PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; exact-main CI 35564747847 passed.
+2. UI-0 is next in **Sequencing** in [ROADMAP.md](ROADMAP.md), but is not started by this bookkeeping change.
 
 **PR #35 (#14 formal T1 harness) has landed** (2026-09-18, `f9f5f0f`), and **#14 is closed**. Its §42 baseline item belongs to **#37** (OPEN, PLANNED), not to #24.
 
 **PR #38 (test-only T0 TEMP-leak cleanup) has landed** (2026-09-19, `3bd89a3`), with green `main` CI.
 
-PR #31 is merged. PR #40 (#24) is the sole active product generation; recheck GitHub before merging it. No third generation starts (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
+PR #40 is merged. No product generation is active; the post-merge bookkeeping PR is documentation-only. No new roadmap feature starts as part of this work (§4). The L-A / L-B harness follow-ups remain recorded, not scheduled.
 
 MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots as historical; this file remains the live position.
 
@@ -214,7 +236,7 @@ MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
 ```text
-#24 → UI-0 → UI-1A → UI-1B → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
+UI-0 → UI-1A → UI-1B → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
    → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 

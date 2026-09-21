@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-20 JST
+Last updated: 2026-09-21 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -37,7 +37,7 @@ Issue #6
   - v1.1.1 does **not** contain PR #5; v1.2.0 is the first release containing its settings and analytics.
 - PR #13 merged Revision 3. PR #31 adds Revision 4 / §65, preserving manual-first Season catalog refresh, local cache, retrospective assignment, unresolved transitions and full multi-season reconciliation. Revision 4 is canonical on main after PR #31 merged as `e214ae0`; no Season runtime feature is implemented.
 - PR #31 merged as `e214ae0` after independent review GO. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) is green. Its reconciliation and merge are complete; do not redo them.
-- MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is in progress.
+- MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is accepted and merged but unreleased.
 
 ## The rule that cost a release — do not lose it
 
@@ -63,29 +63,26 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 ## Required order from here
 
-1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment.** IN PROGRESS — **[PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) is open on `claude/issue-24-app-local-python`; resolve the current head on GitHub.** The original review fixes are applied; exact-commit T3 install support is now being validated in the same PR.
-   - Implementation is complete. T0 PASS, formal T1 42/42 with 0 skipped and corpus `6cfc4873bd0aa2bd…` unchanged, and the full T2 lifecycle/migration matrix PASS, all on Python 3.13 and 3.14. That pre-review evidence was produced on implementation commit `161e1b2`; documentation-only commits since did not alter the tested implementation.
-   - The review required one test-only fix: the new containment test proved membership of *any* job rather than of the job the parent owns, so it could not fail. Repaired and re-verified by mutation on review-fix commit `c5f0767`, passing on Python 3.13 and 3.14. No production defect was found and no production file changed.
-   - The review was performed by Claude Code as a one-time exception the user authorised for PR #40 only. MASTER_REQUIREMENTS §40 still names Codex/Astra as the independent reviewer and is deliberately unchanged; this is not a policy change.
-   - T3 preparation exposed a real blocker: the public bootstrap and stable tag interface cannot install an unmerged PR head. `install.ps1 -SourceCommit <40-hex-SHA>` now selects an explicit candidate channel, verifies the exact commit returned by the official repository API and enters the same installer transaction. Stable defaults, bootstrap, public README commands and the dependency lock are unchanged.
-   - This production installer change invalidates the earlier GO for the final candidate. Next: focused tests → full T0/T1/T2 (including PowerShell T0 and the installer matrix on 3.13/3.14) → exact-head CI → **fresh independent Codex review, explicitly authorized by the user** → required fixes and affected gate reruns → user T3. Resolve current evidence on PR #40; do not infer GO from the historical review below.
-   - Only after final review GO, freeze the full PR head, hash the committed `install.ps1` Git blob, verify the public raw bytes have that hash, and give the user the verified script with `-SourceCommit` set to the same SHA. No moving refs, bootstrap edit, manual file copy or fake Release.
-   - T3 checks real legacy migration, preserved historical results/configuration, one real WIN and one LOSE counted once, Overlay, normal close and relaunch. A screenshot is checked if its existing milestone occurs naturally; no manufactured results or forced win streak. Startup intentionally resets the session, so history preservation is a logical-data check, not byte equality of a running DB/stats file. Do not mark Accepted or Released, and do not merge before user T3.
-   - Keep using the existing `claude/issue-24-app-local-python` branch / `ac6-wt-issue24-app-local-python` worktree. Never reset, recreate or rebase it.
-2. Then the **Sequencing** order in [ROADMAP.md](ROADMAP.md).
+1. **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment: ACCEPTED — UNRELEASED.**
+   - Exact accepted candidate: `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`.
+   - Fresh independent Codex Sol review: GO, Critical 0 / High 0 / Medium 0 / Low 0.
+   - Real-machine T3: PASS, including legacy migration and data preservation, one measured WIN and one measured LOSE counted once, overlay health, normal shutdown, shortcut relaunch, and final lifecycle cleanup. The Effect Screenshot milestone did not occur naturally and was not manufactured.
+   - [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`, preserving the exact tested head. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) passed.
+   - **Not Released:** public stable v1.2.0 does not contain #24.
+2. UI-0 is next in the **Sequencing** order in [ROADMAP.md](ROADMAP.md), but it has not started and must not be inferred from this bookkeeping.
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #31 is merged. PR #40 (#24) is the sole active product generation; recheck GitHub before merging it.
+At most two unmerged generations exist at a time (§4). PR #40 is merged. No product generation is active; the post-merge bookkeeping PR is documentation-only.
 
 ## Order after that — dependency, not preference
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.2.0, PR #13, PR #5 and PR #35 are done; PR #5 is accepted, merged and released in v1.2.0, and PR #35 (#14 formal T1) is accepted and merged. From here:
+v1.2.0, PR #13, PR #5, PR #35 and PR #40 are complete at their recorded states. PR #40 / #24 is accepted and merged, but not released. From here:
 
 ```text
-#24 → UI-0 → UI-1A → UI-1B
+UI-0 → UI-1A → UI-1B
 → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12 → UI-3B
 → #16-B → #18 → #27 → UI-4
 ```
@@ -97,7 +94,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #31 is merged. PR #40 (#24) is the sole active product generation; recheck GitHub before merging it.
+At most two unmerged generations exist at a time (§4). PR #40 is merged. No product generation is active; this post-merge bookkeeping is documentation-only.
 
 ## What is newly recorded and must not be lost
 
