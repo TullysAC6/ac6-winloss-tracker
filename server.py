@@ -108,12 +108,18 @@ class StartupEnvironmentError(RuntimeError):
         super().__init__(f"[{self.code}] {self.description} {self.action}")
 
 
+owned_overlay = None
+
+
 def write_runtime_file(port):
+    from python_spawn import launch_nonce
     payload = {
         "port": int(port),
         "token": CONTROL_TOKEN,
         "pid": os.getpid(),
         "started_at": time.time(),
+        "launch_nonce": launch_nonce(),
+        "install_nonce": os.environ.get('AC6_INSTALL_NONCE', ''),
     }
     tmp = RUNTIME_PATH.with_name(".runtime.json.tmp")
     with tmp.open("w", encoding="utf-8") as f:
@@ -157,6 +163,7 @@ def process_is_alive(pid):
 
 
 def lifecycle_health(now=None):
+    from python_spawn import matches_launch
     now = time.time() if now is None else float(now)
     detector_health = detector_snapshot()
     detector_status = str(detector_health.get("status", "error"))
@@ -173,6 +180,7 @@ def lifecycle_health(now=None):
             and server_pid == os.getpid()
             and heartbeat_age <= OVERLAY_HEARTBEAT_MAX_AGE
             and process_is_alive(overlay_pid)
+            and (owned_overlay is None or matches_launch(raw, owned_overlay))
         )
         overlay = {
             "ok": overlay_ok, "pid": overlay_pid, "state": state,

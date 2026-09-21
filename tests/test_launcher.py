@@ -76,7 +76,8 @@ FAKE_SERVER = textwrap.dedent(
                 self.end_headers()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": "test-token"}
+    runtime = {"pid": os.getpid(), "port": server.server_address[1], "token": "test-token",
+               "launch_nonce": os.environ.get('AC6_LAUNCH_NONCE')}
     (data / ".runtime.json").write_text(json.dumps(runtime), encoding="utf-8")
     server.serve_forever()
     server.server_close()
@@ -140,13 +141,29 @@ with tempfile.TemporaryDirectory() as temporary:
                 """
                 import json, os, time
                 from pathlib import Path
+                import threading
+                from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+                class Handler(BaseHTTPRequestHandler):
+                    def do_GET(self):
+                        self.send_response(200)
+                        self.end_headers()
+                        self.wfile.write(b'{"ok": true}')
+                    def log_message(self, *args): pass
+                server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+                threading.Thread(target=server.serve_forever, daemon=True).start()
                 path = Path(os.environ["LOCALAPPDATA"]) / "AC6WinLossTracker" / ".dashboard-runtime.json"
+                runtime_path = path.with_name('.runtime.json')
+                runtime_path.write_text(json.dumps({'pid':os.getpid(),'port':server.server_address[1]}), encoding='utf-8')
                 path.write_text(json.dumps({
-                    "pid": os.getpid(), "server_pid": os.getppid(),
+                    "pid": os.getpid(), "server_pid": os.getpid(),
                     "heartbeat_at": time.time(), "hwnd": 123,
+                    "launch_nonce": os.environ.get('AC6_LAUNCH_NONCE'),
                 }), encoding="utf-8")
                 time.sleep(0.5)
                 path.unlink(missing_ok=True)
+                runtime_path.unlink(missing_ok=True)
+                server.shutdown()
+                server.server_close()
                 """
             ),
             encoding="utf-8",
@@ -216,7 +233,7 @@ installer = (ROOT / "install.ps1").read_text(encoding="utf-8")
 assert "$shortcut.TargetPath = $PythonwPath" in installer
 assert "$shortcut.Arguments = '\"{0}\"' -f $LauncherPath" in installer
 assert "New-AppShortcut -PythonwPath $python.PythonwPath -LauncherPath $launcherPath" in installer
-assert "Start-Process -FilePath $python.PythonwPath -ArgumentList $launcherArguments" in installer
+assert "Start-TrackerLauncher -PythonwPath $python.PythonwPath -LauncherPath $launcherPath" in installer
 assert "Wait-AppRuntimeReady -TimeoutSeconds 15" in installer
 assert '"http://127.0.0.1:{0}/health"' in installer
 print("launcher shortcut and installer readiness checks: OK")
@@ -227,6 +244,7 @@ assert "Test-TrackerCommandLine" in installer
 assert "(?i)^pythonw?\\.exe$" in installer
 assert "[Regex]::Escape($installPath)" in installer
 assert "(app\\.py|launcher\\.pyw|dashboard\\.py)" in installer
-assert "Stop-Process -Id $processId" in installer
+assert "Stop-VerifiedTrackerProcess -ProcessInfo $processInfo" in installer
+assert '$null = $process.Handle' in installer and '$fresh.CreationDate -ne $ProcessInfo.CreationDate' in installer
 assert installer.index("Stop-RunningTracker") < installer.index("Install-SourceTree -SourcePath")
 print("installer Tracker-only fallback safety checks: OK")

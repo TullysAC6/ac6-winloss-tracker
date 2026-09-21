@@ -21,8 +21,8 @@ assert "$channel = 'stable'" in installer
 assert "$SourceTag = 'v1.2.0'" in installer
 assert "$version = '1.2.0'" in installer
 assert "AC6-WinLoss-Tracker-Installer/1.2.0" in installer
-assert 'https://api.github.com/repos/$repository/commits/$SourceTag' in installer
-assert '^[0-9a-fA-F]{40}$' in installer
+assert 'https://api.github.com/repos/$repository/commits/$sourceRef' in installer
+assert r'\A[0-9a-fA-F]{40}\z' in installer
 assert 'archive/$resolvedCommit.zip' in installer
 assert "archive/refs/heads/main.zip" not in installer
 assert "test/python-source-install" not in installer
@@ -43,18 +43,22 @@ assert "python_version" in installer
 assert "Backup-AppShortcut" in installer and "Restore-AppShortcut" in installer
 assert r"\\Microsoft\\WindowsApps\\" in installer
 assert "Get-AuthenticodeSignature" in installer
-assert "pip', 'install', '--user'" in installer
+assert "'--user'" not in installer
+assert "'--no-deps'" in installer and "'--disable-pip-version-check'" in installer
+assert "'--system-site-packages'" not in installer
 assert "'--require-hashes'" in installer
 assert "'--only-binary=:all:'" in installer
 assert "requirements.lock" in installer
 assert "Remove-Item -LiteralPath $dataPath" not in installer
 assert "Remove-Item -LiteralPath $installPath" in installer
-assert "venv" not in installer.lower()
+assert "'venv\\' + $script:lockHash" in installer
+assert 'Enter-InstallerMutex' in installer
+assert installer.index('    Enter-InstallerMutex') < installer.index('    New-Item -ItemType Directory -Path $dataPath')
 assert not re.search(r"(?i)pyinstaller|makeappx|new-selfsignedcertificate|\.pfx|\.msix", installer)
 
 download = installer.index("Set-InstallStage -Name 'source-download'")
 archive_check = installer.index("archive validation: success", download)
-pip = installer.index("Set-InstallStage -Name 'pip-install'", archive_check)
+pip = installer.index("Set-InstallStage -Name 'venv-prepare'", archive_check)
 stop = installer.index("Stop-RunningTracker", pip)
 swap = installer.index("Install-SourceTree -SourcePath", stop)
 health = installer.index("Wait-AppRuntimeReady", swap)

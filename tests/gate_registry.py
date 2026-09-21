@@ -63,6 +63,7 @@ WRITABLE_HISTORY_SERVER = ("SuccessfulPurgeLeavesAWritableSession", "Unrecoverab
 # Order within a gate is execution order. T0 keeps the relative order the
 # pre-#14 tests/run_all_tests.py used; T2 runs the launcher first, as CI did.
 ENTRIES = (
+    Entry("tests/test_python_spawn.py", T0, "pure executable/environment and launch identity contracts"),
     # ------------------------------------------------------------------ T0
     Entry("tests/test_game_capture.py", T0, "capture validation with mocked workers and the gap loop",
           selectors=CAPTURE_PURE),
@@ -109,6 +110,7 @@ ENTRIES = (
     # ------------------------------------------------------------------ T1
     Entry("tests/run_t1.py", T1, "canonical fixture replay", runner="t1"),
     # ------------------------------------------------------------------ T2
+    Entry("tests/test_python_spawn_integration.py", T2, "real venv python/pythonw PID identity and job-contained workers"),
     Entry("tests/test_launcher.py", T2, "launcher processes and a local HTTP server"),
     Entry("tests/test_game_capture.py", T2, "real spawned capture workers and job objects", selectors=CAPTURE_SPAWN),
     Entry("tests/test_effect_screenshot.py", T2, "a real pythonw screenshot worker", selectors=SCREENSHOT_PROCESS),

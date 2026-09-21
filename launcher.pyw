@@ -12,6 +12,7 @@ import traceback
 import urllib.error
 import urllib.request
 from pathlib import Path
+from python_spawn import clean_environment, matches_launch, spawn_python, stop_owned_process
 
 
 DISPLAY_NAME = "AC6 Win/Loss Tracker"
@@ -29,7 +30,7 @@ STARTUP_TIMEOUT_SECONDS = 10.0
 
 
 def utf8_python_environment() -> dict[str, str]:
-    environment = os.environ.copy()
+    environment = clean_environment()
     environment["PYTHONUTF8"] = "1"
     environment["PYTHONIOENCODING"] = "utf-8"
     return environment
@@ -47,7 +48,8 @@ def read_runtime(path: Path = RUNTIME_PATH) -> dict | None:
     if type(port) is not int or not 1 <= port <= 65535:
         return None
     token = raw.get("token")
-    return {"pid": pid, "port": port, "token": token if isinstance(token, str) else ""}
+    return {"pid": pid, "port": port, "token": token if isinstance(token, str) else "",
+            "launch_nonce": raw.get("launch_nonce")}
 
 
 def process_is_alive(pid: int) -> bool:
@@ -137,15 +139,15 @@ def start_application(
             f"launch: {sys.executable} {app_path}\n"
         )
         startup_log.flush()
-        return subprocess.Popen(
-            [sys.executable, str(app_path)],
+        return spawn_python(
+            [str(app_path)],
             cwd=str(app_dir),
             stdin=subprocess.DEVNULL,
             stdout=startup_log,
             stderr=subprocess.STDOUT,
             shell=False,
             creationflags=creationflags,
-            env=utf8_python_environment(),
+            environment=utf8_python_environment(),
         )
 
 
@@ -161,15 +163,16 @@ def open_dashboard(
     if existing is not None and process_is_alive(existing["pid"]):
         focus_dashboard_window(existing["hwnd"])
         return True
+    process = None
     try:
         rotate_startup_log(log_path)
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
         with log_path.open("a", encoding="utf-8", buffering=1) as startup_log:
-            process = subprocess.Popen(
-                [sys.executable, str(dashboard_path)], cwd=str(app_dir),
+            process = spawn_python(
+                [str(dashboard_path)], cwd=str(app_dir),
                 stdin=subprocess.DEVNULL, stdout=startup_log,
                 stderr=subprocess.STDOUT, shell=False, creationflags=creationflags,
-                env=utf8_python_environment(),
+                environment=utf8_python_environment(),
             )
             startup_log.write(f"dashboard launch PID: {process.pid}\n")
             startup_log.flush()
@@ -181,17 +184,25 @@ def open_dashboard(
                     startup_log.write("dashboard runtime verification: failed\n")
                     return False
                 runtime = read_dashboard_runtime(runtime_path)
-                if runtime is not None and runtime["pid"] == process.pid:
+                server_runtime = read_runtime(runtime_path.with_name('.runtime.json'))
+                if (matches_launch(runtime, process) and server_runtime is not None
+                        and runtime['server_pid'] == server_runtime['pid']
+                        and tracker_health(server_runtime['port']) is not None):
                     startup_log.write("dashboard runtime verification: success\n")
                     return True
                 time.sleep(0.1)
             startup_log.write("dashboard runtime verification: failed (timeout)\n")
             try:
-                process.terminate()
+                stop_owned_process(process)
             except OSError:
                 pass
             return False
     except Exception:
+        if process is not None:
+            try:
+                stop_owned_process(process)
+            except OSError:
+                pass
         log_launcher_error(log_path)
         return False
 
@@ -214,7 +225,8 @@ def read_dashboard_runtime(
         return None
     if time.time() - heartbeat_at > max_heartbeat_age:
         return None
-    return {"pid": pid, "server_pid": server_pid, "heartbeat_at": heartbeat_at, "hwnd": hwnd}
+    return {"pid": pid, "server_pid": server_pid, "heartbeat_at": heartbeat_at, "hwnd": hwnd,
+            "launch_nonce": raw.get('launch_nonce')}
 
 
 def focus_dashboard_window(hwnd: int) -> None:
@@ -235,9 +247,7 @@ def wait_for_application(
             return False
         runtime = read_runtime(runtime_path)
         if (
-            runtime is not None
-            and runtime["pid"] == process.pid
-            and process_is_alive(runtime["pid"])
+            matches_launch(runtime, process)
             and tracker_health(runtime["port"]) is not None
         ):
             return True
@@ -289,7 +299,7 @@ def launch_once(
         return "started"
     if process.poll() is None:
         try:
-            process.terminate()
+            stop_owned_process(process)
         except OSError:
             pass
     try:

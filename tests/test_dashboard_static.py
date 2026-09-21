@@ -19,7 +19,7 @@ assert "POLL_SECONDS = 1.0" in dashboard
 assert 'shell=False' in launcher and 'DASHBOARD_PATH = APP_DIR / "dashboard.py"' in launcher
 assert 'DASHBOARD_LOG = DATA_DIR / "dashboard.log"' in launcher
 assert 'dashboard runtime verification: success' in launcher
-assert 'runtime["pid"] == process.pid' in launcher
+assert 'matches_launch(runtime, process)' in launcher
 assert "ダッシュボードを開く" in launcher
 assert "ttkbootstrap==2.2.2" in requirements
 assert "import mss, ttkbootstrap" in installer

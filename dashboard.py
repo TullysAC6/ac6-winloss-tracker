@@ -73,11 +73,13 @@ def write_runtime(
     server_pid: int, hwnd: int, path: Path = DASHBOARD_RUNTIME_PATH,
     durable: bool = False,
 ) -> None:
+    from python_spawn import launch_nonce
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "pid": os.getpid(), "server_pid": int(server_pid),
         "started_at": getattr(write_runtime, "started_at", time.time()),
         "heartbeat_at": time.time(), "hwnd": int(hwnd),
+        "launch_nonce": launch_nonce(),
     }
     write_runtime.started_at = payload["started_at"]
     temporary = path.with_name(path.name + ".tmp")

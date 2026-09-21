@@ -34,7 +34,7 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 - 1行ごとにインストールするバージョンが固定されています。更新するときは、GitHubのリポジトリページに表示されている最新のREADMEの1行を実行してください。
 
 > [!NOTE]
-> 現在のv1.2.0では専用のPython仮想環境（venv）を使用していません。必要なPythonパッケージはユーザーのPython環境へインストールされるため、他のPythonアプリやスクリプトと依存関係が競合する可能性があります。既存のPython本体はインストール時もアンインストール時も削除しません。専用venvによる完全な環境分離は今後のバージョンで対応予定です。
+> 公開中のv1.2.0は共有Python環境を使用します。以下の公開版インストール手順は変更していません。開発版では、アプリを `%LOCALAPPDATA%\Programs\AC6WinLossTracker\app`、依存パッケージを同じルートの `venv\<requirements.lockのSHA-256>` に保存します。専用venvはユーザー・共有site-packagesを参照せず、更新前に構築・検証します。venvはセキュリティsandboxではありません。Python本体、過去に共有環境へ入れたパッケージ、`%LOCALAPPDATA%\AC6WinLossTracker` の利用者データは通常のアンインストールでも削除しません。ベースPythonが失われた場合は、対応Pythonを復元してインストーラーを再実行してください。開発版の移行機能は公開版へのリリース前です。
 
 ## 使い方
 
