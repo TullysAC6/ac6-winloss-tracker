@@ -56,14 +56,21 @@ the `v1.1.0` nor the `v1.1.1` tag is ever moved; `v1.2.0` is immutable too.
 - `python tests/run_t1.py` passes 42/42 on `main` (25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`). **T1 is no longer N/A**; it is a real gate for every later product change.
 - #14 stays open only for the §42 performance/security baseline-capture item below. *(Superseded on 2026-09-19; see the next note.)*
 
-The next product task is [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24).
+The next product task at that date was [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24); it has since been accepted and merged. See the 2026-09-21 note.
 
 ## Position note — 2026-09-19
 
 - **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed.** Its §42 performance/security baseline item moved to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. The baseline is a reusable development capability, not a T1 concern. #17 and #25 consume it for their own acceptance.
 - **Formal T1 remains available and passing on `main`**: 42/42, 0 skipped, corpus `6cfc4873bd0aa2bd…`.
 - **The T0 TEMP leak is fixed.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` with green `main` CI.
-- **Next product task: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** is **IN PROGRESS** in [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40). App-local isolation is implemented; exact-commit candidate installation is being validated to unblock real migration T3. New gates/CI and fresh independent Codex review precede user T3. Not Accepted, Released or merged; no later feature starts.
+- **Next product task at that date: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)** entered implementation in PR #40. Its final state is superseded by the 2026-09-21 note below.
+
+## Position note — 2026-09-21
+
+- **[#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is `ACCEPTED — UNRELEASED`.** [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a` passed fresh independent Codex Sol review with Critical 0 / High 0 / Medium 0 / Low 0 and passed real-machine T3.
+- PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`, preserving the exact tested head. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) passed.
+- Public stable v1.2.0 does **not** contain #24. It remains not Released until a release containing the merged work is published and verified.
+- UI-0 is next in the authoritative order, but has not started. No later product feature begins as part of this bookkeeping.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -123,7 +130,7 @@ to verify.
 Not a competitor to the two tracks above; it interleaves with them. Requirements:
 [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-65.
 
-1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)), next: the fixture/replay harness it depends on is merged (PR #35), and #14 is closed
+1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)): **ACCEPTED — UNRELEASED**, merged in PR #40
 2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - documentation only, human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
 4. #28-A Season Catalog / Assignment Foundation - after #15 and before UI-2
@@ -143,12 +150,12 @@ corrected.
 
 Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
 **PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14;
-and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-18.
+and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-18;
+and **PR #40 (#24 runtime isolation) accepted on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a` and merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`**, with exact-main CI 35564747847 green. It is not released.
 Revision 4 / §65 was merged in PR #31 as `e214ae0`; exact-main CI 35479744429 passed. Its manual-first Season requirements are not runtime implementation.
 From the current position:
 
 ```text
-→ #24                         app-local Python environment
 → UI-0                        design specification, no code change
 → UI-1A                       Player Overlay polish
 → UI-1B                       Broadcast Overlay polish
@@ -255,7 +262,7 @@ shipped application feature.
 | Startup-failure cleanup | DONE | Installer rolls back source and shortcut and stops what it started |
 | Verified installer / update / uninstall | DONE | Hash-verified bootstrap, immutable commit install, retention on uninstall |
 | Isolated install / update / rollback / uninstall flow test | **DONE** | Accepted on the RC; runs in CI; released in v1.1.1 |
-| Dedicated venv isolation | **IN PROGRESS — implementation / validation** | No longer only a deferral. Adopted as a direction on 2026-09-12: [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. Next product task: its prerequisite [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) harness is merged (PR #35) and #14 is closed. Released v1.2.0 still installs into the user's shared Python environment |
+| Dedicated venv isolation | **ACCEPTED — UNRELEASED** | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), MASTER_REQUIREMENTS §56. PR #40 passed fresh independent review and real-machine T3 on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`, then merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; exact-main CI 35564747847 passed. Released v1.2.0 still installs into the user's shared Python environment |
 
 ## Phase 4 — WGC / screenshot / stability
 
@@ -468,16 +475,15 @@ Added 2026-09-12. Umbrella issue: [#24](https://github.com/TullysAC6/ac6-winloss
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) §56.
 
 Scheduled **after** [#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14), so the
-migration has a fixture/replay harness to regress against. That harness is merged (PR #35, 2026-09-18), so this is the next product task. Not part of v1.1.x and not part of
-PR #5.
+migration has a fixture/replay harness to regress against. That harness merged in PR #35. Phase R then passed review and T3 and merged in PR #40 on 2026-09-21. It is **ACCEPTED — UNRELEASED**: not part of v1.1.x, v1.2.0 or PR #5.
 
 | Item | Status | Notes |
 |---|---|---|
-| App-local Python environment owned by AC6tool | PLANNED | Layout decided at implementation time. Conceptually `…\AC6WinLossTracker\{app,venv}` |
-| Dependency isolation from the user's shared Python | PLANNED | The reason for the whole phase: an unrelated `pip upgrade` must not be able to break the Tracker, and vice versa |
+| App-local Python environment owned by AC6tool | **ACCEPTED — UNRELEASED** | Implemented and T3-accepted in PR #40 |
+| Dependency isolation from the user's shared Python | **ACCEPTED — UNRELEASED** | An unrelated shared-environment `pip upgrade` cannot change the app-owned environment |
 | `requirements.lock`, hash pinning, binary-only policy | **UNCHANGED** | A venv is not a sandbox. This phase must not be used as an argument to relax any supply-chain control |
-| `pythonw` / worker actual-PID ownership through the launcher wrapper | PLANNED — **KNOWN HAZARD** | Already observed here: unmerged `fix/venv-launcher-ownership` (`138fd8f`, `95cc816`) and `release/v1.1.0-venv` (`e4677ce`, `6c88dce`). "It is a venv now" is never evidence that containment lands on the right PID |
-| Migration T2 gate | PLANNED | Clean install, upgrade from shared Python, isolation, `python.exe` and `pythonw.exe` launch, worker PID ownership, duplicate-launch refusal, normal and abnormal shutdown, no orphan worker, update, injected rollback, uninstall, reinstall, user-data retention, port/runtime/mutex cleanup |
+| `pythonw` / worker actual-PID ownership through the launcher wrapper | **ACCEPTED — UNRELEASED** | Proved by the final automated containment tests and real-machine lifecycle evidence; historical failed approaches remain useful context |
+| Migration T2 gate | **ACCEPTED — UNRELEASED** | Clean install, shared-Python migration, isolation, both launch modes, worker ownership, duplicate refusal, normal/abnormal shutdown, rollback, uninstall/reinstall, retention, and cleanup passed |
 
 ---
 
@@ -529,7 +535,7 @@ Number unchanged from the original roadmap.
 
 | Item | Status | Notes |
 |---|---|---|
-| Dedicated venv isolation | **IN PROGRESS — implementation / validation** | Moved to its own track - see Phase R below and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) |
+| Dedicated venv isolation | **ACCEPTED — UNRELEASED** | See Phase R and [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24). Merged in PR #40; public v1.2.0 does not contain it |
 | Support for CUSTOM MATCH / RANK MATCH: TEAM | **PLANNED — moved to Phase 7A** | No longer deferred. Revision 2 requires TEAM and CUSTOM to be recorded as normal matches. The README statement stays accurate for the *shipped* release until 7A passes acceptance |
 | Patch / version awareness (`game_version`, `parts_master_version`, `recognition_version`, `analytics_version`) | PLANNED | Leaves room for before/after balance-patch comparison. Existing data is not back-filled with a guessed version |
 | Localisation beyond Japanese | BACKLOG | |
