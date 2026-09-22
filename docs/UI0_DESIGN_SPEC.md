@@ -1,8 +1,10 @@
 # UI-0 design specification
 
-Status: **DESIGN SPEC COMPLETE — HUMAN REVIEW PENDING**
+Status: **DESIGN SPEC APPROVED**
 
 Date: 2026-09-22 JST
+
+Approval recorded: 2026-09-23 JST
 
 Owner: Issue [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)
 
@@ -10,8 +12,9 @@ Baseline: `main` at `fbc2131d177aa3fb5b271c1bd6894440e07c97e0`
 
 Nature of this change: documentation only; no production code, test, runtime, dependency, or framework change
 
-This document turns MASTER_REQUIREMENTS §§57–63 into an implementation-ready UI contract. It
-does **not** authorize UI-1A or any later implementation. Human review is required first.
+This document turns MASTER_REQUIREMENTS §§57–63 into an implementation-ready UI contract. The
+owner decisions are recorded in §20. Approval of this specification does **not** authorize UI-1A
+or any later implementation.
 
 ## 1. Outcome and boundaries
 
@@ -41,12 +44,13 @@ lifecycle stay intact.
 - New analytics, metadata, Season, rank/rating, or opponent-build data.
 - Framework migration.
 - Tray behaviour. UI-4 remains wholly owned by [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26).
-- Starting UI-1A before this specification receives human approval.
+- Starting UI-1A before this documentation PR is merged and the owner separately authorizes
+  implementation.
 
 ### Authoritative sequence
 
 ```text
-UI-0 human approval
+UI-0 design approval
 → UI-1A Player Overlay
 → UI-1B Broadcast Overlay
 → #15 match metadata
@@ -126,8 +130,20 @@ Desktop shortcut
       → settings_window.py (Launcher-owned Toplevel, on demand)
 ```
 
-This topology is a safety contract, not an implementation inconvenience. UI-1 through UI-3 keep
-the same process count, ownership boundaries, mutexes, shutdown API, runtime files, and port.
+This topology is a safety contract, not an implementation inconvenience:
+
+- UI-1A and UI-1B preserve the current process count and UI ownership.
+- UI-3A and UI-3B preserve the current process and lifecycle topology.
+- UI-2 may make exactly one ownership seam, proposal `S-01` (**Medium**): move presentation of the
+  existing Settings UI from the Launcher-owned Toplevel into the existing Dashboard process/shell.
+- `S-01` may not create a process or change server ownership, shutdown semantics, port ownership,
+  runtime-file ownership, overlay ownership, or the Launcher/server lifecycle merely to support
+  Settings.
+- Rolling back `S-01` restores the Launcher-owned Toplevel without changing stored settings.
+
+Every phase preserves the existing mutexes, shutdown API, runtime files, port ownership, and
+authoritative server/runtime ownership unless a later, separately approved lifecycle issue says
+otherwise.
 
 ### 3.3 Current constraints exposed by the framework
 
@@ -152,7 +168,8 @@ the same process count, ownership boundaries, mutexes, shutdown API, runtime fil
    percentages.
 6. **No performance debt for polish.** Static when idle; event-driven where already event-driven;
    no permanent 60 fps loop.
-7. **No lifecycle drift.** Visual work may not change who owns a process or what a close action means.
+7. **No lifecycle drift.** The bounded `S-01` Settings presentation seam is not permission to change
+   process ownership, server ownership, or what a close action means.
 8. **Pachinko is punctuation.** It belongs to milestones, not the surrounding shell.
 
 ## 5. Shared design system
@@ -254,8 +271,10 @@ when the system can distinguish game waiting, detector degraded, and server offl
 ```
 
 - Values are the first scan line; labels are smaller and quieter.
-- `BEST STREAK` leaves the always-on Player Overlay. It remains available in Overview and may be
-  included in Broadcast.
+- `BEST STREAK` leaves the always-on Player Overlay. It remains always visible in Dashboard
+  Overview. Broadcast exposes it through its own user-toggleable `show_best_streak` setting.
+- Player and Broadcast settings remain independent. This presentation change does not alter the
+  underlying BEST statistic, its calculation, or its persistence.
 - A thin cyan leading rule and two corner ticks supply telemetry character. No faux AC6 copy.
 - Status degradation appears as a compact labelled chip on the right, not as a colour-only change.
 - A genuine result may pulse the leading rule for 100–200 ms. Milestones use the separate effect
@@ -331,7 +350,8 @@ Milestone slot, normally absent:
 
 ### Separate settings contract
 
-Player and Broadcast may share semantic tokens, but Broadcast eventually owns distinct settings:
+Player and Broadcast may share semantic tokens, but Broadcast owns distinct settings and must
+expose BEST as an independently user-toggleable option:
 
 ```text
 broadcast_overlay.enabled
@@ -342,8 +362,8 @@ broadcast_overlay.show_best_streak
 ```
 
 These keys are a UI-1B implementation design input, not authorization to change `config.json` now.
-Any schema addition must be versioned, bounded, backward-compatible, and default to the current
-top-left visible behaviour. Player settings must not mutate these values.
+Any schema addition must be versioned, bounded, and backward-compatible. Player settings must not
+mutate these values, and Broadcast settings must not mutate Player presentation.
 
 ### Rollback and verification
 
@@ -402,11 +422,14 @@ LAST RESULT  WIN · 00:11                 HISTORY HEALTH  OK
 
 ### Mica and titlebar
 
-- A dark native titlebar is a bounded, recommended enhancement with solid fallback.
-- Mica is **conditionally feasible** on supported Windows 11 builds for the Dashboard top-level,
-  but ttk child surfaces are opaque. A proof must show visible benefit without repaint artifacts,
-  unreadable fallback, new dependency, or extra render loop. If not, retain `color.base`.
-- Mica is not used on overlays. Acrylic is not proposed for the main window.
+- UI-2 baseline is a solid dark shell plus a safely supported dark native titlebar and solid
+  fallback.
+- Mica is not required and cannot block UI-2. Only after the solid shell is accepted may a bounded,
+  Windows 11-only Dashboard top-level proof be attempted.
+- Adopt Mica only when the proof shows a clear visible benefit with no repaint artifacts, a working
+  solid fallback, no new dependency, no extra render loop, and no meaningful performance
+  regression. Failure or rejection returns to `color.base` without blocking UI-2.
+- Mica is not used on overlays. Acrylic remains not proposed.
 
 ### Rollback and verification
 
@@ -469,8 +492,10 @@ SEP 03
 
 - Settings becomes the fourth Dashboard navigation destination in UI-2, after the Dashboard shell
   has a stable owner. It does not become a second settings implementation.
+- This is the sole approved `S-01` ownership seam (**Medium**): presentation moves from the
+  Launcher-owned Toplevel into the existing Dashboard process/shell.
 - Existing functions and server ownership remain. The move is presentation/ownership plumbing,
-  not a rewrite of #8/#9.
+  not a rewrite of #8/#9, and it creates no process or lifecycle topology change.
 - Sections: `DISPLAY & EFFECTS`, `DATA & HISTORY`, `SUPPORT`, then `SEASON INFORMATION` after
   #28-A. Destructive actions receive a clearly separated danger region.
 - Inline save/progress/error states remain non-modal. Only irreversible confirmation is modal.
@@ -505,7 +530,8 @@ Last checked            2026-09-22 10:30
 ### Before
 
 - Native and browser effects are separately implemented and visually divergent.
-- Native: 3.5 s for ordinary milestones, 6 s for 50; centered near 62% of client height.
+- Native before-state: 3.5 s for ordinary milestones and 6.0 s for 50; centered near 62% of client
+  height. The 6.0 s value documents current production only and is not an approved target.
 - Browser: 3 s CSS scale/blink sequence centered on the canvas.
 - Native 50 includes a white/dark flash; browser 50 uses a radial gold surface.
 - Source code includes a 25-streak milestone, while the adopted requirement list is
@@ -522,17 +548,22 @@ Last checked            2026-09-22 10:30
 
 - One design-token table defines copy, duration, colours, and motion stages for both renderers;
   each renderer stays native to its current technology.
-- Target obstruction is ≤3.5 s for every tier except 50, whose exact maximum needs human approval.
+- Target obstruction is ≤3.5 s for every tier except 50. The approved 50 target is ≤4.5 s on the
+  normal path and ≤3.0 s with reduced motion. Evidence that would require more than 4.5 s needs a
+  new owner decision; 6.0 s is not an equally approved option.
 - Persistent stats never disappear while a milestone is active.
 - Cleanup, TTL, replay, deduplication, screenshot timing, and failure isolation are unchanged.
-- The 25-streak discrepancy is an explicit review decision; implementation must not silently add or
-  remove it.
+- Production already contains a 25-win milestone while canonical §§57–63 omit it. This is an
+  existing requirement/code discrepancy: UI-0, UI-1A, and UI-1B preserve the current production
+  trigger, name, and semantics exactly. They must not add, remove, rename, remap, or otherwise
+  silently resolve it.
 
 ### Rollback and verification
 
 - Keep milestone work separate from ordinary overlay layout when practical. Token/copy changes are
   revertible without changing event identity.
-- Parity tests assert both renderers map the same accepted milestones to the same copy/tier/duration.
+- Parity tests assert both renderers preserve the production milestone set, including the existing
+  25 discrepancy, and map shared milestones to the same approved copy/tier/duration.
 - Preserve reconnect replay, freshness, deduplication, expired-event rejection, visible-paint
   screenshot, 50-flash screenshot, Alt+Tab rejection, and worker cleanup tests.
 - T3 uses only naturally reached milestones; no history/stat manipulation to manufacture one.
@@ -548,9 +579,10 @@ Last checked            2026-09-22 10:30
 
 ### Proposed now
 
-No Launcher implementation change in UI-1A, UI-1B, UI-2, UI-3A, or UI-3B. Copy and visual
-consistency may be documented, but changing close semantics, keeping a resident icon, relocating
-Settings ownership beyond the reviewed UI-2 seam, or altering process startup/shutdown is UI-4.
+No Launcher process or lifecycle change occurs in UI-1A, UI-1B, UI-2, UI-3A, or UI-3B. UI-2 may
+route Settings presentation through the reviewed `S-01` seam, but changing close semantics,
+keeping a resident icon, relocating Settings ownership beyond that seam, or altering process
+startup/shutdown is UI-4.
 
 ### UI-4 concept — not authorized
 
@@ -588,9 +620,9 @@ UI-0 records the layout rules so UI-3 does not invent them later. It does not cr
 
 | Material | Feasibility in current stack | Decision |
 |---|---|---|
-| Dark titlebar | Good through bounded DWM attributes on supported Windows; solid/native fallback is straightforward | Recommend for UI-2 proof, proposal `E-02` Low |
-| Mica on Dashboard top-level | Technically possible on supported Windows 11, but opaque ttk frames can hide most benefit and OS/version fallback must be tested | Optional experiment `E-01` Medium; adopt only if the proof is visibly useful and regression-free |
-| Acrylic transient surfaces | Poor fit for Tk/ttk menus and popups without custom HWND/control work; adds complexity for little user value | Do not implement in current programme |
+| Solid dark shell + dark titlebar | Good through bounded DWM attributes on supported Windows; solid/native fallback is straightforward | UI-2 baseline, proposal `E-02` Low |
+| Mica on Dashboard top-level | Technically possible on supported Windows 11, but opaque ttk frames can hide most benefit and OS/version fallback must be tested | Optional, non-blocking `E-01` Medium proof only after solid-shell acceptance; adopt only with clear visible benefit, clean fallback, no artifacts, dependency, extra loop, or meaningful performance regression |
+| Acrylic transient surfaces | Poor fit for Tk/ttk menus and popups without custom HWND/control work; adds complexity for little user value | Remains not proposed |
 | Material on Player/Broadcast overlays | Conflicts with performance, transparency, capture, and stream requirements | Prohibited |
 
 No new package is justified for material. A framework migration is not a material implementation
@@ -659,7 +691,7 @@ Risk meanings:
 | DS-05 | System-aware reduced-motion behaviour | UI-1A/UI-1B | Medium | Motion adapter/settings default | Native/browser parity |
 | DS-06 | Text/icon/shape in addition to colour | Per surface | Low | Labels/styles | High-contrast/state matrix |
 | P-01 | Value-first four-metric layout | UI-1A | Low | Native Canvas layout | AC6/DPI screenshots |
-| P-02 | Remove BEST from always-on Player surface | UI-1A; human approval | Low | One rendered field | Glance test; value remains elsewhere |
+| P-02 | Remove BEST from always-on Player surface | UI-1A; owner-approved | Low | One rendered field | Glance test; value remains in Overview and optional Broadcast |
 | P-03 | Thin telemetry rule/corner ticks | UI-1A | Low | Canvas primitives | Pixel/safe-zone review |
 | P-04 | Responsive DPI/aspect safe-zone placement | UI-1A | Medium | Placement calculation | 1080p/1440p/4K, 16:9/21:9 |
 | P-05 | 100–200 ms result acknowledgement | UI-1A | Low | One finite animation | Event/cleanup/performance test |
@@ -683,7 +715,7 @@ Risk meanings:
 | S-04 | Consistent inline progress/error/focus | UI-2 | Low | Feedback styles | Async close/keyboard tests |
 | M-01 | Native/browser milestone token parity | UI-1A/UI-1B | Medium | Shared spec/constants | Mapping parity tests |
 | M-02 | Bounded common timing/easing | UI-1A/UI-1B | Medium | Duration/motion constants | Obstruction/performance test |
-| M-03 | Unique but bounded 50 treatment | UI-1A/UI-1B; human approval | Medium | 50 renderer branch | Reduced motion + screenshot |
+| M-03 | Unique but bounded 50 treatment | UI-1A/UI-1B; owner-approved timing | Medium | 50 renderer branch | ≤4.5 s normal; ≤3.0 s reduced motion + screenshot |
 | M-04 | Preserve stats and deterministic cleanup | UI-1A/UI-1B | Low | Effect presentation only | Existing replay/cleanup suite |
 | E-01 | Conditional Dashboard Mica proof | UI-2 optional | Medium | Capability-gated adapter | Win11/fallback/repaint test |
 | E-02 | Dark native titlebar with fallback | UI-2 | Low | DWM attribute adapter | Supported/unsupported OS test |
@@ -716,30 +748,34 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 6. A failed UI-4 lifecycle proof rolls back the complete UI-4 PR; tray behaviour is not partially
    retained.
 
-## 20. Human decisions required before UI-1A
+## 20. Owner decisions recorded
 
-1. Approve removing `BEST STREAK` from the always-on Player Overlay while keeping it in Overview
-   and optionally Broadcast. **Recommendation: approve.**
-2. Resolve the milestone-25 discrepancy: code currently supports 25, while adopted §§57–63 list
-   omits it. **Recommendation: keep current behaviour until the requirement is explicitly amended;
-   do not silently delete it during polish.**
-3. Approve the 50-streak maximum obstruction duration. **Recommendation: cap the normal path at
-   4.5 s, with the reduced-motion path at 3.0 s; retain 6.0 s only if T3 shows it does not obstruct.**
-4. Decide whether Mica deserves an optional proof in UI-2. **Recommendation: dark titlebar first;
-   perform the Mica proof only after the solid shell is accepted.**
+1. `BEST STREAK` is removed from the always-on Player Overlay, remains always visible in Dashboard
+   Overview, and is independently user-toggleable in Broadcast. Player and Broadcast settings stay
+   independent; the underlying statistic is unchanged.
+2. The production 25-win milestone is preserved exactly. Its omission from canonical §§57–63 is
+   recorded as an existing requirement/code discrepancy and is not resolved in UI-0, UI-1A, or
+   UI-1B.
+3. The 50-win effect target is ≤4.5 s normally and ≤3.0 s with reduced motion. Current 6.0 s is
+   before-state evidence only; exceeding 4.5 s requires a new owner decision.
+4. UI-2 starts with a solid dark shell, safely supported dark native titlebar, and solid fallback.
+   Mica is optional, Windows 11-only, bounded, and non-blocking after solid-shell acceptance;
+   Acrylic remains not proposed.
 
 ## 21. Approval checklist
 
-- [ ] Identity and quiet/loud boundary approved.
-- [ ] Player and Broadcast remain separate products.
-- [ ] All 36 proposals have an accepted risk classification.
-- [ ] UI-1A and UI-1B layouts approved independently.
-- [ ] #15 → #28-A → UI-2 dependency accepted.
-- [ ] UI-3A and UI-3B data ownership boundaries accepted.
-- [ ] Pre-S through A4 vs S discontinuity preserved.
-- [ ] Mica/Acrylic decision accepted.
-- [ ] Accessibility, DPI, performance, lifecycle, rollback, and regression plans accepted.
-- [ ] Milestone 25 and 50-duration decisions recorded.
-- [ ] UI-4 remains isolated under Issue #26.
+- [x] Identity and quiet/loud boundary approved.
+- [x] Player and Broadcast remain separate products.
+- [x] All 36 proposals have an accepted risk classification.
+- [x] UI-1A and UI-1B layouts approved independently.
+- [x] #15 → #28-A → UI-2 dependency accepted.
+- [x] UI-3A and UI-3B data ownership boundaries accepted.
+- [x] Pre-S through A4 vs S discontinuity preserved.
+- [x] Mica/Acrylic decision accepted.
+- [x] Accessibility, DPI, performance, lifecycle, rollback, and regression plans accepted.
+- [x] Milestone 25 and 50-duration decisions recorded.
+- [x] UI-4 remains isolated under Issue #26.
 
-Until this checklist is reviewed, the exact next action is **human review of this UI-0 docs-only PR**.
+The design specification is approved. Issue #25 remains open, UI-1A is **NOT STARTED**, and this
+approval is neither implementation acceptance nor release status. The exact next action is owner
+authorization to merge this documentation-only PR; UI-1A still requires separate authorization.
