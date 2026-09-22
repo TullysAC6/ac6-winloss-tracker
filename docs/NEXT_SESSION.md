@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-21 JST
+Last updated: 2026-09-22 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -38,6 +38,7 @@ Issue #6
 - PR #13 merged Revision 3. PR #31 adds Revision 4 / §65, preserving manual-first Season catalog refresh, local cache, retrospective assignment, unresolved transitions and full multi-season reconciliation. Revision 4 is canonical on main after PR #31 merged as `e214ae0`; no Season runtime feature is implemented.
 - PR #31 merged as `e214ae0` after independent review GO. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) is green. Its reconciliation and merge are complete; do not redo them.
 - MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is accepted and merged but unreleased.
+- **UI-0 is documentation-complete and awaiting human review.** The implementation-ready specification is [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md). No production code, tests, runtime, dependency, or framework changed, and UI-1A has not started.
 
 ## The rule that cost a release — do not lose it
 
@@ -69,11 +70,11 @@ Release publication and post-release verification are complete. See `PROJECT_STA
    - Real-machine T3: PASS, including legacy migration and data preservation, one measured WIN and one measured LOSE counted once, overlay health, normal shutdown, shortcut relaunch, and final lifecycle cleanup. The Effect Screenshot milestone did not occur naturally and was not manufactured.
    - [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`, preserving the exact tested head. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) passed.
    - **Not Released:** public stable v1.2.0 does not contain #24.
-2. UI-0 is next in the **Sequencing** order in [ROADMAP.md](ROADMAP.md), but it has not started and must not be inferred from this bookkeeping.
+2. Review [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md). UI-0 is **DESIGN SPEC COMPLETE — HUMAN REVIEW PENDING**. Record the four human decisions there before authorizing UI-1A.
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40 is merged. No product generation is active; the post-merge bookkeeping PR is documentation-only.
+At most two unmerged generations exist at a time (§4). PR #40 and documentation PR #41 are merged. No product generation is active; the current UI-0 generation is documentation-only.
 
 ## Order after that — dependency, not preference
 
