@@ -11,11 +11,15 @@ $repository = 'TullysAC6/ac6-winloss-tracker'
 $expectedBootstrapUrl = "https://raw.githubusercontent.com/$repository/refs/tags/$expectedTag/bootstrap.ps1"
 $pinnedReleaseApiUrl = "https://api.github.com/repos/$repository/releases/tags/$expectedTag"
 $latestReleaseApiUrl = "https://api.github.com/repos/$repository/releases/latest"
-# README rollback runs the previous public release's own install command. Move
-# these to the release being superseded when the next one ships.
+# README rollback runs the previous public release's own install command, the
+# exact line that release published (and tests/t2_rollback_public_release.py
+# ran). Move these to the release being superseded when the next one ships.
 $rollbackHeading = '1つ前の公開版に戻す（ロールバック）'
 $previousReleaseTag = 'v1.2.0'
 $previousReleaseBootstrapHash = '82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B'
+$previousReleaseCommand = @'
+$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.2.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -ReleaseTag v1.2.0;$ec=$LASTEXITCODE;if($ec -ne 0){throw "Installer failed with exit code $ec"}}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}
+'@
 
 # The commands are published inside the tag they name, so that tag has to be the
 # version this tree ships.
@@ -400,13 +404,16 @@ $uninstallArguments = @(Assert-BootstrapInvocation -Invocation (Invoke-ReadmeCom
 Assert-PinnedReleaseChain -ScriptArguments $installArguments -IsUninstall $false
 Assert-PinnedReleaseChain -ScriptArguments $uninstallArguments -IsUninstall $true
 
-# The rollback command is exactly the install command re-pinned to the previous
-# release's tag and bootstrap hash (that release's own README command).
+# The rollback command is exactly the previous release's published install
+# command, whatever shape this tree's own install command takes later.
 $rollbackCommand = Get-ReadmeCommand -Heading $rollbackHeading
-$expectedRollbackCommand = $installCommand.Replace("refs/tags/$expectedTag/", "refs/tags/$previousReleaseTag/").
-    Replace($expectedHash, $previousReleaseBootstrapHash).Replace("-ReleaseTag $expectedTag;", "-ReleaseTag $previousReleaseTag;")
-if ($rollbackCommand -cne $expectedRollbackCommand) {
-    throw "README rollback command is not the $previousReleaseTag install command"
+if (-not $previousReleaseCommand.Contains("/refs/tags/$previousReleaseTag/bootstrap.ps1';") -or
+    -not $previousReleaseCommand.Contains("-ne '$previousReleaseBootstrapHash'") -or
+    -not $previousReleaseCommand.Contains("-ReleaseTag $previousReleaseTag;")) {
+    throw 'the pinned previous-release command does not match its own tag and hash'
+}
+if ($rollbackCommand -cne $previousReleaseCommand) {
+    throw "README rollback command is not the published $previousReleaseTag install command"
 }
 if ($previousReleaseTag -ceq $expectedTag) {
     # Until the next release ships, the previous release is also this tree's

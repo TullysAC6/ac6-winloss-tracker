@@ -90,6 +90,12 @@ if subprocess.run(("git", "cat-file", "-e", f"{PREVIOUS_RELEASE}:bootstrap.ps1")
             f"not the pinned {PREVIOUS_RELEASE_BOOTSTRAP_SHA256}"
         )
     print(f"README rollback bootstrap SHA-256 matches the {PREVIOUS_RELEASE} blob: {previous_blob_hash}")
+    # The rollback line must be the one that release published, byte for byte.
+    rollback_lines = [line for line in rollback_section.splitlines() if "bootstrap.ps1';" in line]
+    published = git("show", f"{PREVIOUS_RELEASE}:README.md").decode("utf-8").splitlines()
+    if len(rollback_lines) != 1 or rollback_lines[0] not in published:
+        raise SystemExit(f"README rollback command is not a line of {PREVIOUS_RELEASE}:README.md")
+    print(f"README rollback command is the {PREVIOUS_RELEASE} README install command")
 else:
     print(f"{PREVIOUS_RELEASE} tag not in this clone; rollback hash checked against the pinned value")
 

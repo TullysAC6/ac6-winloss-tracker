@@ -45,7 +45,7 @@ v1.2.0より新しいバージョン（開発版を含む）で問題があっ�
 - ロールバックは**アンインストールではありません**。`%LOCALAPPDATA%\AC6WinLossTracker` の累計の戦績履歴（`history.db`）、設定（`config.json`）、診断ログは削除されずに残り、v1.2.0がそのまま使います。現在のセッションの成績は、いつもどおりTrackerの起動時に新しく始まります。
 - v1.2.0にない新しい表示設定（`preferences.json`）も削除されずに残ります。v1.2.0はこのファイルを読み込まず、再び新しいバージョンに更新すると元の設定に戻ります。
 
-1. 起動中の画面で「Trackerを終了」を押して、Trackerを終了します。
+1. Trackerが起動している場合は終了します。「AC6 WinLoss Tracker」ショートカットをもう一度開き、表示されるLauncherで「Trackerを終了」を押します。
 2. Windows PowerShellで次の1行を実行します。v1.2.0のREADMEに掲載されているインストールコマンドと同じものです。
 
 ```powershell
@@ -54,7 +54,10 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 
 3. 「セットアップが完了しました。」と表示され、Trackerがv1.2.0として起動します。
 
-このコマンドは、次をすべて確認できた場合だけv1.2.0をインストールします。1つでも一致しない場合は、何も変更せずに中止します。
+> [!IMPORTANT]
+> 手順1を行わずに実行すると、「セットアップが完了しました。」と表示されても、それまで動いていた新しいバージョンのTrackerが動き続けます。v1.2.0のインストーラーは、新しいバージョンのTrackerを終了できないためです。この場合は、表示されたLauncher（閉じてしまった場合はショートカットをもう一度開いて表示されるLauncher）で「Trackerを終了」を押してから、ショートカットをもう一度開いてください。v1.2.0が起動します。
+
+このコマンドは、次をすべて確認できた場合だけv1.2.0をインストールします。1つでも確認できない場合は、インストール済みのTrackerと戦績データを変更せずに中止します。
 
 - ダウンロードした `bootstrap.ps1` のSHA-256が `82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B` と一致すること
 - 下書き・プレリリースではない公開Release `v1.2.0` から取得した `install.ps1` が、GitHubが示すSHA-256 digestと `install.ps1.sha256` の両方に一致すること
@@ -63,12 +66,18 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 ロールバック後、次のコマンドでインストールされているバージョンを確認できます。
 
 ```powershell
-Get-Content "$env:LOCALAPPDATA\AC6WinLossTracker\installed-version.json"
+Get-Content -Raw "$env:LOCALAPPDATA\AC6WinLossTracker\installed-version.json" | ConvertFrom-Json | Format-List channel, version, resolved_commit
 ```
 
-`"channel": "stable"` と `"resolved_commit": "c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4"` が表示されれば、v1.2.0に戻っています。
+次のように表示されれば、v1.2.0がインストールされています。
 
-v1.2.0は共有Python環境を使う方式のため、依存パッケージを現在のユーザーのPython環境へインストールします。新しいバージョンが作成したアプリ専用環境（`%LOCALAPPDATA%\Programs\AC6WinLossTracker`）は削除されずに残り、再び新しいバージョンをインストールするときに再利用されます。
+```text
+channel         : stable
+version         : 1.2.0
+resolved_commit : c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4
+```
+
+v1.2.0は共有Python環境を使う方式です。対応するPython（3.14または3.13）が見つからない場合はwingetでPython 3.14をインストールし、依存パッケージを現在のユーザーのPython環境（`pip install --user`）へインストールします。これらは再び新しいバージョンに更新しても削除されません（新しいバージョンはこれらを使いません）。新しいバージョンのアプリ専用環境（`%LOCALAPPDATA%\Programs\AC6WinLossTracker`）も削除されずに残ります。再び新しいバージョンをインストールするとき、インストーラーはこの環境を確認し、そのまま使えない場合は作り直します。
 
 ## 使い方
 

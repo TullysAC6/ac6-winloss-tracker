@@ -91,6 +91,10 @@ assert "1つ前の公開版（v1.2.0）だけ" in rollback
 assert "アンインストールではありません" in rollback
 assert "手で編集する必要はありません" in rollback
 assert "install.ps1.sha256" in rollback and "c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4" in rollback
+# v1.2.0 cannot stop a newer Tracker: exit first, and the exercised recovery if not.
+assert rollback.index("Launcherで「Trackerを終了」") < rollback.index("-ReleaseTag v1.2.0;")
+assert "手順1を行わずに実行すると" in rollback and "新しいバージョンのTrackerが動き続けます" in rollback
+assert "| ConvertFrom-Json | Format-List channel, version, resolved_commit" in rollback
 assert "Get-FileHash $p -Algorithm SHA256" in readme
 assert "82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B" in readme
 assert (ROOT / "bootstrap.ps1").read_bytes().startswith(b"\xef\xbb\xbf")
