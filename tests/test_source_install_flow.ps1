@@ -252,9 +252,27 @@ function Invoke-WebRequest {
     $repeatLauncher.Dispose()
     $duplicate.Dispose()
     $dashboard = Start-FixturePython -Arguments ('"{0}"' -f (Join-Path $installed 'dashboard.py'))
-    Start-Sleep -Seconds 2
-    if ($dashboard.HasExited) { throw 'Dashboard failed to start' }
-    if ((Get-Content (Join-Path $data '.dashboard-runtime.json') -Raw | ConvertFrom-Json).pid -ne $dashboard.Id) { throw 'Dashboard handle is a redirector PID' }
+    $dashboardRuntimePath = Join-Path $data '.dashboard-runtime.json'
+    $dashboardDeadline = [DateTime]::UtcNow.AddSeconds(7)
+    $dashboardRuntime = $null
+    $dashboardReadError = 'runtime file not published'
+    do {
+        if ($dashboard.HasExited) { throw "Dashboard exited before runtime readiness (exit $($dashboard.ExitCode))" }
+        if (Test-Path -LiteralPath $dashboardRuntimePath) {
+            try {
+                $dashboardRuntime = Get-Content -LiteralPath $dashboardRuntimePath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                if ($null -eq $dashboardRuntime.pid) { throw 'runtime PID missing' }
+            } catch {
+                $dashboardReadError = $_.Exception.Message
+                $dashboardRuntime = $null
+            }
+            if ($dashboardRuntime) { break }
+        }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $dashboardDeadline)
+    if (-not $dashboardRuntime) { throw "Dashboard runtime not ready within 7 seconds: $dashboardReadError" }
+    if ($dashboard.HasExited) { throw "Dashboard exited after runtime publication (exit $($dashboard.ExitCode))" }
+    if ($dashboardRuntime.pid -ne $dashboard.Id) { throw 'Dashboard handle is a redirector PID' }
     $second = Run-Installer
     if ((Get-Content (Join-Path $data 'installed-version.json') -Raw | ConvertFrom-Json).environment_path -ne $firstEnvironment) { throw 'Unchanged lock did not reuse the verified venv' }
     if ($second.pid -eq $first.pid -or (Get-Process -Id $first.pid,$overlayPid,$dashboard.Id -ErrorAction SilentlyContinue)) { throw 'Update retained old processes' }
