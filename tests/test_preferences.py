@@ -140,6 +140,22 @@ class ValidationTests(Isolated):
                 with patch("builtins.print"):
                     self.assertIs(preferences.effective(KEY, False), False)
 
+    def test_warnings_about_hostile_keys_never_break_the_renderer(self):
+        # A lone surrogate key cannot be encoded to the production UTF-8 log;
+        # the warning must not raise out of effective() into the overlay tick.
+        import io
+        strict = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", errors="strict")
+        surrogate = '"\\ud800"'
+        for text in ('{"preferences_version": 1, ' + surrogate + ': true}',
+                     '{"preferences_version": 1, ' + surrogate + ': true, ' + surrogate + ': false}'):
+            with self.subTest(text=text):
+                self.write(text)
+                preferences._reported_error = None
+                with patch("sys.stdout", strict):
+                    self.assertIs(preferences.effective(KEY, False), False)
+        strict.flush()
+        self.assertIn(b"keeping the previous display setting", strict.buffer.getvalue())
+
     def test_an_invalid_file_is_not_re_read_until_it_changes(self):
         self.write("{broken")
         real_open = Path.open

@@ -75,7 +75,7 @@ def validate(raw: Any) -> dict[str, Any]:
                 raise ValueError(f"{key}: must be {type(DEFAULTS[key]).__name__}")
             values[key] = value
         elif version <= PREFERENCES_VERSION:
-            raise ValueError(f"unknown preference: {key}")
+            raise ValueError(f"unknown preference: {key!r}")
         elif not _NAME.fullmatch(key) or not _is_scalar(value):
             raise ValueError(f"malformed preference from a newer version: {key!r}")
     return values
@@ -91,7 +91,7 @@ def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in pairs:
         if key in result:
-            raise ValueError(f"duplicate preference: {key}")
+            raise ValueError(f"duplicate preference: {key!r}")
         result[key] = value
     return result
 
@@ -115,7 +115,7 @@ def _read_raw(path: Path) -> dict[str, Any] | None:
     try:
         raw = json.loads(data.decode("utf-8"), object_pairs_hook=_unique_pairs)
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
-        raise ValueError(f"preferences file is not valid JSON: {type(error).__name__}") from error
+        raise ValueError(f"preferences file is not valid JSON: {type(error).__name__}: {error}") from error
     validate(raw)
     return raw
 
@@ -152,7 +152,10 @@ def effective(key: str, last: Any = None) -> Any:
     except (OSError, ValueError) as error:
         message = f"{type(error).__name__}: {error}"
         if message != _reported_error:
-            print(f"[preferences] WARNING: {message}; keeping the previous display setting")
+            try:  # a log line must never stop the render loop
+                print(f"[preferences] WARNING: {message!a}; keeping the previous display setting")
+            except Exception:
+                pass
             _reported_error = message
         return DEFAULTS[key] if last is None else last
 
