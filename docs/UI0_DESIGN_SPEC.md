@@ -339,8 +339,10 @@ Milestone slot, normally absent:
                   └──────────────────┘
 ```
 
-- Viewer-distance readability wins over compactness. Use 28–36 CSS px for primary values at a
-  1920×1080 browser source; scale as a component, not via browser zoom.
+- Primary text size: preserve the current 24 px bold baseline as the UI-1B target (owner decision
+  5, §20). Do not enlarge it merely because the surface is viewer-facing; increase it only if real
+  OBS / viewer-distance evidence shows insufficient readability. The earlier 28–36 CSS px proposal
+  is not approved. Any scaling is applied to the component, not via browser zoom.
 - Preserve a transparent page. The component receives its own 45–60% solid dark backing for video
   compression. No backdrop blur or full-canvas material.
 - Default safe area is 5% of canvas on every edge. Provide named `top-left`, `top-right`,
@@ -697,7 +699,7 @@ Risk meanings:
 | P-05 | 100–200 ms result acknowledgement | UI-1A | Low | One finite animation | Event/cleanup/performance test |
 | P-06 | Remove persistent pachinko blink/status from normal panel | UI-1A | Low | Status style mapping | Milestones unaffected |
 | B-01 | Session-first viewer layout | UI-1B | Low | HTML/CSS component | Browser screenshots |
-| B-02 | Viewer-distance type scale | UI-1B | Low | CSS type tokens | OBS 1080p/1440p review |
+| B-02 | Type scale holding the current 24 px bold primary baseline; enlarge only on OBS evidence | UI-1B; owner-approved | Low | CSS type tokens | OBS 1080p/1440p review |
 | B-03 | Independent Broadcast settings namespace | UI-1B | Medium | Versioned config keys/defaults | Migration + live reload |
 | B-04 | OBS safe-area anchors and scale | UI-1B | Medium | Anchor/scale config | Canvas/safe-area matrix |
 | B-05 | Labelled stacked health states | UI-1B | Low | DOM/CSS | State/contrast tests |
@@ -761,6 +763,13 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 4. UI-2 starts with a solid dark shell, safely supported dark native titlebar, and solid fallback.
    Mica is optional, Windows 11-only, bounded, and non-blocking after solid-shell acceptance;
    Acrylic remains not proposed.
+5. Broadcast Overlay primary text keeps its current size, the 24 px bold implementation baseline,
+   as the UI-1B target (2026-09-23,
+   [Issue #25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5787040618)).
+   It is not enlarged merely because the surface is viewer-facing, and increases only if real OBS /
+   viewer-distance evidence shows a readability problem. The earlier 28–36 CSS px proposal is not
+   an approved target. This decision covers typography size only; the other Broadcast decisions
+   are unchanged.
 
 ## 21. Approval checklist
 
