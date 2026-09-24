@@ -72,6 +72,10 @@ STATUS_COLORS = {
 }
 VALUE_FONTS = ("Segoe UI Variable Display", "Yu Gothic UI", "Meiryo")
 LABEL_FONTS = ("Segoe UI Variable Text", "Yu Gothic UI", "Meiryo")
+# Japanese text is set in a Japanese face on purpose, never through glyph
+# fallback from the Latin faces above: the streak status (Yu Gothic UI bold at
+# the value size, as before UI-1A) and the 勝率 / 連勝 labels (label size).
+JAPANESE_FONTS = ("Yu Gothic UI", "Meiryo UI", "Meiryo")
 # Column minimum widths come from these samples, so a count going 9 -> 10
 # does not shift every metric sideways during play.
 METRIC_SAMPLES = ("000", "000", "100.0%", "00")
@@ -142,13 +146,21 @@ def normalize_lifetime(raw: Any) -> dict[str, Any] | None:
 
 
 def player_metrics(wins: int, losses: int, rate: float, streak: int) -> tuple[tuple[str, str], ...]:
-    """The four always-on Player metrics as (label, value). BEST is not one of them."""
+    """The four always-on Player metrics as (label, value). BEST is not one of them.
+
+    The labels are the existing product copy, unchanged by UI-1A.
+    """
     return (
         ("WIN", str(wins)),
-        ("LOSS", str(losses)),
-        ("RATE", f"{rate:.1f}%"),
-        ("STREAK", str(streak)),
+        ("LOSE", str(losses)),
+        ("勝率", f"{rate:.1f}%"),
+        ("連勝", str(streak)),
     )
+
+
+def is_japanese_text(text: str) -> bool:
+    """Text that needs a Japanese face rather than the Latin UI-1A faces."""
+    return not text.isascii()
 
 
 def pick_font_family(available: Any, preferred: tuple[str, ...]) -> str:
@@ -760,12 +772,19 @@ class GameOverlay:
             root=self.root, family=pick_font_family(families, VALUE_FONTS),
             size=font_size, weight="bold",
         )
+        label_size = max(9, round(font_size * 0.45))
         self.label_font = tkfont.Font(
             root=self.root, family=pick_font_family(families, LABEL_FONTS),
-            size=max(9, round(font_size * 0.45)), weight="bold",
+            size=label_size, weight="bold",
         )
+        japanese = pick_font_family(families, JAPANESE_FONTS)
+        self.label_ja_font = tkfont.Font(root=self.root, family=japanese, size=label_size, weight="bold")
+        self.status_font = tkfont.Font(root=self.root, family=japanese, size=font_size, weight="bold")
         self._measured = None
         self._last_render_key = None
+
+    def _label_font(self, label: str) -> Any:
+        return self.label_ja_font if is_japanese_text(label) else self.label_font
 
     def _measure(
         self, metrics: tuple[tuple[str, str], ...], caption: str, status: str,
@@ -774,23 +793,31 @@ class GameOverlay:
         if self._measured is None or self._measured[0] != content:
             columns = tuple(
                 max(int(self.main_font.measure(value)), int(self.main_font.measure(sample)),
-                    int(self.label_font.measure(label)))
+                    int(self._label_font(label).measure(label)))
                 for (label, value), sample in zip(metrics, METRIC_SAMPLES)
             )
+            # Latin and Japanese labels share one baseline; the row is tall
+            # enough for the deeper face.
+            label_fonts = {id(font): font for font in (self._label_font(label) for label, _ in metrics)}
+            label_ascent = max(int(font.metrics("ascent")) for font in label_fonts.values())
+            label_h = max(label_ascent - int(font.metrics("ascent")) + int(font.metrics("linespace"))
+                          for font in label_fonts.values())
             self._measured = (
                 content, columns, int(self.label_font.measure(caption)),
-                int(self.label_font.metrics("linespace")),
+                int(self.label_font.metrics("linespace")), label_ascent, label_h,
                 int(self.main_font.metrics("ascent")),
-                int(self.main_font.measure(status)) if status else 0,
+                int(self.status_font.measure(status)) if status else 0,
+                int(self.status_font.metrics("ascent")),
             )
         return self._measured
 
     def _render(self) -> None:
-        """Value-first WIN / LOSS / RATE / STREAK panel.
+        """Value-first WIN / LOSE / 勝率 / 連勝 panel.
 
         BEST is deliberately not drawn; it stays in Dashboard Overview.  The
-        persistent streak-status wording (アツい … RUSH継続中) follows STREAK
-        only while player_streak_status_enabled is on (the default).
+        persistent streak-status wording (アツい … RUSH継続中) follows 連勝
+        only while player_streak_status_enabled is on (the default), in the
+        Japanese face on the values' baseline.
         """
         s = self.last_stats
         wins, losses, rate, _best_streak, scope_label = self._display_values()
@@ -798,9 +825,9 @@ class GameOverlay:
         caption = "LIFETIME TOTALS" if scope_label else "SESSION"
         status = str(s.get("status") or "") if self._show_streak_status else ""
         status_level = int(s.get("status_level", 0)) if status else 0
-        _content, columns, caption_w, label_h, value_ascent, status_w = self._measure(
-            metrics, caption, status)
-        layout = layout_panel(columns, caption_w, label_h, value_ascent, label_h,
+        (_content, columns, caption_w, caption_h, label_ascent, label_h, value_ascent,
+         status_w, status_ascent) = self._measure(metrics, caption, status)
+        layout = layout_panel(columns, caption_w, caption_h, value_ascent, label_h,
                               self._ui_scale, self._available_width, status_w)
         key = (metrics, caption, status, status_level, layout.gap)
         if key == self._last_render_key:
@@ -846,22 +873,25 @@ class GameOverlay:
                 center, layout.value_y, anchor="n", text=value,
                 font=self.main_font, fill=TEXT_FG,
             )
+            label_font = self._label_font(label)
+            label_y = layout.label_y + label_ascent - int(label_font.metrics("ascent"))
             self.canvas.create_text(
-                center + label_shadow, layout.label_y + label_shadow,
-                anchor="n", text=label, font=self.label_font, fill=SHADOW,
+                center + label_shadow, label_y + label_shadow,
+                anchor="n", text=label, font=label_font, fill=SHADOW,
             )
             self.canvas.create_text(
-                center, layout.label_y, anchor="n", text=label,
-                font=self.label_font, fill=LABEL_FG,
+                center, label_y, anchor="n", text=label,
+                font=label_font, fill=LABEL_FG,
             )
         if status:
+            status_y = layout.value_y + value_ascent - status_ascent
             self.canvas.create_text(
-                layout.status_x + shadow, layout.value_y + shadow,
-                anchor="nw", text=status, font=self.main_font, fill=SHADOW,
+                layout.status_x + shadow, status_y + shadow,
+                anchor="nw", text=status, font=self.status_font, fill=SHADOW,
             )
             self.canvas.create_text(
-                layout.status_x, layout.value_y, anchor="nw", text=status,
-                font=self.main_font, fill=STATUS_COLORS.get(status_level, TEXT_FG),
+                layout.status_x, status_y, anchor="nw", text=status,
+                font=self.status_font, fill=STATUS_COLORS.get(status_level, TEXT_FG),
             )
         self.text_window.update_idletasks()
 

@@ -97,6 +97,9 @@ def partial_overlay(scale=1.0, **values):
     overlay.text_window = Mock()
     overlay.main_font = FakeFont(16 * scale, round(38 * scale), round(30 * scale))
     overlay.label_font = FakeFont(8 * scale, round(18 * scale), round(14 * scale))
+    # The Japanese faces differ in metrics, as Yu Gothic UI does from Segoe UI Variable.
+    overlay.label_ja_font = FakeFont(10 * scale, round(22 * scale), round(17 * scale))
+    overlay.status_font = FakeFont(20 * scale, round(42 * scale), round(33 * scale))
     overlay._ui_scale = scale
     overlay.last_stats = stats(**values)
     overlay._stats_scope = "session"
@@ -129,11 +132,14 @@ def assert_inside_safe_zone(case, x, y, w, h, left, top, width, height, scale):
 class PlayerMetricsTests(unittest.TestCase):
     def test_exactly_four_value_first_metrics_without_best(self):
         metrics = game_overlay.player_metrics(12, 7, 63.157, 3)
-        self.assertEqual(metrics, (("WIN", "12"), ("LOSS", "7"), ("RATE", "63.2%"), ("STREAK", "3")))
-        self.assertEqual(game_overlay.player_metrics(0, 0, 0.0, 0)[2], ("RATE", "0.0%"))
-        self.assertEqual(game_overlay.player_metrics(5, 0, 100.0, 5)[2], ("RATE", "100.0%"))
+        # The existing product copy (T3 finding): UI-1A changes layout, not labels.
+        self.assertEqual(metrics, (("WIN", "12"), ("LOSE", "7"), ("勝率", "63.2%"), ("連勝", "3")))
+        self.assertEqual(game_overlay.player_metrics(0, 0, 0.0, 0)[2], ("勝率", "0.0%"))
+        self.assertEqual(game_overlay.player_metrics(5, 0, 100.0, 5)[2], ("勝率", "100.0%"))
         for label, _ in metrics:
             self.assertNotIn("BEST", label)
+        for renamed in ("LOSS", "RATE", "STREAK"):
+            self.assertNotIn(renamed, SOURCE)
 
     def test_underlying_best_statistic_is_unchanged(self):
         normalized = stats(wins=9, losses=2, streak=3, best=7)
@@ -150,6 +156,36 @@ class PlayerMetricsTests(unittest.TestCase):
         self.assertEqual(pick({"Yu Gothic UI", "Meiryo"}, game_overlay.VALUE_FONTS), "Yu Gothic UI")
         self.assertEqual(pick(set(), game_overlay.LABEL_FONTS), "Meiryo")
 
+    def test_japanese_text_has_its_own_japanese_face(self):
+        pick, japanese = game_overlay.pick_font_family, game_overlay.JAPANESE_FONTS
+        installed = {"Segoe UI Variable Display", "Segoe UI Variable Text", "Yu Gothic UI", "Meiryo UI", "Meiryo"}
+        self.assertEqual(pick(installed, japanese), "Yu Gothic UI", "the pre-UI-1A status face")
+        self.assertEqual(pick({"Meiryo UI", "Meiryo"}, japanese), "Meiryo UI")
+        self.assertEqual(pick(set(), japanese), "Meiryo")
+        self.assertFalse(any("Segoe" in family for family in japanese), "never the Latin value face")
+        for word in ("アツい", "激アツ", "超激アツ", "覚醒ゾーン", "RUSH継続中", "勝率", "連勝"):
+            self.assertTrue(game_overlay.is_japanese_text(word), word)
+        for latin in ("WIN", "LOSE", "SESSION", "LIFETIME TOTALS", "63.2%"):
+            self.assertFalse(game_overlay.is_japanese_text(latin), latin)
+
+    def test_built_fonts_split_values_labels_and_japanese(self):
+        import tkinter.font as tkfont
+        installed = ("Segoe UI Variable Display", "Segoe UI Variable Text", "Yu Gothic UI", "Meiryo")
+        overlay = game_overlay.GameOverlay.__new__(game_overlay.GameOverlay)
+        overlay.root = object()
+        with patch.object(tkfont, "families", return_value=installed), \
+             patch.object(tkfont, "Font", side_effect=lambda **kw: kw):
+            overlay._build_fonts(22)
+        self.assertEqual(overlay.main_font, {"root": overlay.root, "family": "Segoe UI Variable Display",
+                                             "size": 22, "weight": "bold"}, "UI-1A values unchanged")
+        self.assertEqual(overlay.label_font["family"], "Segoe UI Variable Text")
+        self.assertEqual(overlay.status_font, {"root": overlay.root, "family": "Yu Gothic UI",
+                                               "size": 22, "weight": "bold"}, "as before UI-1A")
+        self.assertEqual(overlay.label_ja_font["family"], "Yu Gothic UI")
+        self.assertEqual((overlay.label_ja_font["size"], overlay.label_ja_font["weight"]),
+                         (overlay.label_font["size"], overlay.label_font["weight"]), "same label hierarchy")
+        self.assertLess(overlay.label_ja_font["size"], overlay.main_font["size"])
+
 
 class PlayerRenderTests(unittest.TestCase):
     def test_values_are_primary_and_labels_quieter(self):
@@ -157,16 +193,27 @@ class PlayerRenderTests(unittest.TestCase):
         overlay._render()
         canvas = overlay.canvas
         self.assertEqual(canvas.texts(game_overlay.TEXT_FG), ["12", "7", "63.2%", "3"])
-        self.assertEqual(canvas.texts(game_overlay.LABEL_FG), ["WIN", "LOSS", "RATE", "STREAK"])
+        self.assertEqual(canvas.texts(game_overlay.LABEL_FG), ["WIN", "LOSE", "勝率", "連勝"])
         self.assertEqual(canvas.texts(game_overlay.ACCENT), ["SESSION"])
         values = [kw for kind, _, kw in canvas.items if kind == "text" and kw["fill"] == game_overlay.TEXT_FG]
-        labels = [kw for kind, _, kw in canvas.items if kind == "text" and kw["fill"] == game_overlay.LABEL_FG]
+        labels = {kw["text"]: (pos, kw) for kind, pos, kw in canvas.items
+                  if kind == "text" and kw["fill"] == game_overlay.LABEL_FG}
         self.assertTrue(all(kw["font"] is overlay.main_font for kw in values))
-        self.assertTrue(all(kw["font"] is overlay.label_font for kw in labels))
+        self.assertIs(labels["WIN"][1]["font"], overlay.label_font)
+        self.assertIs(labels["LOSE"][1]["font"], overlay.label_font)
+        self.assertIs(labels["勝率"][1]["font"], overlay.label_ja_font, "a Japanese face, not glyph fallback")
+        self.assertIs(labels["連勝"][1]["font"], overlay.label_ja_font)
+        caption = [kw for kind, _, kw in canvas.items if kw.get("fill") == game_overlay.ACCENT and kind == "text"]
+        self.assertIs(caption[0]["font"], overlay.label_font)
+        baselines = {pos[1] + kw["font"].ascent for pos, kw in labels.values()}
+        self.assertEqual(len(baselines), 1, "Latin and Japanese labels share one baseline")
         value_y = {pos[1] for kind, pos, kw in canvas.items if kw.get("fill") == game_overlay.TEXT_FG}
-        label_y = {pos[1] for kind, pos, kw in canvas.items if kw.get("fill") == game_overlay.LABEL_FG}
+        label_y = {pos[1] for pos, _ in labels.values()}
         self.assertEqual(len(value_y), 1)
         self.assertLess(max(value_y), min(label_y), "values are the first metric scan line")
+        for pos, kw in labels.values():
+            self.assertLessEqual(pos[1] + kw["font"].linespace, overlay._panel_size[1] - game_overlay.PAD_Y,
+                                 "the taller Japanese label row fits the panel")
 
     STATUS_BY_STREAK = {0: ("", 0), 2: ("", 0), 3: ("アツい", 1), 4: ("アツい", 1), 5: ("激アツ", 2),
                         9: ("激アツ", 2), 10: ("超激アツ", 3), 15: ("覚醒ゾーン", 4),
@@ -202,15 +249,37 @@ class PlayerRenderTests(unittest.TestCase):
                 self.assertEqual(len(status), 1)
                 (x, y), kw = status[0]
                 self.assertEqual(kw["fill"], game_overlay.STATUS_COLORS[level])
-                self.assertIs(kw["font"], overlay.main_font, "same size as before UI-1A: the value font")
+                self.assertIs(kw["font"], overlay.status_font, "the Japanese face, as before UI-1A")
+                self.assertIsNot(kw["font"], overlay.main_font, "not the Segoe value face")
                 value_y = {p[1] for k, p, v in overlay.canvas.items if v.get("fill") == game_overlay.TEXT_FG}
-                self.assertEqual({y}, value_y, "on the value row")
+                self.assertEqual({y + overlay.status_font.ascent},
+                                 {vy + overlay.main_font.ascent for vy in value_y}, "on the values' baseline")
+                self.assertGreaterEqual(y, 0)
                 streak_label_x = [p[0] for k, p, v in overlay.canvas.items
-                                  if v.get("text") == "STREAK" and v["fill"] == game_overlay.LABEL_FG][0]
-                self.assertGreater(x, streak_label_x, "follows STREAK")
-                self.assertLessEqual(x + overlay.main_font.measure(word), overlay._panel_size[0])
+                                  if v.get("text") == "連勝" and v["fill"] == game_overlay.LABEL_FG][0]
+                self.assertGreater(x, streak_label_x, "follows 連勝")
+                self.assertLessEqual(x + overlay.status_font.measure(word), overlay._panel_size[0])
+                self.assertLessEqual(y + overlay.status_font.linespace, overlay._panel_size[1])
         self.assertEqual(game_overlay.STATUS_COLORS, {0: game_overlay.TEXT_FG, 1: "#ffb04a", 2: "#ff5a45",
                                                       3: "#ffd740", 4: "#fff176", 5: "#ffffff"})
+
+    def test_status_on_only_widens_the_panel_by_one_gap_and_its_text(self):
+        for scale in SCALES:
+            for streak, (word, _level) in self.STATUS_BY_STREAK.items():
+                if not word:
+                    continue
+                with self.subTest(scale=scale, streak=streak):
+                    on = partial_overlay(scale, wins=streak + 1, losses=1, streak=streak)
+                    off = partial_overlay(scale, wins=streak + 1, losses=1, streak=streak)
+                    off._show_streak_status = False
+                    on._render()
+                    off._render()
+                    gap = round(game_overlay.GAP_REGULAR * scale)
+                    self.assertEqual(on._panel_size, (off._panel_size[0] + gap + on.status_font.measure(word),
+                                                      off._panel_size[1]))
+                    metric_items = lambda o: [(pos, kw["text"]) for kind, pos, kw in o.canvas.items
+                                              if kind == "text" and kw["text"] != word]
+                    self.assertEqual(metric_items(on), metric_items(off), "values and labels do not move")
 
     def test_status_off_is_the_quiet_telemetry_surface(self):
         for streak in self.STATUS_BY_STREAK:
@@ -354,12 +423,13 @@ class LayoutAndSafeZoneTests(unittest.TestCase):
         overlay = partial_overlay(1.0, wins=12, losses=7, streak=3)
         overlay._render()
         regular_width = overlay._panel_size[0]
-        fonts = (overlay.main_font, overlay.label_font)
+        fonts = (overlay.main_font, overlay.label_font, overlay.label_ja_font, overlay.status_font)
         with patch.object(overlay, "_client_scale", return_value=1.0), \
              patch.object(overlay, "_show_absolute"):
             overlay._show_at_game(0, 0, regular_width + 2 * 24 - 1, 720, 1)
         self.assertEqual(overlay._last_render_key[-1], game_overlay.GAP_COMPACT)
-        self.assertEqual((overlay.main_font, overlay.label_font), fonts)
+        self.assertEqual((overlay.main_font, overlay.label_font, overlay.label_ja_font, overlay.status_font),
+                         fonts)
 
     def test_client_smaller_than_panel_stays_anchored_inside(self):
         x, y = game_overlay.place_panel(100, 50, 200, 60, 352, 87, 1.0)
@@ -686,8 +756,27 @@ class RealTkCanvasTests(unittest.TestCase):
         overlay._build_fonts(22)
         return overlay
 
+    def test_real_japanese_text_uses_the_japanese_face(self):
+        import tkinter.font as tkfont
+        overlay = self.use_scale(1.0)
+        families = tkfont.families(overlay.root)
+        japanese = game_overlay.pick_font_family(families, game_overlay.JAPANESE_FONTS)
+        value = game_overlay.pick_font_family(families, game_overlay.VALUE_FONTS)
+        if "Yu Gothic UI" in families:
+            self.assertEqual(japanese, "Yu Gothic UI")
+        self.assertEqual(overlay.status_font.actual("family"), japanese)
+        self.assertEqual(overlay.label_ja_font.actual("family"), japanese)
+        self.assertEqual(overlay.main_font.actual("family"), value)
+        self.assertEqual(overlay.status_font.actual("weight"), "bold")
+        self.assertEqual(overlay.status_font.actual("size"), overlay.main_font.actual("size"))
+        self.assertEqual(overlay.label_ja_font.actual("size"), overlay.label_font.actual("size"))
+        if value.startswith("Segoe"):
+            self.assertNotEqual(overlay.status_font.actual("family"), value)
+
     def test_real_font_matrix_fits_in_both_status_modes(self):
+        # Every status word (アツい 3, 激アツ 5, 超激アツ 10, 覚醒ゾーン 15, RUSH継続中 20+).
         cases = ((0, 0, 0, None), (12, 7, 3, None), (99999, 99999, 50, None), (30, 1, 15, None),
+                 (9, 0, 5, None), (40, 2, 10, None),
                  (2, 1, 1, {"wins": 12345, "losses": 6789, "best_streak": 9, "win_rate": 64.5}))
         for scale in SCALES:
             overlay = self.use_scale(scale)
@@ -722,7 +811,15 @@ class RealTkCanvasTests(unittest.TestCase):
                     expected_status = overlay.last_stats["status"] if status_on else ""
                     if expected_status:
                         self.assertEqual(texts.count(expected_status), 2, "status plus its shadow")
-                    for label in ("WIN", "LOSS", "RATE", "STREAK"):
+                    fonts = {canvas.itemcget(i, "text"): canvas.itemcget(i, "font") for i in canvas.find_all()
+                             if canvas.type(i) == "text"}
+                    self.assertEqual(fonts[str(wins) if not lifetime else str(lifetime["wins"])],
+                                     str(overlay.main_font))
+                    self.assertEqual((fonts["WIN"], fonts["LOSE"]), (str(overlay.label_font),) * 2)
+                    self.assertEqual((fonts["勝率"], fonts["連勝"]), (str(overlay.label_ja_font),) * 2)
+                    if expected_status:
+                        self.assertEqual(fonts[expected_status], str(overlay.status_font))
+                    for label in ("WIN", "LOSE", "勝率", "連勝"):
                         self.assertEqual(texts.count(label), 2, "label plus its shadow")
                     label_points = abs(int(overlay.label_font.actual("size")))
                     self.assertGreaterEqual(label_points, 9, "9 pt = 12 logical px minimum")
