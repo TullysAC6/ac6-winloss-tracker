@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-23 JST
+Last updated: 2026-09-24 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
@@ -11,17 +11,18 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | Item | State |
 |---|---|
 | Public stable | **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4` |
-| `main` product baseline | PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) SUCCESS. Documentation PR #41 then merged as current baseline `fbc2131d177aa3fb5b271c1bd6894440e07c97e0`. Resolve `origin/main` again before later work |
+| `main` product baseline | PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) SUCCESS. Documentation PR #41 then merged as `fbc2131d177aa3fb5b271c1bd6894440e07c97e0`, docs-only UI-0 PR #42 as `be77844dd86852f70e04d07b6885fbbdaa974fa8`, and test-only PR #43 as `0333183b8abe512262910ad81a6a1aadf09e8dda` ([exact-main CI 35946104314](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35946104314) SUCCESS). Production runtime is unchanged since PR #40. Resolve `origin/main` again before later work |
 | Accepted runtime | PR #40 exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`, merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; **accepted but not released**. Public stable v1.2.0 still contains the earlier PR #5 runtime (`38a21c2`, merged as `a042b18`) |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Settings / analytics generation | **PR #5: Implemented + Accepted + merged to `main`** (`a042b18`, 2026-09-13). Focused real-AC6 T3 PASS on the exact head `38a21c2`. **Released in v1.2.0**; not part of v1.1.1 |
 | Test-harness generation | **PR #35 (#14): Implemented + Accepted + merged to `main`** (`f9f5f0f`, 2026-09-18). Test infrastructure only; production runtime unchanged, so it carries no release payload. **[#14](https://github.com/TullysAC6/ac6-winloss-tracker/issues/14) is CLOSED as completed** (2026-09-19) |
 | §42 performance/security baseline | Moved out of #14 to its own owner, **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37) — OPEN, PLANNED, not started**. #17 and #25 consume it for their own acceptance |
 | T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
-| Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0` |
-| Unmerged generations | **No product generation is active.** PR #42 is a documentation-only UI-0 generation from `fbc2131d177aa3fb5b271c1bd6894440e07c97e0`; no UI implementation has started |
+| Source-install CI race | **Fixed and merged (test-only).** The first exact-main CI of `be77844` ([run 35798045591](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35798045591), attempt 1) failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun of the same SHA passed. Classified as a test-fixture timing race, not a product defect. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaces the sleep with a bounded 7 s / 100 ms readiness poll that fails on early exit, requires parseable runtime JSON with a PID, and requires that PID to equal the launched process. Merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`. Independent review GO is recorded in the PR #43 handoff checklist (no separate GitHub review object); T3 N/A (production runtime unchanged) |
+| Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0`. UI-0 design spec PR #42 merged as `be77844` |
+| Unmerged generations | **No product generation is active.** PR #42 and PR #43 are merged; no UI implementation has started |
 | Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
-| Current position | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is **ACCEPTED — UNRELEASED**. [UI-0](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED** in open docs-only PR #42. Issue #25 remains open; UI-1A is not started or authorized |
+| Current position | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is **ACCEPTED — UNRELEASED**. [UI-0](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`); the spec is canonical on `main`. This is a design state, not Implemented, Accepted or Released. Issue #25 remains open; UI-1A is not started or authorized |
 
 ## v1.2.0 published integrity — 2026-09-14
 
@@ -200,7 +201,7 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 | Area | Requirement | Issue | Status |
 |---|---|---|---|
 | Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is covered by automated and real-machine lifecycle evidence | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **ACCEPTED — UNRELEASED**; PR #40 merged, but v1.2.0 does not contain it |
-| UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | [UI-0 design spec](UI0_DESIGN_SPEC.md) **APPROVED** in docs-only PR #42; implementation not started |
+| UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | [UI-0 design spec](UI0_DESIGN_SPEC.md) **APPROVED + MERGED** (docs-only PR #42, `be77844`); implementation not started |
 | Tray / Launcher | A process-architecture change, not visual polish. Last phase, own issue and own PR. Not implemented unless its lifecycle safety can be demonstrated | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | BACKLOG |
 | Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
 | Seasonal rank / rating progression | The user's own rank and rating over time, separated by season and never carried forward. **The pre-S and S rating systems are not one scale** — the boundary is pre-S / non-S (UNRANKED through A4) vs S, with **A4 on the pre-S side** — and the pre-S → S boundary is not drawn as one continuous line without a justified basis. Event-driven recognition only; recognition failure never touches WIN/LOSE, ResultGate, streak or match persistence. Work lands in #15 (acquisition, persistence, `rating_mode`), #16 (progression, chart, Season High/Low, delta, transition markers, `S RANK REACHED`) and #25 (season selector, chart presentation) | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | PLANNED, gated on reliable self-rank recognition |
@@ -221,13 +222,14 @@ not yet confirmed. The approximate two-month / Friday cadence is never authorita
 ## Next actions
 
 1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment: ACCEPTED — UNRELEASED.** Fresh independent Codex Sol review gave GO with zero findings; real-machine T3 passed on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`; PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; exact-main CI 35564747847 passed.
-2. [UI-0 design specification](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED** in docs-only PR #42. Merge requires explicit owner authorization; UI-1A remains not started and requires separate authorization.
+2. [UI-0 design specification](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED**: docs-only PR #42 (exact head `587431d263b174b916efe42cae554e137fc54e93`) merged as `be77844dd86852f70e04d07b6885fbbdaa974fa8`. Owner decisions are in its §20, including the 2026-09-23 decision to keep the Broadcast primary text at the current 24 px bold baseline. UI-0 is a design state only, not Implemented, Accepted or Released.
+3. **UI-1A is NOT STARTED and NOT AUTHORIZED.** It needs a separate explicit owner authorization; nothing in the UI-0 merge or its bookkeeping starts it.
 
 **PR #35 (#14 formal T1 harness) has landed** (2026-09-18, `f9f5f0f`), and **#14 is closed**. Its §42 baseline item belongs to **#37** (OPEN, PLANNED), not to #24.
 
 **PR #38 (test-only T0 TEMP-leak cleanup) has landed** (2026-09-19, `3bd89a3`), with green `main` CI.
 
-PR #40 and documentation PR #41 are merged. PR #42 is the only open documentation generation;
+PR #40, documentation PR #41, UI-0 documentation PR #42 and test-only PR #43 are merged;
 no product generation is active. No UI implementation starts as part of this work (§4). The L-A /
 L-B harness follow-ups remain recorded, not scheduled.
 

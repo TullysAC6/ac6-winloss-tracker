@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-23 JST
+Last updated: 2026-09-24 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -38,7 +38,9 @@ Issue #6
 - PR #13 merged Revision 3. PR #31 adds Revision 4 / §65, preserving manual-first Season catalog refresh, local cache, retrospective assignment, unresolved transitions and full multi-season reconciliation. Revision 4 is canonical on main after PR #31 merged as `e214ae0`; no Season runtime feature is implemented.
 - PR #31 merged as `e214ae0` after independent review GO. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) is green. Its reconciliation and merge are complete; do not redo them.
 - MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is accepted and merged but unreleased.
-- **UI-0 is DESIGN SPEC APPROVED in docs-only PR #42.** The implementation-ready specification is [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md). No production code, tests, runtime, dependency, or framework changed. Issue #25 remains open and UI-1A has not started.
+- **UI-0 is DESIGN SPEC APPROVED + MERGED.** Docs-only PR #42 (exact head `587431d263b174b916efe42cae554e137fc54e93`) merged as `be77844dd86852f70e04d07b6885fbbdaa974fa8`; [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is canonical on `main`. It is a design state, not Implemented, Accepted or Released. No production code, tests, runtime, dependency, or framework changed. Issue #25 remains open; **UI-1A is NOT STARTED and NOT AUTHORIZED**.
+  - Owner decisions are in spec §20: BEST STREAK off the always-on Player Overlay, always in Dashboard Overview, independently toggleable in Broadcast; the production 25-win milestone preserved exactly, with its canonical omission kept as a recorded discrepancy; 50-win ≤4.5 s normal / ≤3.0 s reduced motion; solid dark UI-2 shell as baseline with optional, non-blocking Windows 11 Mica proof; and, since 2026-09-23, **Broadcast primary text kept at the current 24 px bold baseline** unless real OBS evidence shows a readability problem (the earlier 28–36 CSS px proposal is not approved).
+- **The source-install CI race is fixed (test-only).** The first exact-main CI of `be77844` failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun passed. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaced the sleep with a bounded 7 s readiness poll matching `launcher.pyw`, and merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`; [exact-main CI 35946104314](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35946104314) passed. Production runtime unchanged; T3 N/A.
 
 ## The rule that cost a release — do not lose it
 
@@ -70,17 +72,18 @@ Release publication and post-release verification are complete. See `PROJECT_STA
    - Real-machine T3: PASS, including legacy migration and data preservation, one measured WIN and one measured LOSE counted once, overlay health, normal shutdown, shortcut relaunch, and final lifecycle cleanup. The Effect Screenshot milestone did not occur naturally and was not manufactured.
    - [PR #40](https://github.com/TullysAC6/ac6-winloss-tracker/pull/40) merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`, preserving the exact tested head. [Exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) passed.
    - **Not Released:** public stable v1.2.0 does not contain #24.
-2. [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED** in docs-only PR #42. Wait for explicit owner authorization before merging PR #42. Merging it does not authorize UI-1A.
+2. [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`). The merge does not authorize UI-1A.
+3. **UI-1A: NOT STARTED, NOT AUTHORIZED.** Do not create a UI-1A branch, touch `game_overlay.py` / `overlay.html`, add Broadcast config keys, or change milestone behaviour until the owner explicitly authorizes UI-1A.
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40 and documentation PR #41 are merged. No product generation is active; open PR #42 is documentation-only.
+At most two unmerged generations exist at a time (§4). PR #40, documentation PR #41, UI-0 documentation PR #42 and test-only PR #43 are merged. No product generation is active.
 
 ## Order after that — dependency, not preference
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.2.0, PR #13, PR #5, PR #35 and PR #40 are complete at their recorded states. PR #40 / #24 is accepted and merged, but not released. UI-0 is design-approved in open PR #42; UI-1A is not started. From here:
+v1.2.0, PR #13, PR #5, PR #35 and PR #40 are complete at their recorded states. PR #40 / #24 is accepted and merged, but not released. UI-0 is design-approved and merged (PR #42); UI-1A is not started or authorized. From here:
 
 ```text
 UI-0 → UI-1A → UI-1B
@@ -95,7 +98,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #40 is merged. No product generation is active; PR #42 is documentation-only.
+At most two unmerged generations exist at a time (§4). PR #40, PR #42 and PR #43 are merged. No product generation is active.
 
 ## What is newly recorded and must not be lost
 

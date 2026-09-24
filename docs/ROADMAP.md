@@ -75,9 +75,16 @@ The next product task at that date was [#24](https://github.com/TullysAC6/ac6-wi
 
 ## Position note — 2026-09-23
 
-- [UI-0](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED** in docs-only PR #42 from `fbc2131d177aa3fb5b271c1bd6894440e07c97e0`; merge awaits explicit owner authorization.
+- [UI-0](UI0_DESIGN_SPEC.md) was approved as **DESIGN SPEC APPROVED** in docs-only PR #42 from `fbc2131d177aa3fb5b271c1bd6894440e07c97e0`. *(Merged; see the 2026-09-24 note.)*
 - It surveys the current Tk/ttkbootstrap/HTML UI, defines Before → Proposed contracts, classifies all 36 proposals, and records accessibility, DPI, performance, lifecycle, rollback, and regression requirements.
 - No production code, test, runtime, dependency, or framework changed. Issue #25 remains open; UI-1A and every later implementation phase remain not started.
+
+## Position note — 2026-09-24
+
+- **UI-0 is DESIGN SPEC APPROVED + MERGED.** PR #42 (exact head `587431d263b174b916efe42cae554e137fc54e93`) merged as `be77844dd86852f70e04d07b6885fbbdaa974fa8`; [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is canonical on `main`. This is a design state, not Implemented, Accepted or Released.
+- Owner decision 2026-09-23 ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5787040618)), recorded as spec §20 decision 5: UI-1B keeps the current 24 px bold Broadcast primary text and enlarges it only on real OBS readability evidence. The earlier 28–36 CSS px proposal is not approved.
+- Test-only [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) fixed a source-install fixture timing race (fixed 2 s sleep → bounded 7 s Dashboard readiness poll) and merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`; [exact-main CI 35946104314](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35946104314) passed. Production runtime unchanged.
+- Issue #25 remains open. **UI-1A is NOT STARTED and NOT AUTHORIZED**; it needs separate explicit owner authorization. No product generation is active.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -138,7 +145,7 @@ Not a competitor to the two tracks above; it interleaves with them. Requirements
 [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) sections 56-65.
 
 1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)): **ACCEPTED — UNRELEASED**, merged in PR #40
-2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - **DESIGN SPEC APPROVED** in docs-only PR #42; merge and UI-1A each require their own authorization
+2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`); UI-1A requires its own authorization
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
 4. #28-A Season Catalog / Assignment Foundation - after #15 and before UI-2
 5. UI-2 Dashboard / History / Settings shell - after #15 and #28-A, including manual Season refresh
@@ -160,10 +167,11 @@ Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonic
 and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-18;
 and **PR #40 (#24 runtime isolation) accepted on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a` and merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`**, with exact-main CI 35564747847 green. It is not released.
 Revision 4 / §65 was merged in PR #31 as `e214ae0`; exact-main CI 35479744429 passed. Its manual-first Season requirements are not runtime implementation.
+The **UI-0 design specification is approved and merged** (PR #42 as `be77844`); it is a design state only, and UI-1A is not started or authorized.
 From the current position:
 
 ```text
-→ UI-0                        design specification, no code change
+✓ UI-0                        design specification, no code change — APPROVED + MERGED (PR #42)
 → UI-1A                       Player Overlay polish
 → UI-1B                       Broadcast Overlay polish
 → #15                         match metadata foundation
@@ -516,9 +524,9 @@ and History shell is built once against a settled match-metadata contract instea
 
 | Phase | Item | Status | Risk |
 |---|---|---|---|
-| UI-0 | [Design specification](UI0_DESIGN_SPEC.md) — current framework survey, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility; Before → Proposed per item; Low/Medium/High classification; rollback plan; regression-test plan. **No code change. Approval does not authorize implementation** | **DESIGN SPEC APPROVED** | none |
+| UI-0 | [Design specification](UI0_DESIGN_SPEC.md) — current framework survey, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility; Before → Proposed per item; Low/Medium/High classification; rollback plan; regression-test plan. **No code change. Approval does not authorize implementation** | **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`) | none |
 | UI-1A | Player Overlay polish — value over label, telemetry framing, thin background, DPI/aspect/safe-zone, minimal animation. Low-risk visual changes only | PLANNED | low |
-| UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance sizing | PLANNED | low |
+| UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance readability. Primary text keeps the current 24 px bold baseline unless real OBS evidence shows a readability problem (owner decision 2026-09-23, spec §20) | PLANNED | low |
 | UI-2 | Dashboard / History / Settings shell — top navigation (`OVERVIEW / HISTORY / STATISTICS / SETTINGS`), WIN RATE as primary KPI, date-grouped history, plus `SEASON INFORMATION`, cached Season, last checked, and `[ シーズン情報を更新 ]`. No gameplay modal or focus stealing | PLANNED | medium |
 | UI-3A | **Growth / Rank / Rating presentation.** Statistics page for the data from #16-A / #28-B: win-rate trend, rolling win rate, the **season selector**, and the Rank / Rating chart — with a separate scale or presentation where pre-S and S cannot be compared directly | PLANNED | medium |
 | UI-3B | **Opponent build statistics presentation.** Weapon / leg-type / full-build views for #17 and #10/#11/#12. Follows its data | PLANNED | medium |
