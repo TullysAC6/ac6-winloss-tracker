@@ -28,7 +28,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from app_paths import data_dir
 from config_utils import load_config
@@ -43,27 +43,34 @@ OVERLAY_RUNTIME_PATH = ROOT / ".overlay-runtime.json"
 
 # These settings are local to the independent in-game overlay.
 DEFAULT_PROCESS = "armoredcore6.exe"
-DEFAULT_X = 18
-DEFAULT_Y = 18
 DEFAULT_FONT_SIZE = 22
 DEFAULT_POLL_MS = 250
-DEFAULT_PANEL_OPACITY = 10
+DEFAULT_PANEL_OPACITY = 15
 DEFAULT_SERVER_CHECK_MS = 500
 DEFAULT_SERVER_STARTUP_GRACE_SEC = 20.0
 HEARTBEAT_SECONDS = 1.5
 STATS_FALLBACK_SECONDS = 3.0
 TRANSPARENT_KEY = "#010203"
-PANEL_BG = "#101216"
-TEXT_FG = "#f5f7fa"
-SUBTEXT_FG = "#c6cbd2"
-STATUS_COLORS = {
-    0: TEXT_FG,
-    1: "#ffb04a",  # アツい
-    2: "#ff5a45",  # 激アツ
-    3: "#ffd740",  # 超激アツ
-    4: "#fff176",  # 覚醒ゾーン
-    5: "#ffffff",  # RUSH
-}
+
+# UI-1A Player Overlay tokens (docs/UI0_DESIGN_SPEC.md §5 and §6).
+PANEL_BG = "#0B1116"      # color.base
+TEXT_FG = "#F2F7F8"       # color.text.primary: metric values
+LABEL_FG = "#AFC0C7"      # color.text.secondary: quieter metric labels
+ACCENT = "#4BD9E8"        # color.system.cyan: leading rule, corner ticks, caption
+ACK_ACCENT = "#8BE9F3"    # brighter cyan for the one-shot result acknowledgement
+SHADOW = "#000000"
+VALUE_FONTS = ("Segoe UI Variable Display", "Yu Gothic UI", "Meiryo")
+LABEL_FONTS = ("Segoe UI Variable Text", "Yu Gothic UI", "Meiryo")
+# Column minimum widths come from these samples, so a count going 9 -> 10
+# does not shift every metric sideways during play.
+METRIC_SAMPLES = ("000", "000", "100.0%", "00")
+SAFE_INSET_LOGICAL = 24
+SAFE_INSET_FRACTION = 0.0125
+GAP_REGULAR = 24
+GAP_COMPACT = 8
+PAD_X = 16
+PAD_Y = 8
+ACK_MS = 160
 
 
 def status_for_streak(streak: int) -> tuple[str, int]:
@@ -121,6 +128,105 @@ def normalize_lifetime(raw: Any) -> dict[str, Any] | None:
     if min(wins, losses, best) < 0 or not 0.0 <= rate <= 100.0:
         return None
     return {"wins": wins, "losses": losses, "best_streak": best, "win_rate": rate}
+
+
+def player_metrics(wins: int, losses: int, rate: float, streak: int) -> tuple[tuple[str, str], ...]:
+    """The four always-on Player metrics as (label, value). BEST is not one of them."""
+    return (
+        ("WIN", str(wins)),
+        ("LOSS", str(losses)),
+        ("RATE", f"{rate:.1f}%"),
+        ("STREAK", str(streak)),
+    )
+
+
+def pick_font_family(available: Any, preferred: tuple[str, ...]) -> str:
+    names = set(available)
+    for name in preferred:
+        if name in names:
+            return name
+    return preferred[-1]
+
+
+class PanelLayout(NamedTuple):
+    """Physical-pixel geometry of the Player panel; see layout_panel()."""
+
+    width: int
+    height: int
+    gap: int  # logical px token actually used
+    centers: tuple[int, ...]
+    caption_y: int
+    value_y: int
+    label_y: int
+    pad_x: int
+    rule_width: int
+    tick: int
+
+
+def layout_panel(
+    column_widths: tuple[int, ...],
+    caption_width: int,
+    caption_height: int,
+    value_ascent: int,
+    label_height: int,
+    scale: float,
+    available_width: int | None = None,
+) -> PanelLayout:
+    """Place value-first metric columns; spacing tokens are logical px.
+
+    When the regular 24 px gaps do not fit the AC6 client's safe width, gaps
+    fall back to the 8 px token. Type is never reduced.
+    """
+    pad_x = round(PAD_X * scale)
+    pad_y = round(PAD_Y * scale)
+    rule_width = max(1, round(2 * scale))
+    tick = max(4, round(8 * scale))
+    content = sum(column_widths)
+    gaps = len(column_widths) - 1
+
+    def width_for(gap_logical: int) -> int:
+        metrics = content + round(gap_logical * scale) * gaps
+        return rule_width + pad_x + max(metrics, caption_width) + pad_x
+
+    gap_logical = GAP_REGULAR
+    if available_width is not None and width_for(GAP_REGULAR) > available_width:
+        gap_logical = GAP_COMPACT
+    gap = round(gap_logical * scale)
+    width = width_for(gap_logical)
+
+    centers = []
+    x = rule_width + pad_x
+    for column in column_widths:
+        centers.append(x + column // 2)
+        x += column + gap
+    caption_y = pad_y
+    value_y = caption_y + caption_height + round(2 * scale)
+    label_y = value_y + value_ascent + round(4 * scale)
+    height = label_y + label_height + pad_y
+    return PanelLayout(width, height, gap_logical, tuple(centers), caption_y, value_y,
+                       label_y, pad_x, rule_width, tick)
+
+
+def safe_inset(client_width: int, client_height: int, scale: float) -> tuple[int, int]:
+    """max(24 logical px, 1.25% of the client dimension) on each axis."""
+    minimum = SAFE_INSET_LOGICAL * scale
+    return (round(max(minimum, client_width * SAFE_INSET_FRACTION)),
+            round(max(minimum, client_height * SAFE_INSET_FRACTION)))
+
+
+def place_panel(
+    left: int, top: int, client_width: int, client_height: int,
+    panel_width: int, panel_height: int, scale: float,
+) -> tuple[int, int]:
+    """Top-left of the panel inside the AC6 client's safe zone.
+
+    The panel keeps the same clearance from the opposite edges; when it cannot,
+    it stays anchored to the client's top-left rather than leaving the client.
+    """
+    inset_x, inset_y = safe_inset(client_width, client_height, scale)
+    x = max(left, min(left + inset_x, left + client_width - inset_x - panel_width))
+    y = max(top, min(top + inset_y, top + client_height - inset_y - panel_height))
+    return x, y
 
 
 def read_stats(path: Path = STATS_PATH) -> dict[str, Any] | None:
@@ -244,6 +350,10 @@ if os.name == "nt":
     user32.SetWindowPos.restype = wintypes.BOOL
     user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
     user32.ShowWindow.restype = wintypes.BOOL
+    # Windows 10 1607+. The safe-zone inset uses the AC6 window's own DPI.
+    if hasattr(user32, "GetDpiForWindow"):
+        user32.GetDpiForWindow.argtypes = [wintypes.HWND]
+        user32.GetDpiForWindow.restype = wintypes.UINT
 
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel32.OpenProcess.restype = wintypes.HANDLE
@@ -394,18 +504,21 @@ class GameOverlay:
     therefore look almost unchanged on a moving game background.
 
     This implementation uses:
-      * panel_root: solid dark panel with true window alpha (default 10%)
+      * panel_root: solid dark panel with true window alpha (default 15%)
       * text_window: color-key transparent window with fully opaque text
 
     The text window is owned by panel_root, so it stays above the panel.  Both
     windows are click-through, non-activating and topmost.
+
+    x_offset / y_offset of None place the panel in the responsive safe zone;
+    an explicit value keeps the original fixed offset from the client origin.
     """
 
     def __init__(
         self,
         process_name: str,
-        x_offset: int,
-        y_offset: int,
+        x_offset: int | None,
+        y_offset: int | None,
         font_size: int,
         poll_ms: int,
         panel_opacity: int = DEFAULT_PANEL_OPACITY,
@@ -465,8 +578,16 @@ class GameOverlay:
         startup_stats = read_stats()
         if startup_stats is not None:
             self.last_stats = startup_stats
+        # A result acknowledgement needs a known previous count; the first
+        # reading after an unreadable stats.json is a baseline, not a result.
+        self._stats_baseline = startup_stats is not None
+        self._ack_active = False
+        self._ack_after: str | None = None
         self.visible = False
         self._last_render_key: tuple[Any, ...] | None = None
+        self._measured: tuple[Any, ...] | None = None
+        self._available_width: int | None = None
+        self._panel_size = (1, 1)
 
         # Window 1: the actual translucent panel.  This window contains no
         # text, so changing its alpha cannot reduce text readability.
@@ -495,12 +616,11 @@ class GameOverlay:
             pass
         text_window.geometry("+32000+32000")
 
-        self.main_font = tkfont.Font(
-            family="Yu Gothic UI", size=font_size, weight="bold"
-        )
-        self.sub_font = tkfont.Font(
-            family="Yu Gothic UI", size=max(10, font_size - 7), weight="bold"
-        )
+        try:
+            self._ui_scale = float(panel_root.winfo_fpixels("1i")) / 96.0
+        except (tk.TclError, ValueError):
+            self._ui_scale = 1.0
+        self._build_fonts(font_size)
 
         self.canvas = tk.Canvas(
             text_window,
@@ -589,76 +709,136 @@ class GameOverlay:
                     life["best_streak"], "累計 ")
         return (s["wins"], s["losses"], float(s["win_rate"]), s["best_streak"], "")
 
-    def _render(self) -> None:
-        s = self.last_stats
-        wins, losses, rate, best_streak, scope_label = self._display_values()
-        key = (
-            wins, losses, s["streak"], best_streak,
-            round(rate, 1), s["status"], s["status_level"], scope_label,
+    def _build_fonts(self, font_size: int) -> None:
+        import tkinter.font as tkfont
+        families = tkfont.families(self.root)
+        self.main_font = tkfont.Font(
+            root=self.root, family=pick_font_family(families, VALUE_FONTS),
+            size=font_size, weight="bold",
         )
+        self.label_font = tkfont.Font(
+            root=self.root, family=pick_font_family(families, LABEL_FONTS),
+            size=max(9, round(font_size * 0.45)), weight="bold",
+        )
+        self._measured = None
+        self._last_render_key = None
+
+    def _measure(self, metrics: tuple[tuple[str, str], ...], caption: str) -> tuple[Any, ...]:
+        content = (metrics, caption)
+        if self._measured is None or self._measured[0] != content:
+            columns = tuple(
+                max(int(self.main_font.measure(value)), int(self.main_font.measure(sample)),
+                    int(self.label_font.measure(label)))
+                for (label, value), sample in zip(metrics, METRIC_SAMPLES)
+            )
+            self._measured = (
+                content, columns, int(self.label_font.measure(caption)),
+                int(self.label_font.metrics("linespace")),
+                int(self.main_font.metrics("ascent")),
+            )
+        return self._measured
+
+    def _render(self) -> None:
+        """Value-first WIN / LOSS / RATE / STREAK panel.
+
+        BEST and the pachinko streak status are deliberately not drawn: BEST
+        stays in Dashboard Overview and the loud moment is the milestone effect.
+        """
+        s = self.last_stats
+        wins, losses, rate, _best_streak, scope_label = self._display_values()
+        metrics = player_metrics(wins, losses, rate, s["streak"])
+        caption = "LIFETIME TOTALS" if scope_label else "SESSION"
+        _content, columns, caption_w, label_h, value_ascent = self._measure(metrics, caption)
+        layout = layout_panel(columns, caption_w, label_h, value_ascent, label_h,
+                              self._ui_scale, self._available_width)
+        key = (metrics, caption, layout.gap)
         if key == self._last_render_key:
             return
         self._last_render_key = key
 
-        main = (
-            f"WIN {wins}   LOSE {losses}   "
-            f"勝率 {rate:.1f}%   連勝 {s['streak']}"
-        )
-        status = str(s.get("status") or "")
-        status_text = f"   {status}" if status else ""
-        best = f"{scope_label}最高連勝 {best_streak}"
-
-        pad_x, pad_y, gap = 10, 6, 2
-        main_h = int(self.main_font.metrics("linespace"))
-        sub_h = int(self.sub_font.metrics("linespace"))
-        main_w = int(self.main_font.measure(main))
-        status_w = int(self.main_font.measure(status_text))
-        best_w = int(self.sub_font.measure(best))
-        width = max(main_w + status_w, best_w) + pad_x * 2
-        height = main_h + sub_h + gap + pad_y * 2
-
+        width, height = layout.width, layout.height
+        self._panel_size = (width, height)
         self.canvas.configure(width=width, height=height)
         self.canvas.delete("all")
 
-        y_main = pad_y
-        y_sub = pad_y + main_h + gap
-        shadow = "#000000"
-        shadow_dx, shadow_dy = 2, 2
+        # Only text and hairlines are drawn in this window.  The background
+        # panel lives in a separate true-alpha toplevel, so text stays 100%
+        # opaque.
+        accent = ACK_ACCENT if self._ack_active else ACCENT
+        rule_x = layout.rule_width / 2
+        self.canvas.create_line(
+            rule_x, 0, rule_x, height, width=layout.rule_width,
+            capstyle="butt", fill=accent, tags="accent",
+        )
+        tick, right, bottom = layout.tick, width - 1, height - 1
+        for points in ((right - tick, 0, right, 0, right, tick),
+                       (right - tick, bottom, right, bottom, right, bottom - tick)):
+            self.canvas.create_line(*points, fill=accent, tags="accent")
 
-        # Only text is drawn in this window.  The background panel lives in a
-        # separate true-alpha toplevel, so text stays 100% opaque.
+        shadow = max(1, round(2 * self._ui_scale))
+        label_shadow = max(1, round(self._ui_scale))
+        text_x = layout.rule_width + layout.pad_x
         self.canvas.create_text(
-            pad_x + shadow_dx, y_main + shadow_dy,
-            anchor="nw", text=main, font=self.main_font, fill=shadow
+            text_x + label_shadow, layout.caption_y + label_shadow,
+            anchor="nw", text=caption, font=self.label_font, fill=SHADOW,
         )
         self.canvas.create_text(
-            pad_x, y_main, anchor="nw", text=main,
-            font=self.main_font, fill=TEXT_FG
+            text_x, layout.caption_y, anchor="nw", text=caption,
+            font=self.label_font, fill=ACCENT,
         )
-
-        if status_text:
-            sx = pad_x + main_w
-            status_color = STATUS_COLORS.get(
-                int(s.get("status_level", 0)), TEXT_FG
+        for (label, value), center in zip(metrics, layout.centers):
+            self.canvas.create_text(
+                center + shadow, layout.value_y + shadow,
+                anchor="n", text=value, font=self.main_font, fill=SHADOW,
             )
             self.canvas.create_text(
-                sx + shadow_dx, y_main + shadow_dy,
-                anchor="nw", text=status_text, font=self.main_font, fill=shadow
+                center, layout.value_y, anchor="n", text=value,
+                font=self.main_font, fill=TEXT_FG,
             )
             self.canvas.create_text(
-                sx, y_main, anchor="nw", text=status_text,
-                font=self.main_font, fill=status_color
+                center + label_shadow, layout.label_y + label_shadow,
+                anchor="n", text=label, font=self.label_font, fill=SHADOW,
             )
-
-        self.canvas.create_text(
-            pad_x + shadow_dx, y_sub + shadow_dy,
-            anchor="nw", text=best, font=self.sub_font, fill=shadow
-        )
-        self.canvas.create_text(
-            pad_x, y_sub, anchor="nw", text=best,
-            font=self.sub_font, fill=SUBTEXT_FG
-        )
+            self.canvas.create_text(
+                center, layout.label_y, anchor="n", text=label,
+                font=self.label_font, fill=LABEL_FG,
+            )
         self.text_window.update_idletasks()
+
+    def _accept_stats(self, stats: dict[str, Any]) -> None:
+        previous = self.last_stats
+        self.last_stats = stats
+        counted = stats["wins"] + stats["losses"]
+        if self._stats_baseline and counted > previous["wins"] + previous["losses"]:
+            self._acknowledge_result()
+        self._stats_baseline = True
+        self._render()
+
+    def _acknowledge_result(self) -> None:
+        """One finite leading-rule pulse for a newly counted WIN or LOSE.
+
+        Undo, reset and DRAW never raise a count, so they never pulse.  Only
+        the tagged hairlines change colour; nothing is re-laid out.
+        """
+        if self._ack_after is not None:
+            try:
+                self.root.after_cancel(self._ack_after)
+            except self.tk.TclError:
+                pass
+        self._ack_active = True
+        self._paint_accent()
+        self._ack_after = self.root.after(ACK_MS, self._end_acknowledgement)
+
+    def _end_acknowledgement(self) -> None:
+        self._ack_after = None
+        self._ack_active = False
+        self._paint_accent()
+
+    def _paint_accent(self) -> None:
+        try:
+            self.canvas.itemconfigure("accent", fill=ACK_ACCENT if self._ack_active else ACCENT)
+        except self.tk.TclError:
+            pass
 
     def _show_absolute(self, x: int, y: int) -> None:
         self.text_window.update_idletasks()
@@ -699,8 +879,38 @@ class GameOverlay:
         user32.ShowWindow(self.text_hwnd, SW_SHOWNOACTIVATE)
         self.visible = bool(user32.IsWindowVisible(self.text_hwnd))
 
-    def _show_at_game(self, left: int, top: int) -> None:
-        self._show_absolute(left + self.x_offset, top + self.y_offset)
+    def _client_scale(self, hwnd: int) -> float:
+        """Logical-to-physical factor of the AC6 window's monitor."""
+        dpi = 0
+        if hwnd:
+            try:
+                dpi = int(user32.GetDpiForWindow(hwnd))
+            except (AttributeError, OSError):
+                dpi = 0
+        return dpi / 96.0 if dpi > 0 else self._ui_scale
+
+    def _show_at_game(
+        self, left: int, top: int, width: int = 0, height: int = 0, hwnd: int = 0,
+    ) -> None:
+        safe_x = safe_y = 0
+        if self.x_offset is None or self.y_offset is None:
+            scale = self._client_scale(hwnd)
+            inset_x, _inset_y = safe_inset(width, height, scale)
+            available = width - 2 * inset_x if self.x_offset is None else None
+            if available != self._available_width:
+                # Only a change of gap token re-lays out; _render is key-guarded.
+                self._available_width = available
+                self._render()
+            safe_x, safe_y = place_panel(left, top, width, height, *self._panel_size, scale)
+        x = left + self.x_offset if self.x_offset is not None else safe_x
+        y = top + self.y_offset if self.y_offset is not None else safe_y
+        self._show_absolute(x, y)
+
+    def _preview_origin(self) -> tuple[int, int]:
+        """--always-show without a foreground AC6 client: absolute screen origin."""
+        inset = round(SAFE_INSET_LOGICAL * self._ui_scale)
+        return (inset if self.x_offset is None else self.x_offset,
+                inset if self.y_offset is None else self.y_offset)
 
     def _hide(self) -> None:
         if self.visible or user32.IsWindowVisible(self.panel_hwnd):
@@ -923,8 +1133,7 @@ class GameOverlay:
     def _drain_effects(self) -> None:
         try:
             while True:
-                self.last_stats = self._stats_queue.get_nowait()
-                self._render()
+                self._accept_stats(self._stats_queue.get_nowait())
         except queue.Empty:
             pass
         try:
@@ -976,23 +1185,23 @@ class GameOverlay:
             self._next_stats_fallback_at = now + STATS_FALLBACK_SECONDS
             fallback_stats = read_stats()
             if fallback_stats is not None:
-                self.last_stats = fallback_stats
-                self._render()
+                self._accept_stats(fallback_stats)
 
         game = foreground_game_client(self.process_name)
         if game is not None:
-            _hwnd, left, top, width, height = game
+            hwnd, left, top, width, height = game
             # The persistent HUD remains positioned and updated throughout the
             # effect.  The transient window is simply layered over the game.
-            self._show_at_game(left, top)
+            self._show_at_game(left, top, width, height, hwnd)
             if self._active_effect is not None:
                 self._render_milestone_effect(game)
             elif self._effect_visible:
                 self._hide_effect()
         elif self.always_show:
-            self._show_absolute(self.x_offset, self.y_offset)
+            preview_x, preview_y = self._preview_origin()
+            self._show_absolute(preview_x, preview_y)
             if self._active_effect is not None:
-                preview = (0, self.x_offset, self.y_offset, 1920, 1080)
+                preview = (0, preview_x, preview_y, 1920, 1080)
                 self._render_milestone_effect(preview)
         else:
             if self._effect_visible:
@@ -1054,8 +1263,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=configured_process(),
         help="target foreground executable (default: config.json value)",
     )
-    p.add_argument("--x", type=int, default=DEFAULT_X, help="left offset in pixels")
-    p.add_argument("--y", type=int, default=DEFAULT_Y, help="top offset in pixels")
+    p.add_argument(
+        "--x", type=int, default=None,
+        help="fixed left offset in pixels from the game client (default: responsive safe zone)",
+    )
+    p.add_argument(
+        "--y", type=int, default=None,
+        help="fixed top offset in pixels from the game client (default: responsive safe zone)",
+    )
     p.add_argument(
         "--font-size",
         type=int,
@@ -1072,7 +1287,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--panel-opacity",
         type=int,
         default=DEFAULT_PANEL_OPACITY,
-        help="HUD panel opacity in percent (0..100; default: 10)",
+        help=f"HUD panel opacity in percent (0..100; default: {DEFAULT_PANEL_OPACITY})",
     )
     p.add_argument(
         "--always-show",
@@ -1093,7 +1308,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         p.error("--poll-ms must be 100..2000")
     if not 0 <= args.panel_opacity <= 100:
         p.error("--panel-opacity must be 0..100")
-    if not -5000 <= args.x <= 5000 or not -5000 <= args.y <= 5000:
+    if any(value is not None and not -5000 <= value <= 5000 for value in (args.x, args.y)):
         p.error("--x/--y must be -5000..5000")
     return args
 

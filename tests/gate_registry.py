@@ -59,6 +59,9 @@ SCREENSHOT_PURE = ("ScreenshotTests.test_diagnostics_without_stdout_and_io_failu
 WRITABLE_HISTORY_SERVER = ("SuccessfulPurgeLeavesAWritableSession", "UnrecoverableSessionIsNeverSuccess",
                            "FailedPurgeKeepsRecordingInHistory", "SessionResetCannotProduceStatsOnlyResults",
                            "NormalPathIsUnchanged")
+PLAYER_OVERLAY_PURE = ("PlayerMetricsTests", "PlayerRenderTests", "LayoutAndSafeZoneTests",
+                       "ExplicitOffsetCompatibilityTests", "ResultAcknowledgementTests",
+                       "MilestoneCharacterizationTests", "StructuralBudgetTests")
 
 # Order within a gate is execution order. T0 keeps the relative order the
 # pre-#14 tests/run_all_tests.py used; T2 runs the launcher first, as CI did.
@@ -99,6 +102,8 @@ ENTRIES = (
     Entry("test_strict_clear_gate.py", T0, "strict CLEAR gate on labels"),
     Entry("test_game_overlay_static.py", T0, "game overlay static checks"),
     Entry("test_game_overlay_lifecycle_static.py", T0, "game overlay lifecycle static checks"),
+    Entry("tests/test_player_overlay_layout.py", T0, "UI-1A Player layout, safe zone and acknowledgement logic",
+          selectors=PLAYER_OVERLAY_PURE),
     Entry("tests/test_t1_contract.py", T0, "T1 harness contract: schema, loader, integrity, security, reports"),
     Entry("tests/test_t1_legacy_coverage.py", T0, "every pre-#14 pixel assertion is still enforced"),
     Entry("tests/test_gate_registry.py", T0, "this registry: unique ownership and CI order"),
@@ -117,6 +122,8 @@ ENTRIES = (
     Entry("tests/test_windows_capture_integration.py", T2, "native WGC; opt-in through AC6_RUN_WGC_INTEGRATION"),
     Entry("tests/test_native_effect_screenshot.py", T2, "native screenshot; opt-in through AC6_RUN_SCREENSHOT_INTEGRATION"),
     Entry("tests/test_occlusion_cloaked.py", T2, "real windows and DWM queries"),
+    Entry("tests/test_player_overlay_layout.py", T2, "real Tk fonts and the three real overlay HWNDs",
+          selectors=("RealTkCanvasTests",)),
     Entry("tests/test_launcher_gui_lifecycle.py", T2, "launcher GUI and processes"),
     Entry("tests/test_settings_window.py", T2, "settings GUI and launcher processes", selectors=("SettingsTests",)),
     Entry("tests/test_shutdown.py", T2, "shutdown over a local HTTP server"),

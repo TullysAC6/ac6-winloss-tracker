@@ -65,7 +65,7 @@ assert "fallback_stats = read_stats()" in game_source
 assert "\n        s = read_stats()\n" not in game_source[game_source.index("def _tick(self)"):]
 assert 'self.canvas.delete("milestone")' not in game_source
 assert 'self.canvas.delete("all")' in game_source
-assert 'self._show_at_game(left, top)' in game_source
+assert 'self._show_at_game(left, top, width, height, hwnd)' in game_source
 assert 'int(height * 0.62)' in game_source
 print("server-sourced 5..50 effect rendering coverage: OK")
 
