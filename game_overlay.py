@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from app_paths import data_dir
+import preferences
 from config_utils import load_config
 from effect_screenshot import EffectScreenshots
 from event_bus import EFFECT_TTL_MS
@@ -59,8 +60,8 @@ LABEL_FG = "#AFC0C7"      # color.text.secondary: quieter metric labels
 ACCENT = "#4BD9E8"        # color.system.cyan: leading rule, corner ticks, caption
 ACK_ACCENT = "#8BE9F3"    # brighter cyan for the one-shot result acknowledgement
 SHADOW = "#000000"
-# Persistent streak-status wording (config player_streak_status_enabled,
-# default ON). Colours are the pre-UI-1A ones; the text never blinks.
+# Persistent streak-status wording (preferences.json
+# player_streak_status_enabled, default ON). Colours are the pre-UI-1A ones; the text never blinks.
 STATUS_COLORS = {
     0: TEXT_FG,
     1: "#ffb04a",  # アツい
@@ -623,7 +624,7 @@ class GameOverlay:
         # A result acknowledgement needs a known previous count; the first
         # reading after an unreadable stats.json is a baseline, not a result.
         self._stats_baseline = startup_stats is not None
-        self._show_streak_status = True  # config player_streak_status_enabled
+        self._show_streak_status = True  # preferences player_streak_status_enabled
         self._ack_active = False
         self._ack_after: str | None = None
         self.visible = False
@@ -1173,12 +1174,14 @@ class GameOverlay:
         and costs nothing when neither the scope nor the totals moved.
         """
         try:
-            config = load_config()
-            scope = config.get("overlay_stats_scope", "session")
+            scope = load_config().get("overlay_stats_scope", "session")
             self._stats_scope = "lifetime" if scope == "lifetime" else "session"
-            self._show_streak_status = config.get("player_streak_status_enabled", True) is not False
         except Exception:
             pass
+        # preferences.json, not config.json: see preferences.py.  A bad file
+        # keeps the last value instead of flipping the display.
+        self._show_streak_status = preferences.effective(
+            "player_streak_status_enabled", getattr(self, "_show_streak_status", True)) is not False
         try:
             while True:
                 self._lifetime = self._lifetime_queue.get_nowait()

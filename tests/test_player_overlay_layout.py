@@ -225,19 +225,34 @@ class PlayerRenderTests(unittest.TestCase):
                 quiet._render()
                 self.assertEqual(overlay._panel_size, quiet._panel_size, "no space kept for status")
 
-    def test_setting_is_read_live_and_missing_or_unreadable_config_keeps_it_on(self):
+    def test_setting_is_read_live_from_preferences_and_a_bad_file_keeps_it(self):
+        import tempfile
+        import config_utils
+        import preferences
+        directory = tempfile.TemporaryDirectory(prefix="ac6-ui1a-prefs-")
+        self.addCleanup(directory.cleanup)
+        prefs = Path(directory.name) / "preferences.json"
+        patcher = patch.object(config_utils, "CONFIG_PATH", Path(directory.name) / "config.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(setattr, preferences, "_cache", None)
         overlay = partial_overlay(wins=6, losses=1, streak=5)
         overlay._lifetime_queue = queue.Queue()
 
-        def tick(config=None, error=None):
-            with patch.object(game_overlay, "load_config", return_value=config, side_effect=error):
+        def tick(text=None):
+            if text is None:
+                prefs.unlink(missing_ok=True)
+            else:
+                prefs.write_text(text, encoding="utf-8")
+            preferences._cache = None
+            with patch.object(game_overlay, "load_config", return_value={"overlay_stats_scope": "session"}),                  patch("builtins.print"):
                 game_overlay.GameOverlay._drain_display_scope(overlay)
             return " ".join(overlay.canvas.texts())
 
-        self.assertIn("激アツ", tick({"overlay_stats_scope": "session"}), "missing key = ON")
-        self.assertNotIn("激アツ", tick({"player_streak_status_enabled": False}))
-        self.assertNotIn("激アツ", tick(error=OSError("gone")), "unreadable config keeps the last value")
-        self.assertIn("激アツ", tick({"player_streak_status_enabled": True}))
+        self.assertIn("激アツ", tick(), "no preferences file = ON")
+        self.assertNotIn("激アツ", tick('{"preferences_version": 1, "player_streak_status_enabled": false}'))
+        self.assertNotIn("激アツ", tick("{broken"), "an invalid file keeps the last value")
+        self.assertIn("激アツ", tick('{"preferences_version": 1, "player_streak_status_enabled": true}'))
         self.assertEqual(overlay.canvas.deleted, ["all", "all", "all"], "only real changes repaint")
 
     def test_lifetime_scope_is_labelled_and_streak_stays_session(self):
@@ -509,78 +524,32 @@ class MilestoneCharacterizationTests(unittest.TestCase):
 
 
 class StreakStatusSettingTests(unittest.TestCase):
-    """player_streak_status_enabled: additive, default ON, Player-only."""
+    """player_streak_status_enabled: preferences.json, default ON, Player-only.
+
+    The storage rules themselves are covered by tests/test_preferences.py.
+    """
 
     KEY = "player_streak_status_enabled"
 
-    def setUp(self):
-        import tempfile
+    def test_default_on_and_stored_outside_the_frozen_config(self):
         import config_utils
+        import preferences
         import settings_window
-        self.config_utils, self.settings = config_utils, settings_window
-        self.directory = tempfile.TemporaryDirectory(prefix="ac6-ui1a-config-")
-        self.addCleanup(self.directory.cleanup)
-        self.path = Path(self.directory.name) / "config.json"
-        patcher = patch.object(config_utils, "CONFIG_PATH", self.path)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        config_utils._last_good = config_utils._last_good_signature = None
-        self.addCleanup(setattr, config_utils, "_last_good", None)
-        self.addCleanup(setattr, config_utils, "_last_good_signature", None)
-
-    def write(self, raw):
-        self.path.write_text(json.dumps(raw), encoding="utf-8")
-        self.config_utils._last_good = self.config_utils._last_good_signature = None
-
-    def test_default_on_and_existing_v18_config_without_the_key_is_on(self):
-        cu = self.config_utils
-        self.assertIs(cu.DEFAULT_CONFIG[self.KEY], True)
-        self.assertEqual(cu.CONFIG_VERSION, 18, "additive key: no version bump, no forced rewrite")
-        existing = {k: v for k, v in cu.DEFAULT_CONFIG.items() if k != self.KEY}
-        self.write(existing)
-        before = self.path.read_bytes()
-        self.assertIs(cu.load_config()[self.KEY], True)
-        self.assertEqual(self.path.read_bytes(), before, "loading never writes the new key")
-        self.assertIs(self.settings.read_settings()[self.KEY], True)
-
-    def test_value_is_strictly_boolean(self):
-        cu = self.config_utils
-        self.assertIs(cu.validate_config(dict(cu.DEFAULT_CONFIG, **{self.KEY: False}))[self.KEY], False)
-        for bad in ("false", 0, 1, None):
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                cu.validate_config(dict(cu.DEFAULT_CONFIG, **{self.KEY: bad}))
-
-    def test_older_versions_migrate_to_on_without_gaining_the_key(self):
-        cu = self.config_utils
-        old = {k: v for k, v in cu.DEFAULT_CONFIG.items()
-               if k not in (self.KEY, "effect_enabled", "overlay_stats_scope")}
-        old["config_version"] = 17
-        self.write(old)
-        self.assertIs(cu.load_config()[self.KEY], True)
-        self.assertNotIn(self.KEY, json.loads(self.path.read_text(encoding="utf-8")))
-
-    def test_settings_round_trip_keeps_unrelated_keys(self):
-        self.write(dict(self.config_utils.DEFAULT_CONFIG, port=9123))
-        self.assertIn(self.KEY, self.settings.EDITABLE_KEYS)
-        self.settings.save_settings({self.KEY: False})
-        stored = json.loads(self.path.read_text(encoding="utf-8"))
-        self.assertIs(stored[self.KEY], False)
-        self.assertEqual(stored["port"], 9123)
-        self.assertIs(self.config_utils.load_config()[self.KEY], False)
-        with self.assertRaises(ValueError):
-            self.settings.save_settings({self.KEY: "off"})
-        self.settings.save_settings({self.KEY: True})
-        self.assertIs(self.config_utils.load_config()[self.KEY], True)
+        self.assertIs(preferences.DEFAULTS[self.KEY], True)
+        self.assertNotIn(self.KEY, config_utils.DEFAULT_CONFIG)
+        self.assertIn(self.KEY, settings_window.PREFERENCE_KEYS)
+        self.assertIn(self.KEY, settings_window.EDITABLE_KEYS)
 
     def test_player_only_broadcast_and_milestones_are_independent(self):
-        for name in ("server.py", "overlay.html", "event_bus.py", "stats_manager.py", "result_gate.py"):
+        for name in ("server.py", "overlay.html", "event_bus.py", "stats_manager.py", "result_gate.py",
+                     "config_utils.py"):
             self.assertNotIn(self.KEY, (ROOT / name).read_text(encoding="utf-8"), name)
         self.assertIn('if milestone and c["effect_enabled"]:', (ROOT / "server.py").read_text(encoding="utf-8"))
         for name in ("_render_milestone_effect", "_queue_sse_event", "_accept_stats"):
             self.assertNotIn("_show_streak_status", method_source(name), name)
         self.assertIn("_show_streak_status", method_source("_render"))
         self.assertIn("self._show_streak_status = True", method_source("__init__"),
-                      "the overlay itself starts ON before the first config read")
+                      "the overlay itself starts ON before the first preferences read")
         self.assertEqual(game_overlay.status_for_streak(2), ("", 0))
         self.assertEqual([game_overlay.status_for_streak(n)[0] for n in (3, 5, 10, 15, 20, 25)],
                          ["アツい", "激アツ", "超激アツ", "覚醒ゾーン", "RUSH継続中", "RUSH継続中"])

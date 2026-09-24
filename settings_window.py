@@ -22,6 +22,7 @@ from pathlib import Path
 
 import config_utils
 import history_analytics
+import preferences
 from app_paths import DISPLAY_NAME, VERSION
 
 LATEST_RELEASE_URL = "https://api.github.com/repos/TullysAC6/ac6-winloss-tracker/releases/latest"
@@ -30,8 +31,11 @@ RUNTIME_NAME = ".runtime.json"
 PURGE_ENDPOINT = "/api/history/purge"
 DIAGNOSTICS_FLUSH_ENDPOINT = "/api/diagnostics/flush"
 CONTROL_TIMEOUT_SECONDS = 20.0
-EDITABLE_KEYS = ("effect_enabled", "effect_screenshot_enabled", "overlay_stats_scope",
-                 "player_streak_status_enabled")
+CONFIG_KEYS = ("effect_enabled", "effect_screenshot_enabled", "overlay_stats_scope")
+# Additive settings live in preferences.json so the previous build, which
+# validates config.json strictly, still starts after they are saved.
+PREFERENCE_KEYS = tuple(preferences.DEFAULTS)
+EDITABLE_KEYS = CONFIG_KEYS + PREFERENCE_KEYS
 
 DIAGNOSTIC_STEPS = (
     "1. 問題が起きてもTrackerを終了・再起動しない\n"
@@ -66,7 +70,9 @@ def data_root() -> Path:
 def read_settings():
     raw = json.loads(config_utils.CONFIG_PATH.read_text(encoding="utf-8"))
     valid = config_utils.validate_config(raw)
-    return {key: valid[key] for key in EDITABLE_KEYS}
+    values = {key: valid[key] for key in CONFIG_KEYS}
+    values.update(preferences.load())
+    return {key: values[key] for key in EDITABLE_KEYS}
 
 
 def _checked(values):
@@ -85,28 +91,44 @@ def _checked(values):
 
 
 def save_settings(values):
-    """Atomically merge settings into config.json without losing other keys."""
+    """Atomically merge settings without losing other keys.
+
+    Preference keys go to preferences.json, config keys to config.json.  Both
+    files are validated before either is written, so a refused save changes
+    nothing.
+    """
     values = _checked(values)
+    preference_values = {key: values.pop(key) for key in PREFERENCE_KEYS if key in values}
     with _save_lock:
-        path = config_utils.CONFIG_PATH
-        original = path.read_bytes()
-        raw = json.loads(original.decode("utf-8"))
-        config_utils.validate_config(raw)  # Never overwrite an invalid/future config.
-        raw.update(values)
-        config_utils.validate_config(raw)
-        descriptor, name = tempfile.mkstemp(prefix=".config-", suffix=".tmp", dir=path.parent)
-        temporary = Path(name)
-        try:
-            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-                json.dump(raw, stream, ensure_ascii=False, indent=2)
-                stream.write("\n")
-                stream.flush()
-                os.fsync(stream.fileno())
-            if path.read_bytes() != original:
-                raise OSError("保存中に設定が変更されました。設定を開き直してください。")
-            os.replace(temporary, path)
-        finally:
-            temporary.unlink(missing_ok=True)
+        if values:
+            config_utils.validate_config(
+                json.loads(config_utils.CONFIG_PATH.read_text(encoding="utf-8")))
+        if preference_values:
+            preferences.save(preference_values)
+        if values:
+            _save_config(values)
+
+
+def _save_config(values):
+    path = config_utils.CONFIG_PATH
+    original = path.read_bytes()
+    raw = json.loads(original.decode("utf-8"))
+    config_utils.validate_config(raw)  # Never overwrite an invalid/future config.
+    raw.update(values)
+    config_utils.validate_config(raw)
+    descriptor, name = tempfile.mkstemp(prefix=".config-", suffix=".tmp", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(raw, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.read_bytes() != original:
+            raise OSError("保存中に設定が変更されました。設定を開き直してください。")
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def read_screenshot_setting():

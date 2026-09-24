@@ -82,6 +82,7 @@ function Check-Rollback {
     $restored = Wait-Healthy
     if ($Stage -in @('venv-create','pip-install','venv-verify','python-verification','stop-running-app') -and $restored.pid -ne $beforeRuntime.pid) { throw "$Stage stopped the previous application too early" }
     if (Test-Path "$installed.previous") { throw "$Stage leaked previous source" }
+    if ((Get-FileHash (Join-Path $data 'preferences.json')).Hash -ne $script:preferencesHash) { throw "$Stage changed preferences" }
     Write-Output "Rollback $Stage / source / environment / shortcut / metadata / running state: PASS"
 }
 function Run-Installer {
@@ -97,6 +98,7 @@ function Run-Installer {
     $summary = Invoke-RestMethod -Uri "http://127.0.0.1:$($r.port)/api/dashboard/summary"
     if ($summary.lifetime.matches -ne 4 -or $summary.lifetime.wins -ne 3 -or $summary.lifetime.losses -ne 1) { throw 'Lifetime data lost' }
     if ((Get-Content (Join-Path $data 'config.json') -Raw) -ne $script:configBefore) { throw 'Config changed' }
+    if ((Get-FileHash (Join-Path $data 'preferences.json')).Hash -ne $script:preferencesHash) { throw 'Preferences changed' }
     if (Test-Path "$installed.previous") { throw 'Backup source remains after successful install' }
     if (Test-Path (Join-Path $fixture 'forbidden-pip-target')) { throw 'Host pip configuration escaped the owned environment' }
     $metadata = Get-Content (Join-Path $data 'installed-version.json') -Raw | ConvertFrom-Json
@@ -112,7 +114,7 @@ function Run-Uninstaller {
     Assert-NoOwnedProcess
     if ((Test-Path $ownedRoot) -or (Test-Path $legacy)) { throw 'Owned environment or source remains' }
     if (Test-Path (Join-Path $env:AC6_FLOW_DESKTOP 'AC6 WinLoss Tracker.lnk')) { throw 'Shortcut remains' }
-    foreach ($name in @('history.db','config.json','stats.json','diagnostics','installed-version.json')) {
+    foreach ($name in @('history.db','config.json','preferences.json','stats.json','diagnostics','installed-version.json')) {
         if (-not (Test-Path (Join-Path $data $name))) { throw "Preserved data missing: $name" }
     }
     if (@(Get-ChildItem $data -Filter '.*runtime*').Count) { throw 'Runtime files remain' }
@@ -176,6 +178,10 @@ try {
     $config = @{config_version=$configVersion;port=$port;stats_enabled=$true;result_detector_enabled=$false;effect_screenshot_enabled=$true} | ConvertTo-Json
     [IO.File]::WriteAllText((Join-Path $data 'config.json'),$config,(New-Object System.Text.UTF8Encoding($false)))
     $script:configBefore = Get-Content (Join-Path $data 'config.json') -Raw
+    # A saved additive setting (preferences.json) must survive every install,
+    # update, injected-failure rollback, uninstall and reinstall untouched.
+    [IO.File]::WriteAllText((Join-Path $data 'preferences.json'),'{"preferences_version": 1, "player_streak_status_enabled": false}',(New-Object System.Text.UTF8Encoding($false)))
+    $script:preferencesHash = (Get-FileHash (Join-Path $data 'preferences.json')).Hash
     $seed = @'
 import os,sys
 from pathlib import Path
