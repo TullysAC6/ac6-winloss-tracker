@@ -138,8 +138,13 @@ class PlayerMetricsTests(unittest.TestCase):
         self.assertEqual(game_overlay.player_metrics(5, 0, 100.0, 5)[2], ("勝率", "100.0%"))
         for label, _ in metrics:
             self.assertNotIn("BEST", label)
-        for renamed in ("LOSS", "RATE", "STREAK"):
-            self.assertNotIn(renamed, SOURCE)
+        for scope in ("session", "lifetime"):
+            overlay = partial_overlay(wins=12, losses=7, streak=3)
+            overlay._stats_scope = scope
+            overlay._lifetime = {"wins": 40, "losses": 20, "best_streak": 9, "win_rate": 66.7}
+            overlay._render()
+            for renamed in ("LOSS", "RATE", "STREAK"):
+                self.assertNotIn(renamed, overlay.canvas.texts(), scope)
 
     def test_underlying_best_statistic_is_unchanged(self):
         normalized = stats(wins=9, losses=2, streak=3, best=7)
