@@ -414,7 +414,7 @@ This is a polish programme, not a rebuild. Rejected alternative: discarding the 
 
 Requirement: [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md) §58, §59.
 
-They have genuinely different requirements. The Player Overlay is read mid-fight by someone who must not be distracted, so it is quiet, cheap and minimal. The Broadcast Overlay is read by a viewer on a stream who has no other context, so it is denser, larger and may be more expressive.
+They have genuinely different requirements. The Player Overlay is read mid-fight by someone who must not be distracted, so it is quiet, cheap and minimal. The Broadcast Overlay is read by a viewer on a stream who has no other context, so it may be denser and more expressive. "Larger" here is not a default font enlargement: the owner-approved Broadcast primary-text baseline is the current 24 px bold (2026-09-23, [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) §20), and larger typography needs real OBS / viewer-distance readability evidence and a later justified adjustment.
 
 Components and colour tokens are shared. Font size, opacity, information density, animation, duration and layout are **not** forced to a single configuration.
 
