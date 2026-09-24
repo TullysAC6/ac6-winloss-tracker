@@ -50,14 +50,18 @@ if not ready.wait(40) or failure:
 data = root / "AC6WinLossTracker"
 config = json.loads((data / "config.json").read_text(encoding="utf-8"))
 try:
-    state = {"lifetime_before": server.history.lifetime_summary()["wins"]}
+    state = {"lifetime_before": server.history.lifetime_summary()["wins"],
+             "server_file": str(Path(server.__file__).resolve())}
     state["recorded"] = bool(server.record_result("win", "manual"))
     state["lifetime_after"] = server.history.lifetime_summary()["wins"]
-    if phase.startswith("new"):
+    if phase == "new-install":
         import settings_window
-        if phase == "new-install":
-            settings_window.save_settings({"player_streak_status_enabled": False,
-                                           "overlay_stats_scope": "lifetime"})
+        settings_window.save_settings({"player_streak_status_enabled": False,
+                                       "overlay_stats_scope": "lifetime"})
+    # Any build that has preferences.py must accept the file with its own
+    # reader (from UI-1B on, this exercises the previous build's reader too).
+    if (Path(source) / "preferences.py").is_file():
+        import settings_window
         state["settings"] = settings_window.read_settings()
     (root / (phase + ".json")).write_text(json.dumps(state), encoding="utf-8")
 finally:
@@ -78,7 +82,10 @@ def extract_previous(destination):
     present = subprocess.run(git + ["cat-file", "-e", PREVIOUS_VERSION + "^{commit}"],
                              capture_output=True, timeout=30).returncode == 0
     if not present:
-        subprocess.run(git + ["fetch", "--no-tags", "--depth=1", "origin", PREVIOUS_VERSION],
+        shallow = subprocess.run(git + ["rev-parse", "--is-shallow-repository"], capture_output=True,
+                                 text=True, timeout=30).stdout.strip() == "true"
+        depth = ["--depth=1"] if shallow else []  # never make a full clone shallow
+        subprocess.run(git + ["fetch", "--no-tags", *depth, "origin", PREVIOUS_VERSION],
                        capture_output=True, timeout=180)
     archive = subprocess.run(git + ["archive", "--format=tar", PREVIOUS_VERSION],
                              capture_output=True, timeout=120)
@@ -147,6 +154,7 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
 
     def test_new_then_save_setting_then_previous_starts_then_new_again(self):
         installed = self.phase(ROOT, "new-install")
+        self.assertTrue(Path(installed["server_file"]).is_relative_to(ROOT.resolve()))
         self.assertEqual((installed["lifetime_before"], installed["lifetime_after"]), (0, 1))
         self.assertIs(installed["settings"][KEY], False)
         self.assertEqual(installed["settings"]["overlay_stats_scope"], "lifetime")
@@ -157,6 +165,8 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         self.assertEqual(len(rows_after_new), 1)
 
         rolled_back = self.phase(self.previous, "previous-start")
+        self.assertTrue(Path(rolled_back["server_file"]).is_relative_to(self.previous.resolve()),
+                        "the previous build's own server.py ran")
         self.assertEqual((rolled_back["lifetime_before"], rolled_back["recorded"],
                           rolled_back["lifetime_after"]), (1, True, 2))
         self.assertEqual((self.data / "config.json").read_bytes(), config_after_new,

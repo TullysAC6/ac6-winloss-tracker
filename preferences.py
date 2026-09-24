@@ -27,6 +27,7 @@ to config.json.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import tempfile
@@ -46,7 +47,7 @@ MAX_BYTES = 64 * 1024
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 _lock = threading.Lock()
-_cache: tuple[Any, dict[str, Any]] | None = None
+_cache: tuple[Any, dict[str, Any] | str] | None = None  # values, or an error message
 _reported_error: str | None = None
 
 
@@ -75,9 +76,24 @@ def validate(raw: Any) -> dict[str, Any]:
             values[key] = value
         elif version <= PREFERENCES_VERSION:
             raise ValueError(f"unknown preference: {key}")
-        elif not _NAME.match(key) or not isinstance(value, (bool, int, float, str, type(None))):
+        elif not _NAME.fullmatch(key) or not _is_scalar(value):
             raise ValueError(f"malformed preference from a newer version: {key!r}")
     return values
+
+
+def _is_scalar(value: Any) -> bool:
+    if isinstance(value, float):
+        return math.isfinite(value)
+    return isinstance(value, (bool, int, str, type(None)))
+
+
+def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate preference: {key}")
+        result[key] = value
+    return result
 
 
 def _signature(path: Path) -> tuple[int, int] | None:
@@ -90,15 +106,16 @@ def _signature(path: Path) -> tuple[int, int] | None:
 
 def _read_raw(path: Path) -> dict[str, Any] | None:
     try:
-        data = path.read_bytes()
+        with path.open("rb") as stream:
+            data = stream.read(MAX_BYTES + 1)
     except FileNotFoundError:
         return None
     if len(data) > MAX_BYTES:
         raise ValueError("preferences file is too large")
     try:
-        raw = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError(f"preferences file is not valid JSON: {error}") from error
+        raw = json.loads(data.decode("utf-8"), object_pairs_hook=_unique_pairs)
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+        raise ValueError(f"preferences file is not valid JSON: {type(error).__name__}") from error
     validate(raw)
     return raw
 
@@ -110,9 +127,16 @@ def load() -> dict[str, Any]:
     signature = _signature(path)
     with _lock:
         if _cache is not None and _cache[0] == (path, signature):
+            if isinstance(_cache[1], str):  # the same invalid file: do not re-read it
+                raise ValueError(_cache[1])
             return dict(_cache[1])
-    raw = _read_raw(path)
-    values = dict(DEFAULTS) if raw is None else validate(raw)
+    try:
+        raw = _read_raw(path)
+        values = dict(DEFAULTS) if raw is None else validate(raw)
+    except ValueError as error:
+        with _lock:
+            _cache = ((path, signature), str(error))
+        raise
     with _lock:
         _cache = ((path, signature), values)
     return dict(values)

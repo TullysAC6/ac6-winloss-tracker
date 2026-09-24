@@ -95,7 +95,9 @@ def save_settings(values):
 
     Preference keys go to preferences.json, config keys to config.json.  Both
     files are validated before either is written, so a refused save changes
-    nothing.
+    nothing.  Each file is replaced atomically; if writing config.json fails
+    after preferences.json was saved, the error is raised and saving again
+    converges.
     """
     values = _checked(values)
     preference_values = {key: values.pop(key) for key in PREFERENCE_KEYS if key in values}

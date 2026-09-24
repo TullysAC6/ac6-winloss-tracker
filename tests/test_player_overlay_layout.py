@@ -245,7 +245,8 @@ class PlayerRenderTests(unittest.TestCase):
             else:
                 prefs.write_text(text, encoding="utf-8")
             preferences._cache = None
-            with patch.object(game_overlay, "load_config", return_value={"overlay_stats_scope": "session"}),                  patch("builtins.print"):
+            with patch.object(game_overlay, "load_config", return_value={"overlay_stats_scope": "session"}), \
+                 patch("builtins.print"):
                 game_overlay.GameOverlay._drain_display_scope(overlay)
             return " ".join(overlay.canvas.texts())
 

@@ -21,6 +21,12 @@ FROZEN_V18_CONFIG_KEYS = {
     "config_version", "port", "stats_enabled", "result_detector_enabled",
     "effect_screenshot_enabled", "effect_enabled", "overlay_stats_scope",
 }
+# Keys introduced at each preferences_version.  Never edit an existing row:
+# adding a setting means adding the next row and bumping PREFERENCES_VERSION,
+# which is what lets the previous build accept the file (one version newer).
+KEYS_BY_VERSION = {
+    1: {"player_streak_status_enabled"},
+}
 
 
 class Isolated(unittest.TestCase):
@@ -57,6 +63,24 @@ class FrozenConfigTests(unittest.TestCase):
         self.assertFalse(set(preferences.DEFAULTS) & FROZEN_V18_CONFIG_KEYS)
         self.assertEqual(settings_window.PREFERENCE_KEYS, tuple(preferences.DEFAULTS))
         self.assertEqual(set(settings_window.CONFIG_KEYS) & set(settings_window.PREFERENCE_KEYS), set())
+
+
+class VersioningDisciplineTests(unittest.TestCase):
+    def test_every_new_key_comes_with_a_version_bump(self):
+        self.assertEqual(max(KEYS_BY_VERSION), preferences.PREFERENCES_VERSION,
+                         "a new key needs a new KEYS_BY_VERSION row and a PREFERENCES_VERSION bump")
+        self.assertEqual(sorted(KEYS_BY_VERSION), list(range(1, preferences.PREFERENCES_VERSION + 1)))
+        introduced = [key for keys in KEYS_BY_VERSION.values() for key in keys]
+        self.assertEqual(len(introduced), len(set(introduced)), "a key belongs to exactly one version")
+        self.assertEqual(set(introduced), set(preferences.DEFAULTS))
+
+    def test_every_default_is_a_scalar_with_a_forward_compatible_name(self):
+        for key, value in preferences.DEFAULTS.items():
+            with self.subTest(key=key):
+                self.assertIsNotNone(preferences._NAME.fullmatch(key))
+                self.assertTrue(preferences._is_scalar(value) and value is not None,
+                                "the previous build can only carry scalar values")
+                self.assertNotEqual(key, preferences.VERSION_KEY)
 
 
 class ValidationTests(Isolated):
@@ -100,6 +124,36 @@ class ValidationTests(Isolated):
         self.write({"preferences_version": 3, KEY: False})
         with self.assertRaisesRegex(ValueError, "more than one version newer"):
             preferences.load()
+
+    def test_hostile_json_is_invalid_never_a_crash(self):
+        for bad in ('{"preferences_version": 2, "deep": ' + "[" * 30000 + "]" * 30000 + "}",
+                    '{"preferences_version": 1, "%s": true, "%s": false}' % (KEY, KEY),
+                    '{"preferences_version": 2, "ratio": NaN}',
+                    '{"preferences_version": 2, "ratio": Infinity}',
+                    '{"preferences_version": 2, "trailing\\n": 1}',  # JSON \n: the key ends in a newline
+                    '{"preferences_version": NaN}',
+                    '\ufeff{"preferences_version": 1}'):
+            with self.subTest(bad=bad[:60]):
+                self.write(bad)
+                with self.assertRaises(ValueError):
+                    preferences.load()
+                with patch("builtins.print"):
+                    self.assertIs(preferences.effective(KEY, False), False)
+
+    def test_an_invalid_file_is_not_re_read_until_it_changes(self):
+        self.write("{broken")
+        real_open = Path.open
+        opened = []
+
+        def counting_open(path, *args, **kwargs):
+            opened.append(path)
+            return real_open(path, *args, **kwargs)
+
+        with patch.object(Path, "open", counting_open):
+            for _ in range(20):  # five seconds of overlay ticks
+                with self.assertRaises(ValueError):
+                    preferences.load()
+        self.assertEqual(len(opened), 1)
 
     def test_oversized_file_is_refused(self):
         self.write('{"preferences_version": 1, "%s": true}' % KEY + " " * preferences.MAX_BYTES)
