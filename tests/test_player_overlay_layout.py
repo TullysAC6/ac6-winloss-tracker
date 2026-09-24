@@ -483,6 +483,9 @@ class RealTkCanvasTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        # As main() does before any window exists: without it every DPI API
+        # reports 96 and a DPI assertion here would hold by construction.
+        game_overlay._enable_dpi_awareness()
         with patch.object(game_overlay.GameOverlay, "_tick"), \
              patch.object(game_overlay, "read_stats", return_value=None):
             cls.overlay = game_overlay.GameOverlay("armoredcore6.exe", None, None, 22, 250)
@@ -509,6 +512,13 @@ class RealTkCanvasTests(unittest.TestCase):
         user32 = ctypes.WinDLL("user32", use_last_error=True)
         user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(game_overlay.RECT)]
         user32.GetWindowRect.restype = wintypes.BOOL
+        user32.GetDpiForWindow.argtypes = [wintypes.HWND]
+        user32.GetDpiForWindow.restype = wintypes.UINT
+        user32.GetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+        user32.GetAwarenessFromDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+        user32.GetAwarenessFromDpiAwarenessContext.restype = ctypes.c_int
+        self.assertEqual(user32.GetAwarenessFromDpiAwarenessContext(user32.GetThreadDpiAwarenessContext()),
+                         2, "the production Per-Monitor awareness is in force")
         game = tk.Toplevel(overlay.root)
         try:
             game.overrideredirect(True)
@@ -522,8 +532,9 @@ class RealTkCanvasTests(unittest.TestCase):
             width, height = client.right - client.left, client.bottom - client.top
 
             dpi = game_overlay._monitor_dpi(game_hwnd)
-            self.assertEqual(dpi, round(overlay.root.winfo_fpixels("1i")),
-                             "effective DPI of the primary monitor")
+            # Independent API: for a window of this Per-Monitor-aware process
+            # GetDpiForWindow is the DPI of the monitor it is on.
+            self.assertEqual(dpi, user32.GetDpiForWindow(game_hwnd), "effective DPI of the game's monitor")
             scale = dpi / 96.0
             foreground = game_overlay.user32.GetForegroundWindow()
             overlay._show_at_game(origin.x, origin.y, width, height, game_hwnd)
