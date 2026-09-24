@@ -11,6 +11,11 @@ $repository = 'TullysAC6/ac6-winloss-tracker'
 $expectedBootstrapUrl = "https://raw.githubusercontent.com/$repository/refs/tags/$expectedTag/bootstrap.ps1"
 $pinnedReleaseApiUrl = "https://api.github.com/repos/$repository/releases/tags/$expectedTag"
 $latestReleaseApiUrl = "https://api.github.com/repos/$repository/releases/latest"
+# README rollback runs the previous public release's own install command. Move
+# these to the release being superseded when the next one ships.
+$rollbackHeading = '1つ前の公開版に戻す（ロールバック）'
+$previousReleaseTag = 'v1.2.0'
+$previousReleaseBootstrapHash = '82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B'
 
 # The commands are published inside the tag they name, so that tag has to be the
 # version this tree ships.
@@ -394,5 +399,21 @@ $installArguments = @(Assert-BootstrapInvocation -Invocation (Invoke-ReadmeComma
 $uninstallArguments = @(Assert-BootstrapInvocation -Invocation (Invoke-ReadmeCommandContinuationTest -Command $uninstallCommand) -IsUninstall $true)
 Assert-PinnedReleaseChain -ScriptArguments $installArguments -IsUninstall $false
 Assert-PinnedReleaseChain -ScriptArguments $uninstallArguments -IsUninstall $true
+
+# The rollback command is exactly the install command re-pinned to the previous
+# release's tag and bootstrap hash (that release's own README command).
+$rollbackCommand = Get-ReadmeCommand -Heading $rollbackHeading
+$expectedRollbackCommand = $installCommand.Replace("refs/tags/$expectedTag/", "refs/tags/$previousReleaseTag/").
+    Replace($expectedHash, $previousReleaseBootstrapHash).Replace("-ReleaseTag $expectedTag;", "-ReleaseTag $previousReleaseTag;")
+if ($rollbackCommand -cne $expectedRollbackCommand) {
+    throw "README rollback command is not the $previousReleaseTag install command"
+}
+if ($previousReleaseTag -ceq $expectedTag) {
+    # Until the next release ships, the previous release is also this tree's
+    # tag, so the complete install checks apply to the rollback command verbatim.
+    Assert-ReadmeCommand -Command $rollbackCommand -IsUninstall $false
+    $rollbackArguments = @(Assert-BootstrapInvocation -Invocation (Invoke-ReadmeCommandContinuationTest -Command $rollbackCommand) -IsUninstall $false)
+    Assert-PinnedReleaseChain -ScriptArguments $rollbackArguments -IsUninstall $false
+}
 
 Write-Host 'README PowerShell commands: OK'

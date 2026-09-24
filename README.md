@@ -36,6 +36,40 @@ $u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1
 > [!NOTE]
 > 公開中のv1.2.0は共有Python環境を使用します。以下の公開版インストール手順は変更していません。開発版では、アプリを `%LOCALAPPDATA%\Programs\AC6WinLossTracker\app`、依存パッケージを同じルートの `venv\<requirements.lockのSHA-256>` に保存します。専用venvはユーザー・共有site-packagesを参照せず、更新前に構築・検証します。venvはセキュリティsandboxではありません。Python本体、過去に共有環境へ入れたパッケージ、`%LOCALAPPDATA%\AC6WinLossTracker` の利用者データは通常のアンインストールでも削除しません。ベースPythonが失われた場合は、対応Pythonを復元してインストーラーを再実行してください。開発版の移行機能は公開版へのリリース前です。
 
+## 1つ前の公開版に戻す（ロールバック）
+
+v1.2.0より新しいバージョン（開発版を含む）で問題があった場合は、1つ前の公開版 **v1.2.0** に戻せます。
+
+- 戻せるのは**1つ前の公開版（v1.2.0）だけ**です。それより古いバージョンへの復帰は動作確認しておらず、サポートしていません。
+- `config.json` などのファイルを手で編集する必要はありません。
+- ロールバックは**アンインストールではありません**。`%LOCALAPPDATA%\AC6WinLossTracker` の累計の戦績履歴（`history.db`）、設定（`config.json`）、診断ログは削除されずに残り、v1.2.0がそのまま使います。現在のセッションの成績は、いつもどおりTrackerの起動時に新しく始まります。
+- v1.2.0にない新しい表示設定（`preferences.json`）も削除されずに残ります。v1.2.0はこのファイルを読み込まず、再び新しいバージョンに更新すると元の設定に戻ります。
+
+1. 起動中の画面で「Trackerを終了」を押して、Trackerを終了します。
+2. Windows PowerShellで次の1行を実行します。v1.2.0のREADMEに掲載されているインストールコマンドと同じものです。
+
+```powershell
+$u='https://raw.githubusercontent.com/TullysAC6/ac6-winloss-tracker/refs/tags/v1.2.0/bootstrap.ps1';$p=Join-Path ([IO.Path]::GetTempPath()) ('ac6-bootstrap-'+[guid]::NewGuid().ToString('N')+'.ps1');try{Invoke-WebRequest $u -OutFile $p -UseBasicParsing;if((Get-FileHash $p -Algorithm SHA256).Hash -ne '82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B'){throw 'bootstrap SHA-256 mismatch'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -ReleaseTag v1.2.0;$ec=$LASTEXITCODE;if($ec -ne 0){throw "Installer failed with exit code $ec"}}finally{Remove-Item $p -Force -ErrorAction SilentlyContinue}
+```
+
+3. 「セットアップが完了しました。」と表示され、Trackerがv1.2.0として起動します。
+
+このコマンドは、次をすべて確認できた場合だけv1.2.0をインストールします。1つでも一致しない場合は、何も変更せずに中止します。
+
+- ダウンロードした `bootstrap.ps1` のSHA-256が `82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B` と一致すること
+- 下書き・プレリリースではない公開Release `v1.2.0` から取得した `install.ps1` が、GitHubが示すSHA-256 digestと `install.ps1.sha256` の両方に一致すること
+- インストーラーが `v1.2.0` タグのコミットをGitHubで確認し、そのコミットのソースだけを使うこと
+
+ロールバック後、次のコマンドでインストールされているバージョンを確認できます。
+
+```powershell
+Get-Content "$env:LOCALAPPDATA\AC6WinLossTracker\installed-version.json"
+```
+
+`"channel": "stable"` と `"resolved_commit": "c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4"` が表示されれば、v1.2.0に戻っています。
+
+v1.2.0は共有Python環境を使う方式のため、依存パッケージを現在のユーザーのPython環境へインストールします。新しいバージョンが作成したアプリ専用環境（`%LOCALAPPDATA%\Programs\AC6WinLossTracker`）は削除されずに残り、再び新しいバージョンをインストールするときに再利用されます。
+
 ## 使い方
 
 ### 1. Trackerを起動

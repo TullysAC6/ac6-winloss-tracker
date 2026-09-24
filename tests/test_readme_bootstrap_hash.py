@@ -19,6 +19,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# README "1つ前の公開版に戻す（ロールバック）" runs the previous public release's
+# own install command. Its bootstrap is that release's published blob, not
+# HEAD's; the value below is the v1.2.0 blob hash recorded at release. Move
+# both constants to the release being superseded when the next one ships.
+ROLLBACK_HEADING = "## 1つ前の公開版に戻す（ロールバック）"
+PREVIOUS_RELEASE = "v1.2.0"
+PREVIOUS_RELEASE_BOOTSTRAP_SHA256 = "82B223413A44BF9FDBBF399E7EED2AF6983794151DD25C9EE939B569BCD5881B"
 
 
 def git(*args: str) -> bytes:
@@ -52,12 +59,39 @@ worktree = (ROOT / "bootstrap.ps1").read_bytes()
 worktree_hash = hashlib.sha256(worktree).hexdigest().upper()
 
 readme = (ROOT / "README.md").read_text(encoding="utf-8")
-found = re.findall(r"-ne '([0-9A-Fa-f]{64})'", readme)
+before, heading, after = readme.partition(ROLLBACK_HEADING)
+if not heading:
+    raise SystemExit(f"README has no rollback section: {ROLLBACK_HEADING}")
+rollback_section, _, rest = after.partition("\n## ")
+current = before + "\n## " + rest
+found = re.findall(r"-ne '([0-9A-Fa-f]{64})'", current)
 if len(found) != 2:
     raise SystemExit(
         f"expected exactly 2 bootstrap hash comparisons in README, found {len(found)}"
     )
 install_hash, uninstall_hash = found
+
+rollback_found = re.findall(r"-ne '([0-9A-Fa-f]{64})'", rollback_section)
+if rollback_found != [PREVIOUS_RELEASE_BOOTSTRAP_SHA256]:
+    raise SystemExit(
+        f"README rollback command must pin the {PREVIOUS_RELEASE} bootstrap "
+        f"{PREVIOUS_RELEASE_BOOTSTRAP_SHA256}, found {rollback_found}"
+    )
+if f"refs/tags/{PREVIOUS_RELEASE}/bootstrap.ps1" not in rollback_section:
+    raise SystemExit(f"README rollback command does not download the {PREVIOUS_RELEASE} bootstrap")
+# CI checkouts are shallow and carry no tags; a full clone verifies the pinned
+# value against the release's own committed blob.
+if subprocess.run(("git", "cat-file", "-e", f"{PREVIOUS_RELEASE}:bootstrap.ps1"), cwd=str(ROOT),
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+    previous_blob_hash = hashlib.sha256(git("show", f"{PREVIOUS_RELEASE}:bootstrap.ps1")).hexdigest().upper()
+    if previous_blob_hash != PREVIOUS_RELEASE_BOOTSTRAP_SHA256:
+        raise SystemExit(
+            f"{PREVIOUS_RELEASE}:bootstrap.ps1 hashes to {previous_blob_hash}, "
+            f"not the pinned {PREVIOUS_RELEASE_BOOTSTRAP_SHA256}"
+        )
+    print(f"README rollback bootstrap SHA-256 matches the {PREVIOUS_RELEASE} blob: {previous_blob_hash}")
+else:
+    print(f"{PREVIOUS_RELEASE} tag not in this clone; rollback hash checked against the pinned value")
 
 # A convention check, not a correctness one: `Get-FileHash ... .Hash` emits
 # uppercase, so an uppercase literal is what the README should carry. PowerShell

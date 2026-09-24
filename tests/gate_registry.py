@@ -148,6 +148,9 @@ ENTRIES = (
     Entry("tests/test_t1_runner_lifecycle.py", T2, "T1 worker timeout, leak, exit and cleanup ownership"),
     Entry("tests/t2_settings_analytics_e2e.py", T2, "settings/analytics isolated E2E; run manually, as before #14",
           ci=False),
+    Entry("tests/t2_rollback_public_release.py", T2,
+          "README rollback to the previous public release, for real (GitHub/PyPI); run manually",
+          ci=False),
     Entry("tests/test_source_install_flow.ps1", T2, "isolated install, update, rollback and uninstall",
           runner="powershell-ci"),
 )
