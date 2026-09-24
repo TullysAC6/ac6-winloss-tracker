@@ -65,6 +65,7 @@ class SettingsFileTests(unittest.TestCase):
             "effect_enabled": True,
             "effect_screenshot_enabled": False,
             "overlay_stats_scope": "session",
+            "player_streak_status_enabled": True,
         })
         settings.save_settings({"effect_enabled": False, "overlay_stats_scope": "lifetime"})
         stored = json.loads(self.path.read_text(encoding="utf-8"))
@@ -74,6 +75,7 @@ class SettingsFileTests(unittest.TestCase):
             "effect_enabled": False,
             "effect_screenshot_enabled": False,
             "overlay_stats_scope": "lifetime",
+            "player_streak_status_enabled": True,
         })
         # The screenshot helper still edits only its own key.
         settings.save_screenshot_setting(True)
@@ -862,19 +864,23 @@ class SettingsWindowTests(unittest.TestCase):
     def test_every_option_saves_from_one_window(self):
         self.assertTrue(self.window.effect_enabled.get())
         self.assertEqual(self.window.scope.get(), "session")
+        self.assertTrue(self.window.streak_status.get())
         self.window.effect_enabled.set(False)
         self.window.enabled.set(True)
         self.window.scope.set("lifetime")
+        self.window.streak_status.set(False)
         self.window.save_button.invoke()
         self.assertEqual(settings.read_settings(), {
             "effect_enabled": False,
             "effect_screenshot_enabled": True,
             "overlay_stats_scope": "lifetime",
+            "player_streak_status_enabled": False,
         })
         self.window.window.withdraw()
         settings.open_settings(self.root)
         self.assertFalse(self.window.effect_enabled.get())
         self.assertEqual(self.window.scope.get(), "lifetime")
+        self.assertFalse(self.window.streak_status.get())
 
     def test_destructive_actions_require_confirmation(self):
         preview = ("all", {"total_matches": 7})

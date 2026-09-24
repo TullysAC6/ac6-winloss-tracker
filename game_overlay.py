@@ -59,6 +59,16 @@ LABEL_FG = "#AFC0C7"      # color.text.secondary: quieter metric labels
 ACCENT = "#4BD9E8"        # color.system.cyan: leading rule, corner ticks, caption
 ACK_ACCENT = "#8BE9F3"    # brighter cyan for the one-shot result acknowledgement
 SHADOW = "#000000"
+# Persistent streak-status wording (config player_streak_status_enabled,
+# default ON). Colours are the pre-UI-1A ones; the text never blinks.
+STATUS_COLORS = {
+    0: TEXT_FG,
+    1: "#ffb04a",  # アツい
+    2: "#ff5a45",  # 激アツ
+    3: "#ffd740",  # 超激アツ
+    4: "#fff176",  # 覚醒ゾーン
+    5: "#ffffff",  # RUSH
+}
 VALUE_FONTS = ("Segoe UI Variable Display", "Yu Gothic UI", "Meiryo")
 LABEL_FONTS = ("Segoe UI Variable Text", "Yu Gothic UI", "Meiryo")
 # Column minimum widths come from these samples, so a count going 9 -> 10
@@ -161,6 +171,7 @@ class PanelLayout(NamedTuple):
     pad_x: int
     rule_width: int
     tick: int
+    status_x: int  # left edge of the optional streak-status text
 
 
 def layout_panel(
@@ -171,9 +182,11 @@ def layout_panel(
     label_height: int,
     scale: float,
     available_width: int | None = None,
+    status_width: int = 0,
 ) -> PanelLayout:
     """Place value-first metric columns; spacing tokens are logical px.
 
+    Optional streak-status text follows the last column on the value row.
     When the regular 24 px gaps do not fit the AC6 client's safe width, gaps
     fall back to the 8 px token. Type is never reduced.
     """
@@ -185,7 +198,8 @@ def layout_panel(
     gaps = len(column_widths) - 1
 
     def width_for(gap_logical: int) -> int:
-        metrics = content + round(gap_logical * scale) * gaps
+        gap = round(gap_logical * scale)
+        metrics = content + gap * gaps + (gap + status_width if status_width else 0)
         return rule_width + pad_x + max(metrics, caption_width) + pad_x
 
     gap_logical = GAP_REGULAR
@@ -204,7 +218,7 @@ def layout_panel(
     label_y = value_y + value_ascent + round(4 * scale)
     height = label_y + label_height + pad_y
     return PanelLayout(width, height, gap_logical, tuple(centers), caption_y, value_y,
-                       label_y, pad_x, rule_width, tick)
+                       label_y, pad_x, rule_width, tick, x)
 
 
 def safe_inset(client_width: int, client_height: int, scale: float) -> tuple[int, int]:
@@ -609,6 +623,7 @@ class GameOverlay:
         # A result acknowledgement needs a known previous count; the first
         # reading after an unreadable stats.json is a baseline, not a result.
         self._stats_baseline = startup_stats is not None
+        self._show_streak_status = True  # config player_streak_status_enabled
         self._ack_active = False
         self._ack_after: str | None = None
         self.visible = False
@@ -751,8 +766,10 @@ class GameOverlay:
         self._measured = None
         self._last_render_key = None
 
-    def _measure(self, metrics: tuple[tuple[str, str], ...], caption: str) -> tuple[Any, ...]:
-        content = (metrics, caption)
+    def _measure(
+        self, metrics: tuple[tuple[str, str], ...], caption: str, status: str,
+    ) -> tuple[Any, ...]:
+        content = (metrics, caption, status)
         if self._measured is None or self._measured[0] != content:
             columns = tuple(
                 max(int(self.main_font.measure(value)), int(self.main_font.measure(sample)),
@@ -763,23 +780,28 @@ class GameOverlay:
                 content, columns, int(self.label_font.measure(caption)),
                 int(self.label_font.metrics("linespace")),
                 int(self.main_font.metrics("ascent")),
+                int(self.main_font.measure(status)) if status else 0,
             )
         return self._measured
 
     def _render(self) -> None:
         """Value-first WIN / LOSS / RATE / STREAK panel.
 
-        BEST and the pachinko streak status are deliberately not drawn: BEST
-        stays in Dashboard Overview and the loud moment is the milestone effect.
+        BEST is deliberately not drawn; it stays in Dashboard Overview.  The
+        persistent streak-status wording (アツい … RUSH継続中) follows STREAK
+        only while player_streak_status_enabled is on (the default).
         """
         s = self.last_stats
         wins, losses, rate, _best_streak, scope_label = self._display_values()
         metrics = player_metrics(wins, losses, rate, s["streak"])
         caption = "LIFETIME TOTALS" if scope_label else "SESSION"
-        _content, columns, caption_w, label_h, value_ascent = self._measure(metrics, caption)
+        status = str(s.get("status") or "") if self._show_streak_status else ""
+        status_level = int(s.get("status_level", 0)) if status else 0
+        _content, columns, caption_w, label_h, value_ascent, status_w = self._measure(
+            metrics, caption, status)
         layout = layout_panel(columns, caption_w, label_h, value_ascent, label_h,
-                              self._ui_scale, self._available_width)
-        key = (metrics, caption, layout.gap)
+                              self._ui_scale, self._available_width, status_w)
+        key = (metrics, caption, status, status_level, layout.gap)
         if key == self._last_render_key:
             return
         self._last_render_key = key
@@ -830,6 +852,15 @@ class GameOverlay:
             self.canvas.create_text(
                 center, layout.label_y, anchor="n", text=label,
                 font=self.label_font, fill=LABEL_FG,
+            )
+        if status:
+            self.canvas.create_text(
+                layout.status_x + shadow, layout.value_y + shadow,
+                anchor="nw", text=status, font=self.main_font, fill=SHADOW,
+            )
+            self.canvas.create_text(
+                layout.status_x, layout.value_y, anchor="nw", text=status,
+                font=self.main_font, fill=STATUS_COLORS.get(status_level, TEXT_FG),
             )
         self.text_window.update_idletasks()
 
@@ -1136,14 +1167,16 @@ class GameOverlay:
         self._effect_visible = True
 
     def _drain_display_scope(self) -> None:
-        """Apply a mid-match scope change or new lifetime totals.
+        """Apply a mid-match scope / streak-status change or new lifetime totals.
 
         _render() is key-guarded, so this repaints without a new stats event
         and costs nothing when neither the scope nor the totals moved.
         """
         try:
-            scope = load_config().get("overlay_stats_scope", "session")
+            config = load_config()
+            scope = config.get("overlay_stats_scope", "session")
             self._stats_scope = "lifetime" if scope == "lifetime" else "session"
+            self._show_streak_status = config.get("player_streak_status_enabled", True) is not False
         except Exception:
             pass
         try:

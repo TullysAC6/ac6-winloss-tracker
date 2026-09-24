@@ -3,6 +3,7 @@
 T0 classes use fake fonts/canvases and never open a window. ``RealTkCanvasTests``
 measures real Tk fonts and the three real overlay HWNDs, so it is owned by T2.
 """
+import json
 import os
 import queue
 import re
@@ -101,6 +102,7 @@ def partial_overlay(scale=1.0, **values):
     overlay._stats_scope = "session"
     overlay._lifetime = None
     overlay._stats_baseline = True
+    overlay._show_streak_status = True
     overlay._ack_active = False
     overlay._ack_after = None
     overlay._last_render_key = None
@@ -136,7 +138,7 @@ class PlayerMetricsTests(unittest.TestCase):
     def test_underlying_best_statistic_is_unchanged(self):
         normalized = stats(wins=9, losses=2, streak=3, best=7)
         self.assertEqual(normalized["best_streak"], 7)
-        # The pre-UI-1A streak status data is still produced; it is simply not drawn.
+        # The streak status data and thresholds are unchanged; only drawing is optional.
         self.assertEqual((normalized["status"], normalized["status_level"]), ("アツい", 1))
         overlay = partial_overlay(wins=9, losses=2, streak=3, best=7)
         self.assertEqual(overlay._display_values(), (9, 2, overlay.last_stats["win_rate"], 7, ""))
@@ -166,20 +168,77 @@ class PlayerRenderTests(unittest.TestCase):
         self.assertEqual(len(value_y), 1)
         self.assertLess(max(value_y), min(label_y), "values are the first metric scan line")
 
-    def test_best_and_pachinko_status_never_reach_the_persistent_panel(self):
-        for streak in (0, 3, 5, 10, 15, 20, 25, 49, 50):
+    STATUS_BY_STREAK = {0: ("", 0), 2: ("", 0), 3: ("アツい", 1), 4: ("アツい", 1), 5: ("激アツ", 2),
+                        9: ("激アツ", 2), 10: ("超激アツ", 3), 15: ("覚醒ゾーン", 4),
+                        20: ("RUSH継続中", 5), 25: ("RUSH継続中", 5), 50: ("RUSH継続中", 5)}
+
+    def test_best_is_never_drawn_in_either_status_mode(self):
+        for enabled in (True, False):
+            for streak in self.STATUS_BY_STREAK:
+                with self.subTest(enabled=enabled, streak=streak):
+                    overlay = partial_overlay(wins=streak + 1, losses=1, streak=streak, best=streak + 4)
+                    overlay._show_streak_status = enabled
+                    overlay._render()
+                    drawn = " ".join(overlay.canvas.texts())
+                    for word in BEST_WORDS:
+                        self.assertNotIn(word, drawn)
+                    rate = f"{(streak + 1) / (streak + 2) * 100:.1f}%"
+                    self.assertEqual(overlay.canvas.texts(game_overlay.TEXT_FG),
+                                     [str(streak + 1), "1", rate, str(streak)], "BEST value is not drawn")
+        render = method_source("_render")
+        for token in ("最高連勝", "best_streak}"):
+            self.assertNotIn(token, render)
+
+    def test_status_on_draws_the_existing_wording_and_colour_after_streak(self):
+        for streak, (word, level) in self.STATUS_BY_STREAK.items():
             with self.subTest(streak=streak):
-                overlay = partial_overlay(wins=streak + 1, losses=1, streak=streak, best=streak + 4)
+                overlay = partial_overlay(wins=streak + 1, losses=1, streak=streak)
+                overlay._render()
+                status = [(pos, kw) for kind, pos, kw in overlay.canvas.items
+                          if kind == "text" and kw["text"] == word and kw["fill"] != game_overlay.SHADOW]
+                if not word:
+                    self.assertEqual(len(overlay.canvas.texts()), 2 + 8 * 2, "caption + 4 values + 4 labels")
+                    continue
+                self.assertEqual(len(status), 1)
+                (x, y), kw = status[0]
+                self.assertEqual(kw["fill"], game_overlay.STATUS_COLORS[level])
+                self.assertIs(kw["font"], overlay.main_font, "same size as before UI-1A: the value font")
+                value_y = {p[1] for k, p, v in overlay.canvas.items if v.get("fill") == game_overlay.TEXT_FG}
+                self.assertEqual({y}, value_y, "on the value row")
+                streak_label_x = [p[0] for k, p, v in overlay.canvas.items
+                                  if v.get("text") == "STREAK" and v["fill"] == game_overlay.LABEL_FG][0]
+                self.assertGreater(x, streak_label_x, "follows STREAK")
+                self.assertLessEqual(x + overlay.main_font.measure(word), overlay._panel_size[0])
+        self.assertEqual(game_overlay.STATUS_COLORS, {0: game_overlay.TEXT_FG, 1: "#ffb04a", 2: "#ff5a45",
+                                                      3: "#ffd740", 4: "#fff176", 5: "#ffffff"})
+
+    def test_status_off_is_the_quiet_telemetry_surface(self):
+        for streak in self.STATUS_BY_STREAK:
+            with self.subTest(streak=streak):
+                overlay = partial_overlay(wins=streak + 1, losses=1, streak=streak)
+                overlay._show_streak_status = False
                 overlay._render()
                 drawn = " ".join(overlay.canvas.texts())
-                for word in PACHINKO_WORDS + BEST_WORDS:
+                for word in PACHINKO_WORDS:
                     self.assertNotIn(word, drawn)
-                rate = f"{(streak + 1) / (streak + 2) * 100:.1f}%"
-                self.assertEqual(overlay.canvas.texts(game_overlay.TEXT_FG),
-                                 [str(streak + 1), "1", rate, str(streak)], "BEST value is not drawn")
-        render = method_source("_render")
-        for token in ('"status"', "status_level", "最高連勝", "STATUS_COLORS", "best_streak}"):
-            self.assertNotIn(token, render)
+                quiet = partial_overlay(wins=streak + 1, losses=1, streak=0)
+                quiet._render()
+                self.assertEqual(overlay._panel_size, quiet._panel_size, "no space kept for status")
+
+    def test_setting_is_read_live_and_missing_or_unreadable_config_keeps_it_on(self):
+        overlay = partial_overlay(wins=6, losses=1, streak=5)
+        overlay._lifetime_queue = queue.Queue()
+
+        def tick(config=None, error=None):
+            with patch.object(game_overlay, "load_config", return_value=config, side_effect=error):
+                game_overlay.GameOverlay._drain_display_scope(overlay)
+            return " ".join(overlay.canvas.texts())
+
+        self.assertIn("激アツ", tick({"overlay_stats_scope": "session"}), "missing key = ON")
+        self.assertNotIn("激アツ", tick({"player_streak_status_enabled": False}))
+        self.assertNotIn("激アツ", tick(error=OSError("gone")), "unreadable config keeps the last value")
+        self.assertIn("激アツ", tick({"player_streak_status_enabled": True}))
+        self.assertEqual(overlay.canvas.deleted, ["all", "all", "all"], "only real changes repaint")
 
     def test_lifetime_scope_is_labelled_and_streak_stays_session(self):
         overlay = partial_overlay(wins=2, losses=1, streak=2)
@@ -194,10 +253,18 @@ class PlayerRenderTests(unittest.TestCase):
         overlay._render()
         overlay._render()
         self.assertEqual(overlay.canvas.deleted, ["all"])
-        # BEST and the old streak status are not drawn, so they cannot force a repaint.
-        overlay.last_stats = dict(overlay.last_stats, best_streak=99, status="激アツ", status_level=2)
+        # BEST is never drawn, so it cannot force a repaint; with the status
+        # setting OFF neither can the streak status.
+        overlay.last_stats = dict(overlay.last_stats, best_streak=99)
         overlay._render()
         self.assertEqual(overlay.canvas.deleted, ["all"])
+        overlay._show_streak_status = False
+        overlay._render()
+        self.assertEqual(overlay.canvas.deleted, ["all"], "no status was showing at streak 1")
+        overlay.last_stats = dict(overlay.last_stats, status="激アツ", status_level=2)
+        overlay._render()
+        self.assertEqual(overlay.canvas.deleted, ["all"])
+        overlay.last_stats = dict(overlay.last_stats, status="", status_level=0)
         overlay._lifetime_queue = queue.Queue()
         with patch.object(game_overlay, "load_config", return_value={"overlay_stats_scope": "session"}):
             for _ in range(20):  # five seconds of 250 ms ticks
@@ -261,6 +328,12 @@ class LayoutAndSafeZoneTests(unittest.TestCase):
         self.assertEqual(wide.width - compact.width, (24 - 8) * 3)
         self.assertEqual((compact.value_y, compact.label_y, compact.height),
                          (wide.value_y, wide.label_y, wide.height), "type and rows are unchanged")
+        with_status = game_overlay.layout_panel(columns, caption, 18, 30, 18, 1.0, None, 90)
+        self.assertEqual(with_status.width - wide.width, 24 + 90, "status adds one gap plus its width")
+        self.assertEqual(with_status.status_x, wide.centers[-1] - 60 // 2 + 60 + 24)
+        self.assertEqual(with_status.centers, wide.centers, "metric columns do not move")
+        squeezed = game_overlay.layout_panel(columns, caption, 18, 30, 18, 1.0, with_status.width - 1, 90)
+        self.assertEqual(squeezed.gap, game_overlay.GAP_COMPACT, "status width counts toward the fit")
 
         overlay = partial_overlay(1.0, wins=12, losses=7, streak=3)
         overlay._render()
@@ -269,7 +342,7 @@ class LayoutAndSafeZoneTests(unittest.TestCase):
         with patch.object(overlay, "_client_scale", return_value=1.0), \
              patch.object(overlay, "_show_absolute"):
             overlay._show_at_game(0, 0, regular_width + 2 * 24 - 1, 720, 1)
-        self.assertEqual(overlay._last_render_key[2], game_overlay.GAP_COMPACT)
+        self.assertEqual(overlay._last_render_key[-1], game_overlay.GAP_COMPACT)
         self.assertEqual((overlay.main_font, overlay.label_font), fonts)
 
     def test_client_smaller_than_panel_stays_anchored_inside(self):
@@ -435,6 +508,82 @@ class MilestoneCharacterizationTests(unittest.TestCase):
                 self.assertEqual(overlay._active_effect["duration"], duration)
 
 
+class StreakStatusSettingTests(unittest.TestCase):
+    """player_streak_status_enabled: additive, default ON, Player-only."""
+
+    KEY = "player_streak_status_enabled"
+
+    def setUp(self):
+        import tempfile
+        import config_utils
+        import settings_window
+        self.config_utils, self.settings = config_utils, settings_window
+        self.directory = tempfile.TemporaryDirectory(prefix="ac6-ui1a-config-")
+        self.addCleanup(self.directory.cleanup)
+        self.path = Path(self.directory.name) / "config.json"
+        patcher = patch.object(config_utils, "CONFIG_PATH", self.path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        config_utils._last_good = config_utils._last_good_signature = None
+        self.addCleanup(setattr, config_utils, "_last_good", None)
+        self.addCleanup(setattr, config_utils, "_last_good_signature", None)
+
+    def write(self, raw):
+        self.path.write_text(json.dumps(raw), encoding="utf-8")
+        self.config_utils._last_good = self.config_utils._last_good_signature = None
+
+    def test_default_on_and_existing_v18_config_without_the_key_is_on(self):
+        cu = self.config_utils
+        self.assertIs(cu.DEFAULT_CONFIG[self.KEY], True)
+        self.assertEqual(cu.CONFIG_VERSION, 18, "additive key: no version bump, no forced rewrite")
+        existing = {k: v for k, v in cu.DEFAULT_CONFIG.items() if k != self.KEY}
+        self.write(existing)
+        before = self.path.read_bytes()
+        self.assertIs(cu.load_config()[self.KEY], True)
+        self.assertEqual(self.path.read_bytes(), before, "loading never writes the new key")
+        self.assertIs(self.settings.read_settings()[self.KEY], True)
+
+    def test_value_is_strictly_boolean(self):
+        cu = self.config_utils
+        self.assertIs(cu.validate_config(dict(cu.DEFAULT_CONFIG, **{self.KEY: False}))[self.KEY], False)
+        for bad in ("false", 0, 1, None):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                cu.validate_config(dict(cu.DEFAULT_CONFIG, **{self.KEY: bad}))
+
+    def test_older_versions_migrate_to_on_without_gaining_the_key(self):
+        cu = self.config_utils
+        old = {k: v for k, v in cu.DEFAULT_CONFIG.items()
+               if k not in (self.KEY, "effect_enabled", "overlay_stats_scope")}
+        old["config_version"] = 17
+        self.write(old)
+        self.assertIs(cu.load_config()[self.KEY], True)
+        self.assertNotIn(self.KEY, json.loads(self.path.read_text(encoding="utf-8")))
+
+    def test_settings_round_trip_keeps_unrelated_keys(self):
+        self.write(dict(self.config_utils.DEFAULT_CONFIG, port=9123))
+        self.assertIn(self.KEY, self.settings.EDITABLE_KEYS)
+        self.settings.save_settings({self.KEY: False})
+        stored = json.loads(self.path.read_text(encoding="utf-8"))
+        self.assertIs(stored[self.KEY], False)
+        self.assertEqual(stored["port"], 9123)
+        self.assertIs(self.config_utils.load_config()[self.KEY], False)
+        with self.assertRaises(ValueError):
+            self.settings.save_settings({self.KEY: "off"})
+        self.settings.save_settings({self.KEY: True})
+        self.assertIs(self.config_utils.load_config()[self.KEY], True)
+
+    def test_player_only_broadcast_and_milestones_are_independent(self):
+        for name in ("server.py", "overlay.html", "event_bus.py", "stats_manager.py", "result_gate.py"):
+            self.assertNotIn(self.KEY, (ROOT / name).read_text(encoding="utf-8"), name)
+        self.assertIn('if milestone and c["effect_enabled"]:', (ROOT / "server.py").read_text(encoding="utf-8"))
+        for name in ("_render_milestone_effect", "_queue_sse_event", "_accept_stats"):
+            self.assertNotIn("_show_streak_status", method_source(name), name)
+        self.assertIn("_show_streak_status", method_source("_render"))
+        self.assertEqual(game_overlay.status_for_streak(2), ("", 0))
+        self.assertEqual([game_overlay.status_for_streak(n)[0] for n in (3, 5, 10, 15, 20, 25)],
+                         ["アツい", "激アツ", "超激アツ", "覚醒ゾーン", "RUSH継続中", "RUSH継続中"])
+
+
 class StructuralBudgetTests(unittest.TestCase):
     def test_no_new_thread_process_or_loop(self):
         self.assertEqual(SOURCE.count("threading.Thread("), 1, "only the existing SSE listener")
@@ -565,14 +714,16 @@ class RealTkCanvasTests(unittest.TestCase):
         overlay._build_fonts(22)
         return overlay
 
-    def test_real_font_matrix_fits_and_draws_only_the_four_metrics(self):
-        cases = ((0, 0, 0, None), (12, 7, 3, None), (99999, 99999, 50, None),
+    def test_real_font_matrix_fits_in_both_status_modes(self):
+        cases = ((0, 0, 0, None), (12, 7, 3, None), (99999, 99999, 50, None), (30, 1, 15, None),
                  (2, 1, 1, {"wins": 12345, "losses": 6789, "best_streak": 9, "win_rate": 64.5}))
         for scale in SCALES:
             overlay = self.use_scale(scale)
             self.assertAlmostEqual(overlay._ui_scale, scale, delta=0.02)
-            for wins, losses, streak, lifetime in cases:
-                with self.subTest(scale=scale, wins=wins, lifetime=bool(lifetime)):
+            for (wins, losses, streak, lifetime), status_on in (
+                    (case, on) for case in cases for on in (True, False)):
+                with self.subTest(scale=scale, wins=wins, lifetime=bool(lifetime), status_on=status_on):
+                    overlay._show_streak_status = status_on
                     overlay.last_stats = stats(wins=wins, losses=losses, streak=streak)
                     overlay._stats_scope = "lifetime" if lifetime else "session"
                     overlay._lifetime = lifetime
@@ -594,8 +745,11 @@ class RealTkCanvasTests(unittest.TestCase):
                     texts = [canvas.itemcget(i, "text") for i in canvas.find_all()
                              if canvas.type(i) == "text"]
                     drawn = " ".join(texts)
-                    for word in PACHINKO_WORDS + BEST_WORDS:
+                    for word in BEST_WORDS + (() if status_on else PACHINKO_WORDS):
                         self.assertNotIn(word, drawn)
+                    expected_status = overlay.last_stats["status"] if status_on else ""
+                    if expected_status:
+                        self.assertEqual(texts.count(expected_status), 2, "status plus its shadow")
                     for label in ("WIN", "LOSS", "RATE", "STREAK"):
                         self.assertEqual(texts.count(label), 2, "label plus its shadow")
                     label_points = abs(int(overlay.label_font.actual("size")))
@@ -604,6 +758,8 @@ class RealTkCanvasTests(unittest.TestCase):
     def test_real_panel_sizes_fit_every_resolution_and_scale(self):
         for scale in SCALES:
             overlay = self.use_scale(scale)
+            # Widest default surface: status ON at RUSH継続中.
+            overlay._show_streak_status = True
             overlay.last_stats = stats(wins=999, losses=999, streak=25)
             overlay._stats_scope, overlay._lifetime = "session", None
             for width, height in RESOLUTIONS:
@@ -615,7 +771,7 @@ class RealTkCanvasTests(unittest.TestCase):
                     x, y = show.call_args.args
                     w, h = overlay._panel_size
                     assert_inside_safe_zone(self, x, y, w, h, 0, 0, width, height, scale)
-                    self.assertEqual(overlay._last_render_key[2], game_overlay.GAP_REGULAR)
+                    self.assertEqual(overlay._last_render_key[-1], game_overlay.GAP_REGULAR)
 
     def test_three_real_click_through_hwnds_are_preserved(self):
         overlay = self.overlay

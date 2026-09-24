@@ -61,7 +61,8 @@ WRITABLE_HISTORY_SERVER = ("SuccessfulPurgeLeavesAWritableSession", "Unrecoverab
                            "NormalPathIsUnchanged")
 PLAYER_OVERLAY_PURE = ("PlayerMetricsTests", "PlayerRenderTests", "LayoutAndSafeZoneTests",
                        "ExplicitOffsetCompatibilityTests", "ResultAcknowledgementTests",
-                       "MilestoneCharacterizationTests", "StructuralBudgetTests")
+                       "MilestoneCharacterizationTests", "StreakStatusSettingTests",
+                       "StructuralBudgetTests")
 
 # Order within a gate is execution order. T0 keeps the relative order the
 # pre-#14 tests/run_all_tests.py used; T2 runs the launcher first, as CI did.

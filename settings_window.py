@@ -30,7 +30,8 @@ RUNTIME_NAME = ".runtime.json"
 PURGE_ENDPOINT = "/api/history/purge"
 DIAGNOSTICS_FLUSH_ENDPOINT = "/api/diagnostics/flush"
 CONTROL_TIMEOUT_SECONDS = 20.0
-EDITABLE_KEYS = ("effect_enabled", "effect_screenshot_enabled", "overlay_stats_scope")
+EDITABLE_KEYS = ("effect_enabled", "effect_screenshot_enabled", "overlay_stats_scope",
+                 "player_streak_status_enabled")
 
 DIAGNOSTIC_STEPS = (
     "1. 問題が起きてもTrackerを終了・再起動しない\n"
@@ -366,6 +367,7 @@ class SettingsWindow:
         self.enabled = tk.BooleanVar(master=self.window)
         self.effect_enabled = tk.BooleanVar(master=self.window)
         self.scope = tk.StringVar(master=self.window, value="session")
+        self.streak_status = tk.BooleanVar(master=self.window, value=True)
         self.cutoff_date = tk.StringVar(master=self.window)
 
         self._build_display_tab(ttk, notebook)
@@ -411,6 +413,12 @@ class SettingsWindow:
         ttk.Radiobutton(frame, text="累計成績（全履歴）を表示", value="lifetime",
                         variable=self.scope).pack(anchor="w")
         ttk.Label(frame, text="連勝数と演出は、どちらを選んでも現在のセッション基準のままです。",
+                  wraplength=440).pack(anchor="w", pady=(2, 12))
+        ttk.Label(frame, text="ゲーム内オーバーレイ",
+                  font=("Segoe UI", 9, "bold")).pack(anchor="w")
+        ttk.Checkbutton(frame, text="連勝ステータス（アツい／激アツ など）を常に表示する",
+                        variable=self.streak_status).pack(anchor="w", pady=(2, 0))
+        ttk.Label(frame, text="連勝演出のバナーとOBS用オーバーレイには影響しません。",
                   wraplength=440).pack(anchor="w", pady=(2, 12))
         self.save_button = ttk.Button(frame, text="保存", command=self.save)
         self.save_button.pack(anchor="e")
@@ -569,6 +577,7 @@ class SettingsWindow:
                 self.enabled.set(values["effect_screenshot_enabled"])
                 self.effect_enabled.set(values["effect_enabled"])
                 self.scope.set(values["overlay_stats_scope"])
+                self.streak_status.set(values["player_streak_status_enabled"])
                 self.toggle.config(state="normal")
                 self.save_button.config(state="normal")
                 self.status.config(text="保存すると、Trackerの再起動なしで反映されます。")
@@ -585,6 +594,7 @@ class SettingsWindow:
                 "effect_screenshot_enabled": self.enabled.get(),
                 "effect_enabled": self.effect_enabled.get(),
                 "overlay_stats_scope": self.scope.get(),
+                "player_streak_status_enabled": self.streak_status.get(),
             })
             self.status.config(
                 text="保存しました。Trackerの再起動は不要です。試合中でも安全に反映されます。"

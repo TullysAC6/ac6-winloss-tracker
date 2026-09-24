@@ -26,6 +26,9 @@ DEFAULT_CONFIG = {
     "effect_screenshot_enabled": False,
     "effect_enabled": True,
     "overlay_stats_scope": "session",
+    # Additive at version 18: a config without it keeps the pre-existing
+    # behaviour (the Player Overlay shows its streak-status wording).
+    "player_streak_status_enabled": True,
 }
 
 OVERLAY_STATS_SCOPES = ("session", "lifetime")
@@ -87,7 +90,7 @@ def validate_config(raw):
         raise ValueError(f"config_version: expected {CONFIG_VERSION}, got {c['config_version']}")
     c["port"] = _bounded("port", c["port"], 1024, 65535, int)
     for k in ("stats_enabled", "result_detector_enabled", "effect_screenshot_enabled",
-              "effect_enabled"):
+              "effect_enabled", "player_streak_status_enabled"):
         if type(c[k]) is not bool:
             raise ValueError(f"{k}: must be true or false")
     if c["overlay_stats_scope"] not in OVERLAY_STATS_SCOPES:
