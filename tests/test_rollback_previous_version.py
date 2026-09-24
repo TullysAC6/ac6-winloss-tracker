@@ -104,33 +104,45 @@ def extract_previous(destination):
 
 
 def preferences_contract(tree):
-    """(PREFERENCES_VERSION, DEFAULTS keys) read from a tree's source, or None."""
+    """(PREFERENCES_VERSION, {key: default type name}) from a tree's source, or None."""
     path = Path(tree) / "preferences.py"
     if not path.is_file():
         return None
-    version = keys = None
+    version = defaults = None
     for node in ast.parse(path.read_text(encoding="utf-8")).body:
         target = node.target if isinstance(node, ast.AnnAssign) else (
             node.targets[0] if isinstance(node, ast.Assign) and len(node.targets) == 1 else None)
         if isinstance(target, ast.Name) and target.id == "PREFERENCES_VERSION":
             version = ast.literal_eval(node.value)
         if isinstance(target, ast.Name) and target.id == "DEFAULTS":
-            keys = set(ast.literal_eval(node.value))
-    return version, keys
+            defaults = {key: type(value).__name__ for key, value in ast.literal_eval(node.value).items()}
+    return version, defaults
+
+
+# UI-1A introduces preferences.json.  It is the only build whose previous build
+# has no preferences.py, so a build in that position must be exactly this.
+FIRST_GENERATION = (1, {KEY: "bool"})
 
 
 def contract_violation(previous, new):
     """Why ``new`` breaks one-version rollback to ``previous``, or None."""
-    new_version, new_keys = new
+    new_version, new_types = new
     if previous is None:
-        return None if new_version == 1 else "the first preferences build must be version 1"
-    old_version, old_keys = previous
-    if not old_keys <= new_keys:
-        return f"keys removed or renamed: {sorted(old_keys - new_keys)}"
-    if new_keys == old_keys:
+        if new == FIRST_GENERATION:
+            return None
+        return ("only the first preferences build may follow a build without preferences.py; "
+                "move PREVIOUS_VERSION to this generation's base")
+    old_version, old_types = previous
+    if not set(old_types) <= set(new_types):
+        return f"keys removed or renamed: {sorted(set(old_types) - set(new_types))}"
+    changed = sorted(key for key in old_types if old_types[key] != new_types[key])
+    if changed:
+        return f"key types changed (the previous build would reject the file): {changed}"
+    if set(new_types) == set(old_types):
         return None if new_version == old_version else "version changed without a key change"
     if new_version != old_version + 1:
-        return f"keys {sorted(new_keys - old_keys)} added without bumping {old_version} -> {old_version + 1}"
+        added = sorted(set(new_types) - set(old_types))
+        return f"keys {added} added without bumping {old_version} -> {old_version + 1}"
     return None
 
 
@@ -139,14 +151,16 @@ class PreferencesContractRuleTests(unittest.TestCase):
 
     def test_rule(self):
         cases = [
-            (None, (1, {"a"}), None),
-            (None, (2, {"a"}), "first"),
-            ((1, {"a"}), (1, {"a"}), None),
-            ((1, {"a"}), (1, {"a", "b"}), "without bumping"),
-            ((1, {"a"}), (2, {"a", "b"}), None),
-            ((1, {"a"}), (3, {"a", "b"}), "without bumping"),
-            ((1, {"a"}), (2, {"a"}), "without a key change"),
-            ((1, {"a", "b"}), (2, {"a"}), "removed"),
+            (None, FIRST_GENERATION, None),
+            (None, (2, {KEY: "bool"}), "only the first"),
+            (None, (1, {KEY: "bool", "b": "bool"}), "only the first"),  # stale PREVIOUS_VERSION + no bump
+            ((1, {"a": "bool"}), (1, {"a": "bool"}), None),
+            ((1, {"a": "bool"}), (1, {"a": "bool", "b": "str"}), "without bumping"),
+            ((1, {"a": "bool"}), (2, {"a": "bool", "b": "str"}), None),
+            ((1, {"a": "bool"}), (3, {"a": "bool", "b": "str"}), "without bumping"),
+            ((1, {"a": "bool"}), (2, {"a": "bool"}), "without a key change"),
+            ((1, {"a": "bool", "b": "bool"}), (2, {"a": "bool"}), "removed"),
+            ((1, {"a": "bool"}), (2, {"a": "str", "b": "bool"}), "types changed"),
         ]
         for previous, new, expected in cases:
             with self.subTest(previous=previous, new=new):
@@ -158,8 +172,9 @@ class PreferencesContractRuleTests(unittest.TestCase):
 
     def test_this_tree_contract_is_readable(self):
         import preferences
-        self.assertEqual(preferences_contract(ROOT),
-                         (preferences.PREFERENCES_VERSION, set(preferences.DEFAULTS)))
+        self.assertEqual(preferences_contract(ROOT), (
+            preferences.PREFERENCES_VERSION,
+            {key: type(value).__name__ for key, value in preferences.DEFAULTS.items()}))
 
 
 def history_rows(data):
@@ -237,8 +252,12 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         rolled_back = self.phase(self.previous, "previous-start")
         self.assertTrue(Path(rolled_back["server_file"]).is_relative_to(self.previous.resolve()),
                         "the previous build's own server.py ran")
-        if preferences_contract(self.previous) is not None:
+        previous_contract = preferences_contract(self.previous)
+        if previous_contract is not None:
             self.assertIn("settings", rolled_back, "the previous build read preferences.json itself")
+            for key, type_name in previous_contract[1].items():
+                if type_name == "bool":  # new-install saved every bool flipped from its default
+                    self.assertIs(rolled_back["settings"][key], installed["settings"][key], key)
         self.assertEqual((rolled_back["lifetime_before"], rolled_back["recorded"],
                           rolled_back["lifetime_after"]), (1, True, 2))
         self.assertEqual((self.data / "config.json").read_bytes(), config_after_new,
