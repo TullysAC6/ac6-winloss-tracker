@@ -44,8 +44,7 @@ lifecycle stay intact.
 - New analytics, metadata, Season, rank/rating, or opponent-build data.
 - Framework migration.
 - Tray behaviour. UI-4 remains wholly owned by [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26).
-- Starting UI-1A before this documentation PR is merged and the owner separately authorizes
-  implementation.
+- Starting UI-1A without separate explicit owner authorization.
 
 ### Authoritative sequence
 
@@ -786,5 +785,6 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 - [x] UI-4 remains isolated under Issue #26.
 
 The design specification is approved. Issue #25 remains open, UI-1A is **NOT STARTED**, and this
-approval is neither implementation acceptance nor release status. The exact next action is owner
-authorization to merge this documentation-only PR; UI-1A still requires separate authorization.
+approval is neither implementation acceptance nor release status. The UI-0 documentation PR (#42)
+is merged. The next product action is a separate explicit owner authorization to start UI-1A;
+nothing in this specification grants it.
