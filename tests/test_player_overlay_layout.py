@@ -579,6 +579,8 @@ class StreakStatusSettingTests(unittest.TestCase):
         for name in ("_render_milestone_effect", "_queue_sse_event", "_accept_stats"):
             self.assertNotIn("_show_streak_status", method_source(name), name)
         self.assertIn("_show_streak_status", method_source("_render"))
+        self.assertIn("self._show_streak_status = True", method_source("__init__"),
+                      "the overlay itself starts ON before the first config read")
         self.assertEqual(game_overlay.status_for_streak(2), ("", 0))
         self.assertEqual([game_overlay.status_for_streak(n)[0] for n in (3, 5, 10, 15, 20, 25)],
                          ["アツい", "激アツ", "超激アツ", "覚醒ゾーン", "RUSH継続中", "RUSH継続中"])

@@ -834,7 +834,14 @@ class CaptureGapDiagnosticsTests(unittest.TestCase):
 @GUI
 class SettingsWindowTests(unittest.TestCase):
     def setUp(self):
+        import gc
         import tkinter as tk
+        # Tk variables of earlier windows sit in reference cycles. Collect them
+        # on this (Tk) thread; otherwise cyclic GC can finalize them inside a
+        # settings worker thread, where each Variable.__del__ waits ~1 s for a
+        # mainloop these update()-pumped tests never run, and a worker such as
+        # the CSV export overruns pump()'s 10 s budget.
+        gc.collect()
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name) / "config.json"
@@ -877,6 +884,9 @@ class SettingsWindowTests(unittest.TestCase):
             "player_streak_status_enabled": False,
         })
         self.window.window.withdraw()
+        # Put the reused window's variable back to the default so the reopen
+        # assertion can only pass if show() re-reads the saved file.
+        self.window.streak_status.set(True)
         settings.open_settings(self.root)
         self.assertFalse(self.window.effect_enabled.get())
         self.assertEqual(self.window.scope.get(), "lifetime")
