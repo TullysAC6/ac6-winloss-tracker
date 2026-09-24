@@ -350,10 +350,20 @@ if os.name == "nt":
     user32.SetWindowPos.restype = wintypes.BOOL
     user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
     user32.ShowWindow.restype = wintypes.BOOL
-    # Windows 10 1607+. The safe-zone inset uses the AC6 window's own DPI.
-    if hasattr(user32, "GetDpiForWindow"):
-        user32.GetDpiForWindow.argtypes = [wintypes.HWND]
-        user32.GetDpiForWindow.restype = wintypes.UINT
+    # The safe-zone inset uses the effective DPI of the monitor showing AC6.
+    MONITOR_DEFAULTTONEAREST = 2
+    MDT_EFFECTIVE_DPI = 0
+    user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+    user32.MonitorFromWindow.restype = wintypes.HMONITOR
+    try:
+        shcore = ctypes.WinDLL("shcore")  # Windows 8.1+
+        shcore.GetDpiForMonitor.argtypes = [
+            wintypes.HMONITOR, ctypes.c_int,
+            ctypes.POINTER(wintypes.UINT), ctypes.POINTER(wintypes.UINT),
+        ]
+        shcore.GetDpiForMonitor.restype = ctypes.c_long
+    except (OSError, AttributeError):
+        shcore = None
 
     kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     kernel32.OpenProcess.restype = wintypes.HANDLE
@@ -404,6 +414,25 @@ def _tk_toplevel_hwnd(widget_hwnd: int) -> int:
         return widget_hwnd
     parent = user32.GetParent(widget_hwnd)
     return int(parent) if parent else int(widget_hwnd)
+
+
+def _monitor_dpi(hwnd: int) -> int:
+    """Effective DPI of the monitor showing ``hwnd``; 0 when unknown.
+
+    GetDpiForWindow is not used: it reports 96 for a DPI-unaware game window
+    whatever the Windows scale, which would shrink the logical-px inset.
+    """
+    if os.name != "nt" or not hwnd or shcore is None:
+        return 0
+    try:
+        monitor = user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)
+        dpi_x, dpi_y = wintypes.UINT(0), wintypes.UINT(0)
+        if not monitor or shcore.GetDpiForMonitor(
+                monitor, MDT_EFFECTIVE_DPI, ctypes.byref(dpi_x), ctypes.byref(dpi_y)) != 0:
+            return 0
+        return int(dpi_x.value)
+    except (AttributeError, OSError):
+        return 0
 
 
 def _enable_dpi_awareness() -> None:
@@ -529,7 +558,6 @@ class GameOverlay:
             raise RuntimeError("game_overlay.py is Windows-only")
 
         import tkinter as tk
-        import tkinter.font as tkfont
 
         self.tk = tk
         self.process_name = process_name.lower()
@@ -881,12 +909,7 @@ class GameOverlay:
 
     def _client_scale(self, hwnd: int) -> float:
         """Logical-to-physical factor of the AC6 window's monitor."""
-        dpi = 0
-        if hwnd:
-            try:
-                dpi = int(user32.GetDpiForWindow(hwnd))
-            except (AttributeError, OSError):
-                dpi = 0
+        dpi = _monitor_dpi(hwnd)
         return dpi / 96.0 if dpi > 0 else self._ui_scale
 
     def _show_at_game(

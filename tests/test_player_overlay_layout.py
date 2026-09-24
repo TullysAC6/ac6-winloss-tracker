@@ -286,16 +286,20 @@ class LayoutAndSafeZoneTests(unittest.TestCase):
         self.assertEqual(render.call_count, 1)
         self.assertEqual(overlay.canvas.deleted, ["all"])
 
-    def test_client_dpi_comes_from_the_game_window(self):
+    def test_client_dpi_comes_from_the_game_monitor(self):
         overlay = partial_overlay(1.0)
-        fake = Mock()
-        fake.GetDpiForWindow.return_value = 144
-        with patch.object(game_overlay, "user32", fake, create=True):
+        with patch.object(game_overlay, "_monitor_dpi", return_value=144) as monitor_dpi:
             self.assertEqual(overlay._client_scale(77), 1.5)
-            fake.GetDpiForWindow.assert_called_once_with(77)
-            fake.GetDpiForWindow.return_value = 0
-            self.assertEqual(overlay._client_scale(77), 1.0)
-            self.assertEqual(overlay._client_scale(0), 1.0)
+            monitor_dpi.assert_called_once_with(77)
+        with patch.object(game_overlay, "_monitor_dpi", return_value=0):
+            self.assertEqual(overlay._client_scale(77), 1.0, "unknown DPI falls back to the Tk DPI")
+        self.assertEqual(game_overlay._monitor_dpi(0), 0)
+        # The monitor's effective DPI, never GetDpiForWindow: a DPI-unaware game
+        # window reports 96 whatever the Windows scale.
+        monitor_dpi_source = SOURCE[SOURCE.index("def _monitor_dpi("):SOURCE.index("def _enable_dpi_awareness(")]
+        self.assertIn("GetDpiForMonitor", monitor_dpi_source)
+        self.assertIn("MDT_EFFECTIVE_DPI", monitor_dpi_source)
+        self.assertNotIn("GetDpiForWindow(", SOURCE)
 
 
 class ExplicitOffsetCompatibilityTests(unittest.TestCase):
@@ -327,6 +331,11 @@ class ExplicitOffsetCompatibilityTests(unittest.TestCase):
              patch.object(overlay, "_show_absolute") as show:
             overlay._show_at_game(0, 0, 1920, 1080, 1)
         show.assert_called_once_with(5, 24)
+        overlay.x_offset, overlay.y_offset = None, 7
+        with patch.object(overlay, "_client_scale", return_value=1.0), \
+             patch.object(overlay, "_show_absolute") as show:
+            overlay._show_at_game(100, 50, 1920, 1080, 1)
+        show.assert_called_once_with(124, 57)
 
     def test_always_show_preview_origin(self):
         overlay = partial_overlay(1.25)
@@ -371,6 +380,11 @@ class ResultAcknowledgementTests(unittest.TestCase):
         self.assertEqual(overlay.canvas.items, items_before)
         self.assertEqual(overlay.canvas.deleted, ["all"])
         self.assertEqual(overlay.canvas.recoloured, [("accent", game_overlay.ACK_ACCENT)])
+        # A repaint while the pulse is live keeps the pulse colour until it ends.
+        overlay.last_stats = stats(wins=2)
+        overlay._render()
+        accents = [kw["fill"] for kind, _, kw in overlay.canvas.items if kw.get("tags") == "accent"]
+        self.assertEqual(accents, [game_overlay.ACK_ACCENT] * 3)
 
     def test_fallback_and_sse_paths_share_the_same_acceptance(self):
         tick = method_source("_tick")
@@ -472,10 +486,66 @@ class RealTkCanvasTests(unittest.TestCase):
         with patch.object(game_overlay.GameOverlay, "_tick"), \
              patch.object(game_overlay, "read_stats", return_value=None):
             cls.overlay = game_overlay.GameOverlay("armoredcore6.exe", None, None, 22, 250)
+        cls.native_scaling = float(cls.overlay.root.tk.call("tk", "scaling"))
 
     @classmethod
     def tearDownClass(cls):
         cls.overlay.root.destroy()
+
+    def test_production_default_placement_on_real_windows(self):
+        """No --x/--y, real monitor DPI, real SetWindowPos: the L3 review gap."""
+        import ctypes
+        from ctypes import wintypes
+        import tkinter as tk
+        overlay = self.overlay
+        overlay.root.tk.call("tk", "scaling", self.native_scaling)
+        overlay._ui_scale = float(overlay.root.winfo_fpixels("1i")) / 96.0
+        overlay._build_fonts(22)
+        overlay.last_stats = stats(wins=12, losses=7, streak=3)
+        overlay._stats_scope, overlay._lifetime = "session", None
+        overlay._available_width = None
+        overlay._render()
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(game_overlay.RECT)]
+        user32.GetWindowRect.restype = wintypes.BOOL
+        game = tk.Toplevel(overlay.root)
+        try:
+            game.overrideredirect(True)
+            game.geometry("1280x720+64+64")
+            game.configure(bg="#203040")
+            game.update()
+            game_hwnd = game_overlay._tk_toplevel_hwnd(game.winfo_id())
+            client, origin = game_overlay.RECT(), game_overlay.POINT(0, 0)
+            self.assertTrue(game_overlay.user32.GetClientRect(game_hwnd, ctypes.byref(client)))
+            self.assertTrue(game_overlay.user32.ClientToScreen(game_hwnd, ctypes.byref(origin)))
+            width, height = client.right - client.left, client.bottom - client.top
+
+            dpi = game_overlay._monitor_dpi(game_hwnd)
+            self.assertEqual(dpi, round(overlay.root.winfo_fpixels("1i")),
+                             "effective DPI of the primary monitor")
+            scale = dpi / 96.0
+            foreground = game_overlay.user32.GetForegroundWindow()
+            overlay._show_at_game(origin.x, origin.y, width, height, game_hwnd)
+            overlay.root.update()
+
+            inset_x, inset_y = game_overlay.safe_inset(width, height, scale)
+            panel_w, panel_h = overlay._panel_size
+            for hwnd in (overlay.text_hwnd, overlay.panel_hwnd):
+                rect = game_overlay.RECT()
+                self.assertTrue(user32.GetWindowRect(hwnd, ctypes.byref(rect)))
+                self.assertEqual((rect.left, rect.top), (origin.x + inset_x, origin.y + inset_y))
+                self.assertEqual((rect.right - rect.left, rect.bottom - rect.top), (panel_w, panel_h))
+                self.assertTrue(game_overlay.user32.IsWindowVisible(hwnd))
+            self.assertEqual(game_overlay.user32.GetForegroundWindow(), foreground, "no focus theft")
+            assert_inside_safe_zone(self, origin.x + inset_x, origin.y + inset_y, panel_w, panel_h,
+                                    origin.x, origin.y, width, height, scale)
+        finally:
+            overlay._hide()
+            game.destroy()
+            overlay.root.update()
+        self.assertFalse(game_overlay.user32.IsWindowVisible(overlay.text_hwnd))
+        self.assertFalse(game_overlay.user32.IsWindowVisible(overlay.panel_hwnd))
 
     def use_scale(self, scale):
         overlay = self.overlay
