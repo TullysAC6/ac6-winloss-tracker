@@ -630,6 +630,44 @@ class StreakStatusSettingTests(unittest.TestCase):
         self.assertEqual([game_overlay.status_for_streak(n)[0] for n in (3, 5, 10, 15, 20, 25)],
                          ["アツい", "激アツ", "超激アツ", "覚醒ゾーン", "RUSH継続中", "RUSH継続中"])
 
+    def test_the_broadcast_best_streak_preference_never_reaches_the_player(self):
+        # UI-1B's Broadcast-only key: not read by the Player source at all, and a
+        # file holding it changes nothing the Player draws.
+        self.assertNotIn("broadcast_show_best_streak", SOURCE)
+        self.assertEqual(re.findall(r"preferences\.(\w+)\(", SOURCE), ["effective"])
+        import tempfile
+        import config_utils
+        import preferences
+        directory = tempfile.TemporaryDirectory(prefix="ac6-ui1b-prefs-")
+        self.addCleanup(directory.cleanup)
+        prefs = Path(directory.name) / "preferences.json"
+        patcher = patch.object(config_utils, "CONFIG_PATH", Path(directory.name) / "config.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(setattr, preferences, "_cache", None)
+        overlay = partial_overlay(wins=6, losses=1, streak=5)
+        overlay._lifetime_queue = queue.Queue()
+
+        def drawn(text):
+            prefs.write_text(text, encoding="utf-8")
+            preferences._cache = None
+            with patch.object(game_overlay, "load_config", return_value={"overlay_stats_scope": "session"}):
+                game_overlay.GameOverlay._drain_display_scope(overlay)
+            overlay._render()
+            return " ".join(overlay.canvas.texts())
+
+        for broadcast in ("true", "false"):
+            with self.subTest(broadcast=broadcast):
+                shown = drawn('{"preferences_version": 2, "player_streak_status_enabled": true, '
+                              '"broadcast_show_best_streak": %s}' % broadcast)
+                hidden = drawn('{"preferences_version": 2, "player_streak_status_enabled": false, '
+                               '"broadcast_show_best_streak": %s}' % broadcast)
+                self.assertIn("激アツ", shown)
+                self.assertNotIn("激アツ", hidden)
+                for text in (shown, hidden):
+                    self.assertNotIn("最高連勝", text, "BEST stays off the Player panel either way")
+                    self.assertNotIn("BEST", text)
+
 
 class StructuralBudgetTests(unittest.TestCase):
     def test_no_new_thread_process_or_loop(self):

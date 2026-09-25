@@ -66,6 +66,7 @@ class SettingsFileTests(unittest.TestCase):
             "effect_screenshot_enabled": False,
             "overlay_stats_scope": "session",
             "player_streak_status_enabled": True,
+            "broadcast_show_best_streak": True,
         })
         settings.save_settings({"effect_enabled": False, "overlay_stats_scope": "lifetime"})
         stored = json.loads(self.path.read_text(encoding="utf-8"))
@@ -76,6 +77,7 @@ class SettingsFileTests(unittest.TestCase):
             "effect_screenshot_enabled": False,
             "overlay_stats_scope": "lifetime",
             "player_streak_status_enabled": True,
+            "broadcast_show_best_streak": True,
         })
         # The screenshot helper still edits only its own key.
         settings.save_screenshot_setting(True)
@@ -602,6 +604,66 @@ class LiveServerPurgeTests(unittest.TestCase):
         self.assertEqual(self.get("/config")["overlay_stats_scope"], "lifetime")
         self.assertFalse(self.get("/config")["effect_enabled"] is None)
 
+    def test_config_endpoint_publishes_only_the_broadcast_best_streak_preference(self):
+        import preferences
+        path = self.config.with_name("preferences.json")
+
+        def write(text):
+            path.write_text(text, encoding="utf-8")
+            preferences._cache = None  # the same process: skip the mtime granularity
+            return path.read_bytes()
+
+        def cleanup():
+            path.unlink(missing_ok=True)
+            preferences._cache = None
+            self.get("/config")  # back to the default for the next test
+
+        self.addCleanup(cleanup)
+        path.unlink(missing_ok=True)
+        preferences._cache = None
+        body = self.get("/config")
+        self.assertIs(body["broadcast_show_best_streak"], True, "no preferences.json = shown")
+        self.assertEqual(set(body), {"stats_enabled", "effect_enabled", "overlay_stats_scope", "config_health",
+                                     "broadcast_show_best_streak"}, "one new field, nothing else")
+        self.assertFalse(path.exists(), "reading never creates preferences.json")
+
+        write('{"preferences_version": 2, "broadcast_show_best_streak": false, '
+              '"player_streak_status_enabled": false}')
+        body = self.get("/config")
+        self.assertIs(body["broadcast_show_best_streak"], False, "applies without a restart")
+        self.assertNotIn("player_streak_status_enabled", body, "Player preferences stay out of the browser")
+        write('{"preferences_version": 2, "player_streak_status_enabled": true}')
+        self.assertIs(self.get("/config")["broadcast_show_best_streak"], True, "the Player value never moves it")
+        write('{"preferences_version": 2, "broadcast_show_best_streak": false}')
+        self.assertIs(self.get("/config")["broadcast_show_best_streak"], False)
+
+        # An invalid or too-new file: /config still answers, keeps the last
+        # valid value, and nothing rewrites the user's file.
+        for bad in ("{broken", '{"preferences_version": 4, "broadcast_show_best_streak": true}',
+                    '{"preferences_version": 2, "broadcast_show_best_streak": "yes"}'):
+            with self.subTest(bad=bad):
+                before = write(bad)
+                with patch("builtins.print"):
+                    body = self.get("/config")
+                self.assertIs(body["broadcast_show_best_streak"], False)
+                self.assertEqual(body["config_health"]["status"], "active", "config.json health is its own")
+                self.assertEqual(path.read_bytes(), before)
+
+    def test_invalid_config_json_behaves_as_before_with_the_broadcast_field_present(self):
+        self.assertEqual(self.get("/config")["config_health"]["status"], "active")
+        self.config.write_text('{"config_version": 18, "unexpected": 1}', encoding="utf-8")
+        with patch("builtins.print"):
+            body = self.get("/config")
+        # The last good config is kept and reported as degraded, as before UI-1B.
+        self.assertEqual(body["config_health"]["status"], "degraded")
+        self.assertEqual(body["overlay_stats_scope"], "session")
+        self.assertIs(body["broadcast_show_best_streak"], True)
+        config_utils._last_good = config_utils._last_good_signature = None
+        with patch("builtins.print"), self.assertRaises(urllib.error.HTTPError) as raised:
+            self.get("/config")
+        self.assertEqual(raised.exception.code, 503, "no last good config: 503, unchanged")
+        raised.exception.close()
+
 
 class StoppedTrackerTests(unittest.TestCase):
     def test_maintenance_reports_a_stopped_tracker_instead_of_starting_one(self):
@@ -872,25 +934,100 @@ class SettingsWindowTests(unittest.TestCase):
         self.assertTrue(self.window.effect_enabled.get())
         self.assertEqual(self.window.scope.get(), "session")
         self.assertTrue(self.window.streak_status.get())
+        self.assertTrue(self.window.broadcast_best.get(), "Broadcast BEST defaults to ON")
         self.window.effect_enabled.set(False)
         self.window.enabled.set(True)
         self.window.scope.set("lifetime")
         self.window.streak_status.set(False)
+        self.window.broadcast_best.set(False)
         self.window.save_button.invoke()
         self.assertEqual(settings.read_settings(), {
             "effect_enabled": False,
             "effect_screenshot_enabled": True,
             "overlay_stats_scope": "lifetime",
             "player_streak_status_enabled": False,
+            "broadcast_show_best_streak": False,
         })
         self.window.window.withdraw()
-        # Put the reused window's variable back to the default so the reopen
+        # Put the reused window's variables back to the default so the reopen
         # assertion can only pass if show() re-reads the saved file.
         self.window.streak_status.set(True)
+        self.window.broadcast_best.set(True)
         settings.open_settings(self.root)
         self.assertFalse(self.window.effect_enabled.get())
         self.assertEqual(self.window.scope.get(), "lifetime")
         self.assertFalse(self.window.streak_status.get())
+        self.assertFalse(self.window.broadcast_best.get())
+
+    def preferences_file(self):
+        return json.loads(self.path.with_name("preferences.json").read_text(encoding="utf-8"))
+
+    def reopen(self):
+        self.window.window.withdraw()
+        return settings.open_settings(self.root)
+
+    def test_player_and_broadcast_toggles_are_independent(self):
+        config_before = json.loads(self.path.read_text(encoding="utf-8"))
+        self.window.broadcast_best.set(False)
+        self.window.save_button.invoke()
+        self.assertEqual(self.preferences_file(), {
+            "preferences_version": 2, "player_streak_status_enabled": True, "broadcast_show_best_streak": False})
+        self.reopen()
+        self.assertTrue(self.window.streak_status.get(), "Broadcast OFF never turns the Player status off")
+        self.assertFalse(self.window.broadcast_best.get())
+        self.window.streak_status.set(False)
+        self.window.save_button.invoke()
+        self.reopen()
+        self.assertFalse(self.window.broadcast_best.get(), "the Player status never turns Broadcast BEST on")
+        self.window.broadcast_best.set(True)
+        self.window.save_button.invoke()
+        self.assertEqual(self.preferences_file(), {
+            "preferences_version": 2, "player_streak_status_enabled": False, "broadcast_show_best_streak": True})
+        # The window also saves its config-owned options, so config.json is
+        # rewritten, but never with a new key or a changed value.
+        self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), config_before)
+        self.assertEqual(set(config_before), set(config_utils.DEFAULT_CONFIG))
+
+    def display_tab(self):
+        notebook = self.window.window.winfo_children()[0]
+        return notebook, [self.root.nametowidget(tab) for tab in notebook.tabs()]
+
+    def test_the_broadcast_toggle_is_its_own_obs_labelled_group(self):
+        _, tabs = self.display_tab()
+        widgets = tabs[0].winfo_children()
+        variable = str(self.window.broadcast_best)
+        index = next(i for i, widget in enumerate(widgets)
+                     if widget.winfo_class() == "TCheckbutton" and str(widget.cget("variable")) == variable)
+        self.assertEqual(widgets[index].cget("text"), "最高連勝を表示する")
+        self.assertIn("OBS", widgets[index - 1].cget("text"), "the group heading says it is the OBS overlay")
+        self.assertIn("ゲーム内オーバーレイには影響しません", widgets[index + 1].cget("text"))
+        player = next(widget for widget in widgets if widget.winfo_class() == "TCheckbutton"
+                      and str(widget.cget("variable")) == str(self.window.streak_status))
+        self.assertLess(widgets.index(player), index, "one checkbox per overlay, Player first")
+
+    def test_the_display_tab_never_sets_the_fixed_window_size(self):
+        # The window is fixed (not resizable) and sizes itself to its tallest
+        # and widest tab. The Broadcast group must not make the Display tab that
+        # tab at any Tk scaling, so it cannot grow or clip the window. (The
+        # Launcher is not DPI-aware; Windows scales the whole bitmap.)
+        import tkinter as tk
+        for scaling in (96 / 72, 1.25 * 96 / 72, 1.5 * 96 / 72):
+            with self.subTest(scaling=scaling):
+                root = tk.Tk()
+                root.withdraw()
+                try:
+                    root.tk.call("tk", "scaling", scaling)
+                    window = settings.SettingsWindow(root)
+                    window.show()
+                    root.update()
+                    notebook = window.window.winfo_children()[0]
+                    tabs = [root.nametowidget(tab) for tab in notebook.tabs()]
+                    display, others = tabs[0], tabs[1:]
+                    self.assertEqual(notebook.tab(notebook.tabs()[0], "text"), "表示・演出")
+                    self.assertLessEqual(display.winfo_reqheight(), max(tab.winfo_reqheight() for tab in others))
+                    self.assertLessEqual(display.winfo_reqwidth(), max(tab.winfo_reqwidth() for tab in others))
+                finally:
+                    root.destroy()
 
     def test_destructive_actions_require_confirmation(self):
         preview = ("all", {"total_matches": 7})
