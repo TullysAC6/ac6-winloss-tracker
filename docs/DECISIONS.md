@@ -528,3 +528,61 @@ non-modal during gameplay and incapable of stealing AC6 focus.
 
 The manifest is bounded, fixed-schema data from a fixed HTTPS GitHub source. It is never evaluated
 or executed, and no match history or personal data is uploaded to fetch it.
+
+---
+
+## Additive settings live in `preferences.json`; `config.json` is frozen
+
+**Decision (2026-09-24, accepted in real-machine T3 on 2026-09-25): a new user setting is stored in
+the separate, versioned `preferences.json`, never as a new key in `config.json`.**
+
+Requirement: the owner's rollback-resilience requirement on
+[#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5810072373).
+Introduced by UI-1A, [PR #46](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46), in
+`preferences.py`.
+
+Why: `config.json` is validated strictly, and the previous build and v1.2.0 refuse to start on a
+key they do not know (`ENV-CONFIG-INVALID`). A setting saved into `config.json` therefore makes
+the one-version-older build unstartable until the user edits the file by hand. The superseded UI-1A
+candidate `f2e4b4d` did exactly that. The negative control in
+`tests/test_rollback_previous_version.py` keeps proving it.
+
+The rules:
+
+- `config.json` stays at `config_version` 18 with its current key set. `tests/test_preferences.py`
+  pins that set.
+- `preferences.json` sits beside `config.json`. A missing file means every default, and nothing is
+  written until a value differs from its default.
+- Every key is a flat name matching `^[a-z][a-z0-9_]{0,63}$` with one scalar value.
+- A generation that adds keys bumps `preferences_version` by exactly one. The tests fail on a new
+  key without that bump, and on a bump without a new key.
+- A build accepts a file written by the build exactly one version newer:
+  - its own keys are still type-checked;
+  - the newer keys are kept on save and never interpreted.
+- Dotted names, nested objects, lists and non-finite numbers are refused even by that tolerant
+  reader. Using them would bring the rollback problem back.
+- Anything else is strict and invalid:
+  - an unknown key at the build's own version, or a wrong type;
+  - malformed JSON, a duplicate key, or an oversized file;
+  - a file more than one version newer.
+- An invalid file is never used or overwritten. Renderers keep their last value; Settings refuses to
+  save.
+- Rollback support is exactly one generation. There is no multi-version migration framework.
+
+Evidence:
+
+- `tests/test_rollback_previous_version.py` (T2) round-trips data through the real previous build.
+- The owner's real-machine T3 on 2026-09-25
+  ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46#issuecomment-5831572036)):
+  1. UI-1A with the setting saved OFF;
+  2. the README rollback to public v1.2.0, which started and ignored the file;
+  3. a re-upgrade that restored OFF.
+
+  `config.json` and `preferences.json` stayed byte-identical throughout.
+
+Rejected alternatives:
+
+- **Asking users to delete the new key by hand before rolling back.** The owner rejected it.
+- **Relaxing `config.json` validation to ignore unknown keys.** It weakens the strictness that
+  protects known settings.
+- **A general multi-version migration system.** It is unbounded for a one-generation need.

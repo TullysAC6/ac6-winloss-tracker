@@ -16,6 +16,16 @@ This document turns MASTER_REQUIREMENTS §§57–63 into an implementation-ready
 owner decisions are recorded in §20. Approval of this specification does **not** authorize UI-1A
 or any later implementation.
 
+Implementation status, 2026-09-25:
+
+- **UI-1A is implemented, accepted and merged, but not released.** PR #46 merged as
+  `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`. The amendments it carries are recorded in §6 and in
+  §20, decisions 6–7.
+- **UI-1B is not started and not authorized.** The owner's pre-authorization decisions for it are
+  recorded in §20, decision 8.
+- Sections marked *Before* describe the pre-UI-1A product and stay as historical evidence.
+- Live project state is in [PROJECT_STATE.md](PROJECT_STATE.md).
+
 ## 1. Outcome and boundaries
 
 The target identity is:
@@ -220,6 +230,12 @@ Player / Broadcast overlays:
 Tk implementations use logical point sizes that preserve these proportions under Windows scaling;
 they must not hard-code physical pixels to imitate CSS.
 
+Japanese text is set in a Japanese face on purpose, never reached through glyph fallback from a
+Segoe face. In UI-1A the Player uses Yu Gothic UI → Meiryo UI → Meiryo for Japanese labels and
+status, while numerals keep Segoe UI Variable. Fallback from Segoe made the status look wrong in
+real T3 (§20, decision 6). The overlay chain above is therefore not permission to set Japanese text
+in a Segoe face.
+
 ### 5.3 Spacing, shape, and elevation
 
 - Spacing scale: `4 / 8 / 12 / 16 / 24 / 32` logical px.
@@ -269,15 +285,22 @@ when the system can distinguish game waiting, detector degraded, and server offl
 └─────────────────────────────────────────┘
 ```
 
+The diagram shows hierarchy, not copy. UI-1A keeps the existing labels `WIN / LOSE / 勝率 / 連勝`
+(§20, decision 6).
+
 - Values are the first scan line; labels are smaller and quieter.
 - `BEST STREAK` leaves the always-on Player Overlay. It remains always visible in Dashboard
-  Overview. Broadcast exposes it through its own user-toggleable `show_best_streak` setting.
+  Overview. Broadcast exposes it through its own user-toggleable Broadcast setting, a flat
+  `preferences.json` key (§7).
 - Player and Broadcast settings remain independent. This presentation change does not alter the
   underlying BEST statistic, its calculation, or its persistence.
 - A thin cyan leading rule and two corner ticks supply telemetry character. No faux AC6 copy.
 - Status degradation appears as a compact labelled chip on the right, not as a colour-only change.
+  *(Deferred in UI-1A.)*
 - A genuine result may pulse the leading rule for 100–200 ms. Milestones use the separate effect
   window. Threshold status words such as `激アツ` do not loop or blink in the persistent panel.
+  *Amended by §20 decision 6:* the words stay as static text while the user-toggleable, Player-only
+  streak-status setting is ON, which is the default, and are hidden when it is OFF.
 
 ### Placement, DPI, and safe zone
 
@@ -301,12 +324,40 @@ when the system can distinguish game waiting, detector degraded, and server offl
 
 ### Rollback and verification
 
-- UI-1A is one isolated PR. Reverting it restores only Canvas layout/tokens; no schema or migration.
+- UI-1A is one isolated PR. Reverting it restores the Canvas layout/tokens and removes the
+  streak-status setting. A `preferences.json` already written stays in place and is ignored. There
+  is no `config.json` schema change and no migration.
 - Preserve static assertions for click-through/topmost/no-activate styles, separate alpha/text HWNDs,
   mutex, heartbeat, fallback, SSE freshness, effect isolation, and shutdown.
 - Add deterministic Canvas measurement tests and screenshot comparisons for every DPI/aspect cell.
 - T3: confirm glance legibility during real AC6, zero focus theft, no HUD collision, unchanged result
   counting, and baseline-relative performance.
+
+### As delivered in UI-1A
+
+[PR #46](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46) merged as
+`c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS
+([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46#issuecomment-5831572036)). It is
+accepted but not released.
+
+**Delivered:**
+- P-01 to P-05.
+- P-06 as amended: a static, Player-only streak status behind a toggle that defaults to ON.
+- The existing labels, and Japanese text in a Japanese face.
+- The setting is stored in `preferences.json`, with `config.json` frozen (§19;
+  [DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen)).
+
+**Panel opacity:** defaults to 15%, inside the 12–18% target. The owner accepted it although large
+white `RANK MATCH: SINGLE` game text can compete with the overlay where they overlap (§20,
+decision 7).
+
+**Deferred:** the status chip, milestone parity and tiers (M-01 to M-03, including the ≤4.5 s
+50-win target), and reduced motion (DS-05).
+
+**Future:** Player personalization is adopted as future work, not scheduled (§20, decision 7).
+
+Performance was not measured in T3 because the #37 baseline method is not implemented yet. The
+structural budget (no new process, thread or loop) is enforced by tests.
 
 ## 7. Broadcast Overlay — UI-1B
 
@@ -329,6 +380,9 @@ Default compact scene component:
 └──────────────────────────────────────────┘
 ```
 
+The diagram shows hierarchy, not copy. The Broadcast Overlay keeps its existing product wording
+(§20, decision 8).
+
 Milestone slot, normally absent:
 
 ```text
@@ -346,34 +400,49 @@ Milestone slot, normally absent:
   compression. No backdrop blur or full-canvas material.
 - Default safe area is 5% of canvas on every edge. Provide named `top-left`, `top-right`,
   `bottom-left`, and `bottom-right` anchors in the future Broadcast settings; default stays top-left.
+  *Superseded for the first UI-1B scope by §20 decision 8:* the current 22 px top-left placement
+  stays the default, the 5% movement is not forced on existing OBS scenes, and no anchor setting is
+  added.
 - Health warnings stack within the same safe region and include an icon/word, not red alone.
 - Ordinary streak state is static. No infinite blink. Only the finite milestone slot is loud.
 
 ### Separate settings contract
 
 Player and Broadcast may share semantic tokens, but Broadcast owns distinct settings and must
-expose BEST as an independently user-toggleable option:
+expose BEST as an independently user-toggleable option.
 
-```text
-broadcast_overlay.enabled
-broadcast_overlay.anchor
-broadcast_overlay.scale
-broadcast_overlay.opacity
-broadcast_overlay.show_best_streak
-```
+**Storage, as established by UI-1A.** A Broadcast setting is an additive preference in
+`preferences.json`, never a `config.json` key (see
+[DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen)):
 
-These keys are a UI-1B implementation design input, not authorization to change `config.json` now.
-Any schema addition must be versioned, bounded, and backward-compatible. Player settings must not
-mutate these values, and Broadcast settings must not mutate Player presentation.
+- It is a flat name matching `^[a-z][a-z0-9_]{0,63}$` with one scalar value.
+- It is added together with a `preferences_version` bump.
+
+The approval-time sketch named `broadcast_overlay.enabled`, `.anchor`, `.scale`, `.opacity` and
+`.show_best_streak`. Dotted or nested names like those are refused by the one-version-older reader,
+so they must not be used.
+
+**First UI-1B scope (§20, decision 8):**
+
+- The only new setting is the BEST STREAK toggle, default ON. For example
+  `broadcast_show_best_streak`; the final name is chosen at implementation.
+- No enabled, anchor, scale or opacity settings are added.
+
+**Independence:**
+
+- Player settings must not change Broadcast values.
+- Broadcast settings must not change Player presentation.
+- The Player streak-status setting does not affect the Broadcast Overlay.
 
 ### Rollback and verification
 
-- UI-1B is separate from UI-1A. Revert `overlay.html` and any new bounded config keys/defaults;
-  older config remains valid.
+- UI-1B is separate from UI-1A. Revert `overlay.html` and the new preference default. The
+  one-version-older build keeps a newer preference in `preferences.json` without interpreting it,
+  so no file edit is needed; `config.json` is untouched.
 - Keep SSE reconnect/replay/freshness/dedup tests and config polling tests.
 - Add browser screenshots at 1920×1080 and 2560×1440, transparent-background alpha checks,
   safe-area assertions, long Japanese/English value stress, stream-compression legibility review,
-  and reduced-motion coverage.
+  and reduced-motion coverage once reduced-motion work is scheduled (deferred, §20 decision 8).
 - OBS T3 verifies scene composition, chat/HUD non-collision, viewer-distance readability, and no
   measurable game-performance regression.
 
@@ -689,18 +758,18 @@ Risk meanings:
 | DS-02 | Shared typography roles and fallback order | UI-1A first | Low | Font declarations | DPI/text matrix |
 | DS-03 | 4/8/12/16/24/32 spacing scale | UI-1A first | Low | Layout constants | Geometry snapshots |
 | DS-04 | Restrained radius/divider/elevation rules | Per surface | Low | Style declarations | Visual review |
-| DS-05 | System-aware reduced-motion behaviour | UI-1A/UI-1B | Medium | Motion adapter/settings default | Native/browser parity |
+| DS-05 | System-aware reduced-motion behaviour | UI-1A/UI-1B; deferred in UI-1A and for UI-1B's first scope (§20 decision 8) | Medium | Motion adapter/settings default | Native/browser parity |
 | DS-06 | Text/icon/shape in addition to colour | Per surface | Low | Labels/styles | High-contrast/state matrix |
 | P-01 | Value-first four-metric layout | UI-1A | Low | Native Canvas layout | AC6/DPI screenshots |
 | P-02 | Remove BEST from always-on Player surface | UI-1A; owner-approved | Low | One rendered field | Glance test; value remains in Overview and optional Broadcast |
 | P-03 | Thin telemetry rule/corner ticks | UI-1A | Low | Canvas primitives | Pixel/safe-zone review |
 | P-04 | Responsive DPI/aspect safe-zone placement | UI-1A | Medium | Placement calculation | 1080p/1440p/4K, 16:9/21:9 |
 | P-05 | 100–200 ms result acknowledgement | UI-1A | Low | One finite animation | Event/cleanup/performance test |
-| P-06 | Remove persistent pachinko blink/status from normal panel | UI-1A | Low | Status style mapping | Milestones unaffected |
+| P-06 | Remove persistent pachinko blink/status from normal panel. *Amended (§20 decision 6): no blink; the status stays as static text behind a Player-only toggle that defaults to ON* | UI-1A; delivered as amended | Low | Status style mapping | Milestones unaffected |
 | B-01 | Session-first viewer layout | UI-1B | Low | HTML/CSS component | Browser screenshots |
 | B-02 | Type scale holding the current 24 px bold primary baseline; enlarge only on OBS evidence | UI-1B; owner-approved | Low | CSS type tokens | OBS 1080p/1440p review |
-| B-03 | Independent Broadcast settings namespace | UI-1B | Medium | Versioned config keys/defaults | Migration + live reload |
-| B-04 | OBS safe-area anchors and scale | UI-1B | Medium | Anchor/scale config | Canvas/safe-area matrix |
+| B-03 | Independent Broadcast settings namespace | UI-1B | Medium | Flat, versioned `preferences.json` keys/defaults (§7) | `preferences_version` bump + one-version rollback + live reload |
+| B-04 | OBS safe-area anchors and scale | UI-1B; not in the first scope (§20 decision 8) | Medium | Anchor/scale setting | Canvas/safe-area matrix |
 | B-05 | Labelled stacked health states | UI-1B | Low | DOM/CSS | State/contrast tests |
 | D-01 | Top navigation shell | UI-2 after #15/#28-A | Medium | Dashboard shell | Keyboard/navigation/lifecycle |
 | D-02 | WIN RATE primary KPI hierarchy | UI-2 | Low | Overview layout | Data parity/screenshots |
@@ -729,7 +798,7 @@ Proposal count: **36 total — Low 20, Medium 15, High 1**.
 | Phase | Automated before review | Human/visual before acceptance | Must remain unchanged |
 |---|---|---|---|
 | UI-1A | T0 full; T1 42/42; overlay static/lifecycle, SSE, Canvas geometry, DPI screenshot matrix; T2 lifecycle | Real AC6 glance, safe zone, focus, update acknowledgement, natural milestone if available, performance comparison | Detection, ResultGate, stats/history writes, three HWND roles, process count, shutdown |
-| UI-1B | T0/T1; browser JS replay tests; transparent screenshots; config migration; T2 | OBS 1080p/1440p composition, viewer distance, chat/HUD collision, performance | Server endpoints, SSE identity/TTL, Player settings |
+| UI-1B | T0/T1; browser JS replay tests; transparent screenshots; `preferences_version` bump and one-version rollback; T2 | OBS 1080p/1440p composition, viewer distance, chat/HUD collision, performance | Server endpoints, SSE identity/TTL, Player settings |
 | UI-2 | T0/T1; Dashboard/Settings/History tests; keyboard/DPI/text/high-contrast screenshots; T2 | Normal use, reset confirmation, offline/degraded states, no focus theft, performance | Dashboard process/mutex/runtime heartbeat, server ownership, DB ownership |
 | UI-3A | T0/T1 fixtures for provided data; chart snapshots including pre-S/S boundary; T2 | Interpretability and sparse-data review | #16/#28 data semantics; unresolved Season honesty |
 | UI-3B | T0/T1 opponent fixtures; partial/failed states; T2 | Interpretability and mode separation | #17/#10/#11/#12 data and match independence |
@@ -742,8 +811,10 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 
 1. One phase per PR; UI-1A and UI-1B never share a rollback unit.
 2. Keep current data endpoints and persisted meanings. Visual rollback must not require DB repair.
-3. New config fields, if accepted, are additive, bounded, versioned, and have current-behaviour
-   defaults. Old config remains loadable.
+3. New settings, if accepted, are additive, bounded, versioned, and have current-behaviour
+   defaults. Since UI-1A they are flat keys in `preferences.json`, and `config.json` stays frozen
+   ([DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen)).
+   The one-version-older build keeps working without a file edit. Old config remains loadable.
 4. Do not delete current renderer paths until the replacement has passed the phase's T3.
 5. A failed material experiment falls back to solid surfaces without blocking the rest of UI-2.
 6. A failed UI-4 lifecycle proof rolls back the complete UI-4 PR; tray behaviour is not partially
@@ -769,6 +840,40 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
    viewer-distance evidence shows a readability problem. The earlier 28–36 CSS px proposal is not
    an approved target. This decision covers typography size only; the other Broadcast decisions
    are unchanged.
+6. **UI-1A amendments, 2026-09-24.** Made during implementation and real T3; all delivered in
+   PR #46.
+   - The persistent Player streak status is user-toggleable. It is Player-only, is ON when no
+     preference is saved, keeps a saved choice across updates, and is static text. This amends P-06
+     ([Issue #25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5809023031)).
+   - Rolling back to the previous supported version must not need a manual file edit. This produced
+     the frozen `config.json` / versioned `preferences.json` design and the README rollback section
+     ([rollback](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5810072373),
+     [README](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5810224686)).
+   - The Player labels keep the existing copy `WIN / LOSE / 勝率 / 連勝`; the §6 diagram was hierarchy
+     ([labels](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5815401135)).
+   - Japanese labels and status use a Japanese face rather than glyph fallback
+     ([typography](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5816558411)).
+7. **UI-1A acceptance, 2026-09-25.**
+   - The 15% Player panel opacity default is accepted for UI-1A, although large white game text can
+     compete with it where they overlap. This is a non-blocking observation.
+   - Player personalization is adopted as a **future** requirement: text size, panel size/density,
+     opacity, position and reset to defaults, stored through `preferences.json`, with current UI-1A
+     behaviour as the default. It is not scheduled or authorized, and exact ranges and widgets are
+     decided when it is
+     ([Issue #25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5831075818)).
+8. **UI-1B pre-authorization decisions, 2026-09-25.** Relayed with the UI-1A merge authorization and
+   recorded on
+   [Issue #25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5832173039).
+   They do **not** authorize UI-1B.
+   - Primary text keeps the current 24 px bold default (decision 5).
+   - The Broadcast BEST STREAK toggle defaults to ON, preserving current behaviour.
+   - Broadcast copy keeps the existing product wording; the §7 diagram is hierarchy.
+   - The current 22 px top-left placement stays the default; the 5% safe-area movement is not
+     forced on existing scenes.
+   - The first UI-1B scope adds only the BEST STREAK toggle as a new setting; no anchor, scale or
+     opacity expansion.
+   - Reduced-motion milestone work stays deferred.
+   - Player and Broadcast presentation settings stay independent.
 
 ## 21. Approval checklist
 
@@ -784,7 +889,13 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 - [x] Milestone 25 and 50-duration decisions recorded.
 - [x] UI-4 remains isolated under Issue #26.
 
-The design specification is approved. Issue #25 remains open, UI-1A is **NOT STARTED**, and this
+The design specification is approved. At approval time UI-1A was **NOT STARTED**, and this
 approval is neither implementation acceptance nor release status. The UI-0 documentation PR (#42)
-is merged. The next product action is a separate explicit owner authorization to start UI-1A;
-nothing in this specification grants it.
+is merged.
+
+State as of 2026-09-25:
+
+- UI-1A was separately authorized, then accepted and merged in PR #46. It is not released.
+- Issue #25 remains open.
+- The next product action is a separate explicit owner authorization to start UI-1B; nothing in
+  this specification grants it.
