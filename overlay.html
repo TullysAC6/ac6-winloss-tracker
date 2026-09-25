@@ -9,8 +9,9 @@ html,body{width:100%;height:100%;margin:0;overflow:hidden;background:transparent
 body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
 /* Stats panel at 22,22 and the warning stack at 18 px from the top right, as
    before. Sharing one wrapping row means that on a narrow Browser Source the
-   warnings drop below the panel instead of covering it, and neither leaves the
-   page. */
+   warnings drop below the panel instead of covering it. A source too short for
+   that keeps them at the top right, over the panel as before, so a warning is
+   never pushed off the page. */
 #top-bar{position:fixed;left:22px;right:18px;top:18px;z-index:1000;display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;pointer-events:none}
 #stats-panel{display:none;box-sizing:border-box;max-width:100%;margin-top:4px;padding:10px 14px 8px;background:rgba(0,0,0,.50);border:1px solid rgba(255,255,255,.30);border-radius:6px;color:#fff;font-size:24px;font-weight:800;text-shadow:0 2px 2px #000;pointer-events:none}
 #stats-panel .record,#stats-panel .rate,#stats-panel .streak,#stats-panel .status{display:inline-block}
@@ -25,6 +26,7 @@ body{font-family:"Yu Gothic UI","Meiryo","Noto Sans JP",sans-serif}
 #stats-panel.hot-5 .status{color:#fff;text-shadow:0 0 9px #ffe45c,0 2px 2px #000}
 #health-warnings{display:flex;flex-direction:column;align-items:flex-end;gap:3px;margin-left:auto;max-width:100%;pointer-events:none}
 .health-warning{display:none;box-sizing:border-box;max-width:100%;padding:6px 9px;background:rgba(120,0,0,.82);color:#fff;font-size:16px;font-weight:900;border-radius:4px;pointer-events:none}
+@media (max-height:299px){#health-warnings{position:fixed;right:18px;top:18px;z-index:1200}}
 #milestone{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;pointer-events:none}
 #milestone.show{display:flex}
 #milestone .inner{position:relative;padding:18px 42px;background:linear-gradient(180deg,rgba(90,12,0,.90),rgba(10,0,0,.86));border:3px solid #ffd94a;border-radius:8px;color:#fff166;font-size:68px;font-weight:900;letter-spacing:.04em;box-shadow:0 0 12px rgba(255,190,40,.45),inset 0 0 10px rgba(255,220,80,.18);text-shadow:0 0 4px #ff9c20,0 3px 4px #000;animation:milestone 1.8s ease-out forwards}

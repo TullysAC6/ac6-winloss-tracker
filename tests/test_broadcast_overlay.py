@@ -192,6 +192,9 @@ class BroadcastConfigTests(unittest.TestCase):
 BROWSER_TIMEOUT_SECONDS = 120
 SIZES = ((1920, 1080), (1280, 720), (2560, 1440), (3840, 2160), (800, 600), (640, 360))
 WIDE = ((1920, 1080), (1280, 720), (2560, 1440), (3840, 2160))
+# Sources too short for the warnings to drop below the panel (a strip cropped
+# to the panel, say): the warnings keep their previous top-right place instead.
+SHORT = ((800, 150), (640, 200), (1280, 120), (400, 299))
 CONFIG = {"stats_enabled": True, "effect_enabled": True, "overlay_stats_scope": "lifetime",
           "config_health": {"status": "degraded"}}
 # A realistic long panel: lifetime counts, the longest status word, both
@@ -402,6 +405,11 @@ class BroadcastGeometryTests(unittest.TestCase):
                               "status": STATUS, "events": WARNINGS})
                 cases.append(dict(QUIET, name=f"previous-quiet {width}x{height}", source="previous",
                                   width=width, height=height, lifetime=LIFETIME, status=STATUS))
+        for width, height in SHORT:
+            for best in (True, False):
+                cases.append({"name": f"new {width}x{height} {best}", "source": "new", "width": width,
+                              "height": height, "config": dict(CONFIG, broadcast_show_best_streak=best),
+                              "stats": STATS, "lifetime": LIFETIME, "status": STATUS, "events": WARNINGS})
         cls.expected = len(cases)
         cls.returncode, results, cls.leftover, cls.residue = render(cases, sources)
         cls.results = {row["name"]: row for row in results}
@@ -471,12 +479,40 @@ class BroadcastGeometryTests(unittest.TestCase):
                     self.assertLessEqual(panel[3], height)
                     shown = [box for box in row["warnings"] if box]
                     self.assertEqual(len(shown), 2, "detector and config warnings are both shown")
+                    self.assert_one_stack(shown)
                     for box in shown:
                         self.assertAlmostEqual(box[2], width - 18, delta=0.5, msg="warnings stay at the right")
                         self.assertGreaterEqual(box[0], 22 - 0.5)
                         self.assertLessEqual(box[3], height)
                         overlaps = box[0] < panel[2] and panel[0] < box[2] and box[1] < panel[3] and panel[1] < box[3]
                         self.assertFalse(overlaps, f"warning {box} covers the panel {panel}")
+                    if (width, height) in WIDE:
+                        self.assertAlmostEqual(shown[0][1], 18, delta=0.5, msg="beside the panel at 18 px")
+
+    def assert_one_stack(self, shown):
+        # Shown warnings stack 3 px apart with no slot kept for a hidden one: the
+        # config warning sits right under the detector warning (the previous
+        # layout left the stats warning's slot empty between them).
+        for above, below in zip(shown, shown[1:]):
+            self.assertAlmostEqual(below[1], above[3] + 3, delta=0.5, msg="one stack, 3 px apart")
+
+    def test_a_short_source_keeps_every_warning_on_the_page(self):
+        for width, height in SHORT:
+            for best in (True, False):
+                with self.subTest(size=(width, height), best=best):
+                    row = self.case("new", width, height, best)
+                    self.assertEqual((row["vw"], row["vh"]), (width, height))
+                    self.assertAlmostEqual(row["panel"][0], 22, delta=0.5, msg="existing 22 px placement")
+                    self.assertAlmostEqual(row["panel"][1], 22, delta=0.5)
+                    self.assertEqual(row["font"], ["24px", "800", "24px"])
+                    shown = [box for box in row["warnings"] if box]
+                    self.assertEqual(len(shown), 2)
+                    self.assertAlmostEqual(shown[0][1], 18, delta=0.5, msg="the previous top-right place")
+                    self.assert_one_stack(shown)
+                    for box in shown:
+                        self.assertAlmostEqual(box[2], width - 18, delta=0.5)
+                        self.assertGreaterEqual(box[0], 0)
+                        self.assertLessEqual(box[3], height, "no warning is pushed off the page")
 
     def test_wide_sources_match_the_pre_ui_1b_layout(self):
         if not self.has_previous:
