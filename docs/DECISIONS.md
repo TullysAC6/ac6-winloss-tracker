@@ -418,7 +418,7 @@ They have genuinely different requirements. The Player Overlay is read mid-fight
 
 Components and colour tokens are shared. Font size, opacity, information density, animation, duration and layout are **not** forced to a single configuration.
 
-*Refined 2026-09-26:* two visibility settings, the streak status and the best streak, become one shared user preference each. The two overlays still render them separately. See [Shared visibility settings across the two overlays](#shared-visibility-settings-across-the-two-overlays).
+*Refined 2026-09-26, future work (not started, not authorized):* two visibility settings, the streak status and the best streak, become one shared user preference each; the renderers may remain separate. See [Shared visibility settings across the two overlays](#shared-visibility-settings-across-the-two-overlays).
 
 Rejected alternative: one overlay with one settings surface. It looked simpler, but every setting then has to compromise between "must not distract the player" and "must read at streaming distance", and both audiences get a worse result.
 
@@ -603,7 +603,7 @@ Rejected alternatives:
 
 ## Shared visibility settings across the two overlays
 
-**Decision (2026-09-26, future work): the two visibility settings that mean the same thing on both overlays become one shared user preference each. The two renderers stay separate.**
+**Decision (2026-09-26, future work): the two visibility settings that mean the same thing on both overlays become one shared user preference each. The renderers may remain separate; only the preference state is shared.**
 
 Requirement: the owner decision on
 [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161), made
@@ -618,25 +618,44 @@ The two settings:
 
 Why: from the user's point of view each is one question, "do I want this shown?". Two separately
 saved answers to the same question are confusing. The overlays still differ in how they draw the
-information, so the renderers stay separate and only the preference state is shared.
+information, so the renderers may remain technically separate; what is shared is the user's
+preference.
 
 This supersedes the earlier long-term assumption that these two toggles stay independently
 configurable per overlay (UI-0 spec §20, decisions 1 and 8). It does **not** rewrite what was
-delivered:
+delivered. UI-1A and UI-1B are accepted and merged with that asymmetry, which was the requirement
+at the time:
 
-- UI-1A shipped a Player-only streak-status toggle (`player_streak_status_enabled`).
-- UI-1B shipped a Broadcast-only BEST toggle (`broadcast_show_best_streak`).
-- Both are accepted and merged as separate, independent keys, which was the requirement at the time.
+| Setting | Player Overlay today | Broadcast Overlay today |
+|---|---|---|
+| Streak status | User toggle `player_streak_status_enabled` (UI-1A, default ON) | Always shown, static, no toggle |
+| Best streak | Never shown (spec §20 decision 1) | User toggle `broadcast_show_best_streak` (UI-1B, default ON) |
+
+Sharing each setting therefore implies that each overlay will honour a setting it does not honour
+today. These questions stay **open** until the cleanup is authorized, and are the owner's to decide:
+
+- whether BEST returns to the Player Overlay when 最高連勝を表示 is ON;
+- the shared defaults;
+- how each existing key combines with the other overlay's current fixed behaviour. That includes a
+  deterministic rule for a user whose saved Player and Broadcast behaviour of the same setting
+  differ.
+
+Until then, decision 1's removal of BEST from the Player Overlay stands.
 
 It also does **not** decide whether future size, opacity, layout or position settings are shared.
-Those stay under [Two overlay audiences](#two-overlay-audiences) until the owner decides otherwise.
+The rule in [Two overlay audiences](#two-overlay-audiences) still applies to them; sharing any of
+them would need a separate owner decision.
 
 Status: **adopted, not started, not authorized.** When the cleanup is authorized, its migration
 must:
 
 - start from the existing keys `player_streak_status_enabled` and `broadcast_show_best_streak`;
 - preserve the user's existing choices where possible;
-- resolve a disagreement between the old Player and Broadcast values deterministically;
+- resolve differences between the Player and Broadcast behaviour of the same setting
+  deterministically;
 - follow [Additive settings live in `preferences.json`](#additive-settings-live-in-preferencesjson-configjson-is-frozen):
-  a `preferences_version` bump, one-generation rollback, nothing added to `config.json`, and no
-  manual file edit.
+  - a `preferences_version` bump when a key is added;
+  - the one-version-newer reader, with the old keys kept meaningful so that rolling back to UI-1B
+    still works;
+  - nothing added to `config.json`;
+  - no manual file edit.

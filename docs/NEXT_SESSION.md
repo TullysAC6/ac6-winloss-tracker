@@ -51,7 +51,7 @@ Issue #6
   - The Player Overlay is unchanged.
   - The exact UI-1A build kept the unknown v2 key through a real UI-1B → UI-1A → UI-1B round trip, with no hand edit.
   - Known limitation (Low, accepted): on a source shorter than 300 px and narrow, a shown health warning covers part of the panel.
-- **Shared visibility settings are decided as future work** (2026-09-26, [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)). 連勝ステータスを表示 and 最高連勝を表示 each become one preference shared by the Player and Broadcast overlays; the renderers stay separate. **Not started, not authorized.** See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
+- **Shared visibility settings are decided as future work** (2026-09-26, [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)). 連勝ステータスを表示 and 最高連勝を表示 each become one preference shared by the Player and Broadcast overlays; the renderers may remain separate. Whether BEST returns to the Player Overlay, the shared defaults and the migration rule are open. **Not started, not authorized.** See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
 
 ## The rule that cost a release — do not lose it
 
@@ -116,7 +116,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #40, PR #42, PR #43, PR #46 and PR #48 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PRs #40 to #48 are all merged. No product generation is active.
 
 ## What is newly recorded and must not be lost
 
@@ -137,7 +137,11 @@ Seven things in there are easy to erode and are the reason they are written down
 - **The pre-S → S rating boundary is not one continuous line.** The ladder is `UNRANKED → … → A4 → S`, and the boundary is **pre-S / non-S (through A4) vs S** — A4 is on the pre-S side, so never write "below A" for it. The game presents rating differently on each side, so the obvious-looking single-line chart asserts a comparison the game does not support, and it fails silently. Rank/Rating recognition is event-driven, never a continuous OCR loop, and a failed read is recorded as a failed read — never as a rating change.
 - **Season synchronization is manual-first catalog reconciliation, not cadence inference.** Unknown and transition records stay unresolved; a long absence fetches every missing Season definition; failure keeps cached data and never affects result persistence.
 - **`config.json` is frozen; additive settings live in `preferences.json`** (UI-1A, #25). A new key in `config.json` makes the one-version-older build refuse to start. A dotted or nested preference, or a new key without a `preferences_version` bump, makes it reject the whole preferences file. Rolling back must never require a hand edit.
-- **Equivalent visibility settings will share one user state** (#25, 2026-09-26). 連勝ステータスを表示 and 最高連勝を表示 are each one preference for both overlays, with the renderers kept separate. The merged UI-1A / UI-1B keys stay separate until that cleanup is authorized. The cleanup's migration must resolve a Player/Broadcast disagreement deterministically and keep one-generation rollback. It does not decide whether size, opacity or position settings are shared.
+- **Equivalent visibility settings will share one user state** (#25, 2026-09-26).
+  - 連勝ステータスを表示 and 最高連勝を表示 are each one preference for both overlays; the renderers may remain separate.
+  - The merged UI-1A / UI-1B keys, and the Player Overlay's removal of BEST, stay until that cleanup is implemented and accepted.
+  - Open questions: whether BEST returns to the Player Overlay, the shared defaults, and a deterministic migration rule. The migration keeps one-generation rollback.
+  - Size, opacity, layout and position stay separately configurable unless the owner decides otherwise.
 
 ## STOP conditions
 

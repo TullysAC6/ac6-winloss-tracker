@@ -2090,12 +2090,20 @@ visibility settings are the exception.
   Broadcast overlays.
 - **最高連勝を表示** (show the best streak) is one user preference shared by both overlays.
 
-Each overlay keeps its own renderer; only the user's ON/OFF state is shared. This supersedes the
+The renderers may remain separate; only the user's ON/OFF state is shared. This supersedes the
 earlier assumption that these two toggles stay independently configurable per overlay.
 
-It is **future work, not implemented**. UI-1A and UI-1B shipped them as separate settings
-(`player_streak_status_enabled`, `broadcast_show_best_streak`). The decision does not settle
-whether future size, opacity, layout or position settings are shared.
+It is **future work, not implemented**. UI-1A and UI-1B shipped them as separate, one-overlay
+settings:
+
+- `player_streak_status_enabled`: the Player Overlay's streak status.
+- `broadcast_show_best_streak`: the Broadcast Overlay's best streak.
+
+Today the Player Overlay never shows the best streak, and the Broadcast Overlay always shows the
+streak status. How the shared settings apply there is decided when the cleanup is authorized.
+
+The rule above still applies to size, opacity, layout and position. Sharing any of them would need
+a separate owner decision.
 
 ## Milestone presentation
 

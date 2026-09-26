@@ -22,7 +22,7 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
 | Source-install CI race | **Fixed and merged (test-only).** The first exact-main CI of `be77844` ([run 35798045591](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35798045591), attempt 1) failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun of the same SHA passed. Classified as a test-fixture timing race, not a product defect. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaces the sleep with a bounded 7 s / 100 ms readiness poll that fails on early exit, requires parseable runtime JSON with a PID, and requires that PID to equal the launched process. Merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`. Independent review GO is recorded in the PR #43 handoff checklist (no separate GitHub review object); T3 N/A (production runtime unchanged) |
 | Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0`. UI-0 design spec PR #42 merged as `be77844` |
-| Unmerged generations | **No product generation is active.** PR #48 (UI-1B) is merged. UI-2, the shared visibility settings and Player personalization have not started |
+| Unmerged generations | **No product generation is active.** PR #48 (UI-1B) is merged. #15, #28-A, UI-2, the shared visibility settings and Player personalization have not started |
 | Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
 | Current position | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is **ACCEPTED — UNRELEASED**. [UI-0](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`); the spec is canonical on `main`. This is a design state, not Implemented, Accepted or Released. **UI-1A is ACCEPTED + MERGED — UNRELEASED** (PR #46, `c2b00dc`). **UI-1B is ACCEPTED + MERGED — UNRELEASED** (PR #48, `b64ce73`). Issue #25 remains open. Next in the Sequencing order is #15; like UI-2, the shared visibility settings and Player personalization, it is **NOT STARTED and NOT AUTHORIZED** |
 
@@ -201,15 +201,21 @@ Acceptance evidence:
   - the Windows display scaling;
   - the match outcome and Lifetime counts.
 
-Known limitation, Low, accepted and non-blocking: on a Browser Source shorter than 300 px and narrower than about 1060 px, a shown health warning covers part of the stats panel. This keeps the warning visible instead of pushing it off the page, and the previous build also overlapped on narrow sources. It did not apply to the owner's 1920×1080 source. The other review nits are listed in the PR #48 description.
+Known limitation, Low, accepted and non-blocking: on a Browser Source shorter than 300 px and narrower than about 1060 px, a shown health warning covers part of the stats panel. This keeps the warning visible instead of pushing it off the page, and the previous build also overlapped on narrow sources. It did not apply to the owner's 1920×1080 source. Also, on a source about 330 px wide or narrower and at least 300 px tall, the last warning can end below the page, which the previous build did not do. The other review nits are listed in the PR #48 description.
 
 **Future shared visibility settings** were decided on 2026-09-26 ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)):
 
-- 連勝ステータスを表示 and 最高連勝を表示 each become one user preference shared by the Player and Broadcast overlays. The two renderers stay separate.
+- 連勝ステータスを表示 and 最高連勝を表示 each become one user preference shared by the Player and Broadcast overlays. The renderers may remain separate; only the preference state is shared.
 - This supersedes the earlier assumption that these two toggles stay independent per overlay. It does not change what UI-1A and UI-1B delivered.
-- It does not decide whether future size, opacity or position settings are shared.
-- It is **not started and not authorized**.
-- Its migration from `player_streak_status_enabled` and `broadcast_show_best_streak` must resolve a disagreement between them deterministically, keep one-generation rollback, and never touch `config.json` or need a hand edit. See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
+- Today the Player Overlay has the streak-status toggle but never shows BEST, and the Broadcast Overlay has the BEST toggle but always shows the status.
+- **Open until the cleanup is authorized:**
+  - whether BEST returns to the Player Overlay;
+  - the shared defaults;
+  - how the existing keys combine with the other overlay's fixed behaviour, deterministically where a user's Player and Broadcast behaviour of the same setting differ.
+
+  The Player removal of BEST stands until then.
+- It is **not started and not authorized**. Its migration keeps one-generation rollback, never touches `config.json` and needs no hand edit.
+- Size, opacity, layout and position stay separately configurable; sharing any of them would need a separate owner decision. See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
 
 ## Implemented, accepted and merged — PR #46 (UI-1A Player Overlay)
 
