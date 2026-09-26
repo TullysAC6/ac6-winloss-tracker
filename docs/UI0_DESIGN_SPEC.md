@@ -16,13 +16,17 @@ This document turns MASTER_REQUIREMENTS §§57–63 into an implementation-ready
 owner decisions are recorded in §20. Approval of this specification does **not** authorize UI-1A
 or any later implementation.
 
-Implementation status, 2026-09-25:
+Implementation status, 2026-09-26:
 
 - **UI-1A is implemented, accepted and merged, but not released.** PR #46 merged as
   `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`. The amendments it carries are recorded in §6 and in
   §20, decisions 6–7.
-- **UI-1B is not started and not authorized.** The owner's pre-authorization decisions for it are
-  recorded in §20, decision 8.
+- **UI-1B is implemented, accepted and merged, but not released.** PR #48 merged as
+  `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`. The owner's pre-authorization decisions are in §20,
+  decision 8. What it delivered is in §7 and in §20, decision 9.
+- **The two visibility settings will become shared** between the overlays (§20, decision 10).
+  This is future work, not started and not authorized. It amends the future-facing independence
+  wording in §6, §7, §17 (P-02, B-03) and §20 for those two settings only.
 - Sections marked *Before* describe the pre-UI-1A product and stay as historical evidence.
 - Live project state is in [PROJECT_STATE.md](PROJECT_STATE.md).
 
@@ -294,6 +298,11 @@ The diagram shows hierarchy, not copy. UI-1A keeps the existing labels `WIN / LO
   `preferences.json` key (§7).
 - Player and Broadcast settings remain independent. This presentation change does not alter the
   underlying BEST statistic, its calculation, or its persistence.
+  *Amended for future work by §20 decision 10:* showing the streak status and showing BEST each
+  become one user preference shared by both overlays. UI-1A and UI-1B shipped them as separate,
+  one-overlay settings. BEST stays off the Player Overlay. Whether it returns there when the
+  shared setting is ON is an open question of decision 10, and any change takes effect only once
+  implemented and accepted.
 - A thin cyan leading rule and two corner ticks supply telemetry character. No faux AC6 copy.
 - Status degradation appears as a compact labelled chip on the right, not as a colour-only change.
   *(Deferred in UI-1A.)*
@@ -434,6 +443,13 @@ so they must not be used.
 - Broadcast settings must not change Player presentation.
 - The Player streak-status setting does not affect the Broadcast Overlay.
 
+UI-1B delivered this contract as written.
+
+*Amended for future work by §20 decision 10:* the streak-status and BEST visibility settings each
+become one user preference shared by both overlays; the renderers may remain separate. The
+independence above still applies to every other presentation setting, including size, opacity,
+layout and position. Sharing any of them would need a separate owner decision.
+
 ### Rollback and verification
 
 - UI-1B is separate from UI-1A. Revert `overlay.html` and the new preference default. The
@@ -445,6 +461,55 @@ so they must not be used.
   and reduced-motion coverage once reduced-motion work is scheduled (deferred, §20 decision 8).
 - OBS T3 verifies scene composition, chat/HUD non-collision, viewer-distance readability, and no
   measurable game-performance regression.
+
+### As delivered in UI-1B
+
+[PR #48](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48) merged as
+`b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head
+`499939f2e3e5ccfcfd25972fe8be3037172afe33`
+([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5844417204)). It is
+accepted but not released.
+
+**Delivered, the first UI-1B scope of §20 decision 8:**
+
+- **The BEST STREAK toggle, the only new setting.**
+  - `broadcast_show_best_streak` is a boolean in `preferences.json`, with `preferences_version` 2.
+  - It defaults to ON; a missing value behaves as ON.
+  - It is set in Settings → 表示・演出 → **OBS用オーバーレイ（配信画面）** → **最高連勝を表示する**.
+  - It reaches OBS through the existing 3 s `/config` poll, with no restart. `config.json` stays
+    frozen.
+- **A static ordinary streak status.** The wording and colours are unchanged; the infinite blink is
+  removed. The milestone banner is the only animation.
+- **B-02 as approved:** 24 px bold primary text, the existing copy, and the 22 px top-left default.
+- **B-05:** the health warnings already carried words, not red alone, and the shown ones now form
+  one stack at the top right. On a narrow source they drop below the panel instead of covering it.
+  Below 300 px of height they keep their previous top-right place, so they stay visible; on a
+  source that is also narrow, that place covers part of the panel. No icons were added.
+- **Independence:** the Player Overlay is unchanged. The Player streak-status setting and Broadcast
+  BEST are separate keys, and only the Broadcast key is published on `/config`.
+- **Rollback:** one generation, with no hand edit. The exact UI-1A build kept the unknown v2 key in
+  real T3.
+
+**Not delivered:**
+- B-01 (session-first layout) and B-04 (anchors and scale);
+- the enabled / scale / opacity settings;
+- reduced motion (DS-05);
+- the milestone proposals M-01 to M-03, including the ≤4.5 s 50-win target of decision 3.
+
+They remain adopted proposals, unscheduled and not authorized. No second UI-1B scope is planned.
+
+**Known limitation (Low, accepted, non-blocking):** on a source shorter than 300 px and narrower
+than about 1060 px, a shown warning covers part of the panel. The owner's real 1920×1080 source is
+not affected.
+
+The PR #48 known limitations also record a delta-review nit, which the owner did not accept
+separately: on a source about 330 px wide or narrower and at least 300 px tall, the last warning
+can end below the page.
+
+**Future:** the visibility settings become shared between the overlays (§20, decision 10).
+
+Performance was not measured in T3; the #37 baseline method is not implemented yet. The structural
+budget is enforced by tests: no new process, thread, route, poll or animation loop.
 
 ## 8. Dashboard / Overview — UI-2
 
@@ -761,16 +826,16 @@ Risk meanings:
 | DS-05 | System-aware reduced-motion behaviour | UI-1A/UI-1B; deferred in UI-1A and for UI-1B's first scope (§20 decision 8) | Medium | Motion adapter/settings default | Native/browser parity |
 | DS-06 | Text/icon/shape in addition to colour | Per surface | Low | Labels/styles | High-contrast/state matrix |
 | P-01 | Value-first four-metric layout | UI-1A | Low | Native Canvas layout | AC6/DPI screenshots |
-| P-02 | Remove BEST from always-on Player surface | UI-1A; owner-approved | Low | One rendered field | Glance test; value remains in Overview and optional Broadcast |
+| P-02 | Remove BEST from always-on Player surface. *Stays in force; whether BEST returns to the Player Overlay under §20 decision 10 is open, and any change takes effect only once implemented and accepted* | UI-1A; owner-approved | Low | One rendered field | Glance test; value remains in Overview and optional Broadcast |
 | P-03 | Thin telemetry rule/corner ticks | UI-1A | Low | Canvas primitives | Pixel/safe-zone review |
 | P-04 | Responsive DPI/aspect safe-zone placement | UI-1A | Medium | Placement calculation | 1080p/1440p/4K, 16:9/21:9 |
 | P-05 | 100–200 ms result acknowledgement | UI-1A | Low | One finite animation | Event/cleanup/performance test |
 | P-06 | Remove persistent pachinko blink/status from normal panel. *Amended (§20 decision 6): no blink; the status stays as static text behind a Player-only toggle that defaults to ON* | UI-1A; delivered as amended | Low | Status style mapping | Milestones unaffected |
-| B-01 | Session-first viewer layout | UI-1B | Low | HTML/CSS component | Browser screenshots |
+| B-01 | Session-first viewer layout | UI-1B; not in the first scope | Low | HTML/CSS component | Browser screenshots |
 | B-02 | Type scale holding the current 24 px bold primary baseline; enlarge only on OBS evidence | UI-1B; owner-approved | Low | CSS type tokens | OBS 1080p/1440p review |
-| B-03 | Independent Broadcast settings namespace | UI-1B | Medium | Flat, versioned `preferences.json` keys/defaults (§7) | `preferences_version` bump + one-version rollback + live reload |
+| B-03 | Independent Broadcast settings namespace. *Delivered in UI-1B as the one flat key `broadcast_show_best_streak`. The two visibility settings are to become shared (§20 decision 10)* | UI-1B; delivered | Medium | Flat, versioned `preferences.json` keys/defaults (§7) | `preferences_version` bump + one-version rollback + live reload |
 | B-04 | OBS safe-area anchors and scale | UI-1B; not in the first scope (§20 decision 8) | Medium | Anchor/scale setting | Canvas/safe-area matrix |
-| B-05 | Labelled stacked health states | UI-1B | Low | DOM/CSS | State/contrast tests |
+| B-05 | Labelled stacked health states | UI-1B; delivered without icons | Low | DOM/CSS | State/contrast tests |
 | D-01 | Top navigation shell | UI-2 after #15/#28-A | Medium | Dashboard shell | Keyboard/navigation/lifecycle |
 | D-02 | WIN RATE primary KPI hierarchy | UI-2 | Low | Overview layout | Data parity/screenshots |
 | D-03 | Explicit runtime/history states | UI-2 | Low | Status mapping | Health-state matrix |
@@ -824,7 +889,9 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 
 1. `BEST STREAK` is removed from the always-on Player Overlay, remains always visible in Dashboard
    Overview, and is independently user-toggleable in Broadcast. Player and Broadcast settings stay
-   independent; the underlying statistic is unchanged.
+   independent; the underlying statistic is unchanged. *The independence of the two visibility
+   settings is amended for future work by decision 10; the Player removal of BEST stays in force
+   (see decision 10).*
 2. The production 25-win milestone is preserved exactly. Its omission from canonical §§57–63 is
    recorded as an existing requirement/code discrepancy and is not resolved in UI-0, UI-1A, or
    UI-1B.
@@ -873,7 +940,46 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
    - The first UI-1B scope adds only the BEST STREAK toggle as a new setting; no anchor, scale or
      opacity expansion.
    - Reduced-motion milestone work stays deferred.
-   - Player and Broadcast presentation settings stay independent.
+   - Player and Broadcast presentation settings stay independent. *Amended for the two visibility
+     settings by decision 10.*
+9. **UI-1B acceptance, 2026-09-26.** The owner authorized UI-1B on 2026-09-25
+   ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5832871482)).
+   PR #48 delivered the first scope of decision 8 (see "As delivered in UI-1B" in §7).
+   - Real-machine T3 passed on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`, on a
+     1920×1080 OBS Browser Source at 30 FPS
+     ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5844417204)).
+   - PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`. It is not released.
+   - The short, narrow source warning overlap is accepted as a Low, non-blocking known limitation.
+10. **Shared visibility settings, 2026-09-26: future work.** Decided during UI-1B T3
+    ([Issue #25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)).
+    - **連勝ステータスを表示** and **最高連勝を表示** each become one ON/OFF user preference, shared by the
+      Player and Broadcast overlays. The renderers may remain separate; only the preference state
+      is shared.
+    - This supersedes the earlier assumption, in decisions 1 and 8, that these two toggles stay
+      independent per overlay. It does not change what UI-1A and UI-1B delivered.
+    - Today each setting has one saved key and a fixed behaviour on the other overlay:
+      - the Player Overlay has the streak-status toggle `player_streak_status_enabled` but never
+        shows BEST (decision 1);
+      - the Broadcast Overlay has the BEST toggle `broadcast_show_best_streak` but always shows the
+        static status.
+
+      The owner's wording implies each overlay will honour a setting it does not honour today;
+      the details are confirmed when the cleanup is authorized.
+    - **Open until the cleanup is authorized:**
+      - whether BEST returns to the Player Overlay when ON;
+      - the shared defaults;
+      - how each existing key combines with the other overlay's fixed behaviour, including a
+        deterministic rule where the current Player and Broadcast behaviour of the same setting
+        differ.
+
+      Decision 1's Player removal of BEST stays in force; any change to it is decided with the cleanup and takes effect only once implemented and accepted.
+    - The migration keeps one-generation rollback under the `preferences.json` rules: the old keys
+      stay meaningful to the previous build, nothing touches `config.json`, and no hand edit is
+      needed.
+    - It does not decide whether size, opacity, layout or position settings are shared; that would
+      need a separate owner decision.
+    - **Not started and not authorized.**
+    - See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
 
 ## 21. Approval checklist
 
@@ -893,9 +999,11 @@ The design specification is approved. At approval time UI-1A was **NOT STARTED**
 approval is neither implementation acceptance nor release status. The UI-0 documentation PR (#42)
 is merged.
 
-State as of 2026-09-25:
+State as of 2026-09-26:
 
 - UI-1A was separately authorized, then accepted and merged in PR #46. It is not released.
+- UI-1B was separately authorized, then accepted and merged in PR #48. It is not released.
 - Issue #25 remains open.
-- The next product action is a separate explicit owner authorization to start UI-1B; nothing in
-  this specification grants it.
+- UI-2, the shared visibility settings (decision 10) and Player personalization (decision 7) are
+  not started and not authorized. Each needs its own explicit owner authorization; nothing in this
+  specification grants it. The order is under **Sequencing** in [ROADMAP.md](ROADMAP.md).

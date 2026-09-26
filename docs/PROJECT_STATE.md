@@ -1,6 +1,6 @@
 # Project state
 
-Last updated: 2026-09-25 JST
+Last updated: 2026-09-26 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
@@ -11,8 +11,9 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | Item | State |
 |---|---|
 | Public stable | **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4` |
-| `main` product baseline | PR #46 (UI-1A) merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`, whose tree is identical to the accepted head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`. [Exact-main CI 36132227642](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36132227642) SUCCESS. Before it: PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d` ([exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) SUCCESS), then documentation PRs #41 / #42 / #44 / #45 and test-only PR #43, none of which changed the production runtime. Resolve `origin/main` again before later work |
-| Accepted runtime | PR #46 exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` (UI-1A), merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`, on top of the PR #40 runtime (`9aa883c`, merged as `2166487`); **both accepted but not released**. Public stable v1.2.0 still contains the earlier PR #5 runtime (`38a21c2`, merged as `a042b18`) |
+| `main` product baseline | PR #48 (UI-1B) merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`, whose tree is identical to the accepted head `499939f2e3e5ccfcfd25972fe8be3037172afe33`. [Exact-main CI 36230655908](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36230655908) SUCCESS. Before it: PR #46 (UI-1A) merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`, tree identical to accepted head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` ([exact-main CI 36132227642](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36132227642) SUCCESS), then docs-only PR #47. Earlier: PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d` ([exact-main CI 35564747847](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35564747847) SUCCESS), then documentation PRs #41 / #42 / #44 / #45 and test-only PR #43, none of which changed the production runtime. Resolve `origin/main` again before later work |
+| Accepted runtime | PR #48 exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` (UI-1B), merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`, on top of PR #46 exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` (UI-1A, merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`) and the PR #40 runtime (`9aa883c`, merged as `2166487`); **all accepted but not released**. Public stable v1.2.0 still contains the earlier PR #5 runtime (`38a21c2`, merged as `a042b18`) |
+| UI-1B Broadcast Overlay generation | **PR #48: Implemented + Accepted + merged to `main`** (`b64ce73`, 2026-09-26). Real-machine T3 PASS on the exact head. **Not released**. See the PR #48 section below |
 | UI-1A Player Overlay generation | **PR #46: Implemented + Accepted + merged to `main`** (`c2b00dc`, 2026-09-25). Real-machine T3 PASS on the exact head. **Not released**. See the PR #46 section below |
 | Superseded release | v1.1.0, tag `7a5959f` — published, runtime accepted, **formal release acceptance never completed**; superseded by v1.1.1 |
 | Settings / analytics generation | **PR #5: Implemented + Accepted + merged to `main`** (`a042b18`, 2026-09-13). Focused real-AC6 T3 PASS on the exact head `38a21c2`. **Released in v1.2.0**; not part of v1.1.1 |
@@ -21,9 +22,9 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | T0 TEMP leak | **Fixed and merged.** PR #38 (test-only; production runtime unchanged) merged as `3bd89a3` on 2026-09-19 after [independent review](https://github.com/TullysAC6/ac6-winloss-tracker/pull/38#pullrequestreview-5249924515) GO. A full T0 run now leaves 0 `tmp*` directories (was 12). [`main` CI 35366334508](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35366334508) green |
 | Source-install CI race | **Fixed and merged (test-only).** The first exact-main CI of `be77844` ([run 35798045591](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35798045591), attempt 1) failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun of the same SHA passed. Classified as a test-fixture timing race, not a product defect. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaces the sleep with a bounded 7 s / 100 ms readiness poll that fails on early exit, requires parseable runtime JSON with a PID, and requires that PID to equal the launched process. Merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`. Independent review GO is recorded in the PR #43 handoff checklist (no separate GitHub review object); T3 N/A (production runtime unchanged) |
 | Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0`. UI-0 design spec PR #42 merged as `be77844` |
-| Unmerged generations | **No product generation is active.** PR #46 (UI-1A) is merged. UI-1B has not started |
+| Unmerged generations | **No product generation is active.** PR #48 (UI-1B) is merged. #15, #28-A, UI-2, the shared visibility settings and Player personalization have not started |
 | Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
-| Current position | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is **ACCEPTED — UNRELEASED**. [UI-0](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`); the spec is canonical on `main`. This is a design state, not Implemented, Accepted or Released. **UI-1A is ACCEPTED + MERGED — UNRELEASED** (PR #46, `c2b00dc`). Issue #25 remains open. **UI-1B is next, NOT STARTED and NOT AUTHORIZED** |
+| Current position | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) is **ACCEPTED — UNRELEASED**. [UI-0](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`); the spec is canonical on `main`. This is a design state, not Implemented, Accepted or Released. **UI-1A is ACCEPTED + MERGED — UNRELEASED** (PR #46, `c2b00dc`). **UI-1B is ACCEPTED + MERGED — UNRELEASED** (PR #48, `b64ce73`). Issue #25 remains open. Next in the Sequencing order is #15; like UI-2, the shared visibility settings and Player personalization, it is **NOT STARTED and NOT AUTHORIZED** |
 
 ## v1.2.0 published integrity — 2026-09-14
 
@@ -148,6 +149,74 @@ PR #5 (*Known limitations*) lists the known residuals; none of them blocks:
 - the missing recovery hint for a corrupt `pending-history.json`
 - the two meanings of `matches`
 
+## Implemented, accepted and merged — PR #48 (UI-1B Broadcast Overlay)
+
+| | |
+|---|---|
+| Implemented | **yes**, on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`. The owner authorized UI-1B on 2026-09-25 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5832871482)) within the pre-authorization decisions of [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) §20, decision 8 |
+| Reviewed | **yes**. A fresh read-only independent review gave GO with no High or Medium finding. Its two Low findings were fixed in `499939f`, and the delta review of `499939f` also gave GO. Both are recorded in the [PR #48](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48) description; there is no separate GitHub review object |
+| Accepted | **yes**. Real-machine T3 PASS on the exact head ([T3 record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5844417204), [acceptance checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5844418399)) |
+| Merged | `main` as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` (2026-09-26), a merge commit whose tree is identical to the accepted head. [Exact-main CI 36230655908](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36230655908) SUCCESS ([merge checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5844811665)) |
+| Released | **no**. Public stable v1.2.0 does not contain UI-1B |
+
+Merged Broadcast Overlay behaviour:
+
+- **BEST STREAK toggle, the only new setting.**
+  - `broadcast_show_best_streak` is a boolean in `preferences.json`, and `preferences_version` goes 1 → 2.
+  - It is **ON by default**. A missing file, key or `/config` field behaves as ON, which is what every earlier build showed.
+  - It is set in Settings → 表示・演出 → **OBS用オーバーレイ（配信画面）** → **最高連勝を表示する**.
+  - It reaches OBS through the existing 3 s `/config` poll, so it applies without a Tracker restart or a source refresh.
+  - `config.json` stays frozen.
+- **Static streak status.** `アツい` … `RUSH継続中` keep their wording and colours. The infinite blink is removed and nothing replaces it; the milestone banner is the only animation.
+- **Layout.** The primary text stays 24 px bold, the panel keeps the 22 px top-left default, and the product copy is unchanged.
+  - The shown health warnings form one stack at the top right.
+  - On a narrow source they drop below the panel instead of covering it.
+  - Below 300 px of height they keep their previous top-right place.
+- **Player isolation.** The Player Overlay is unchanged. In the merged implementation the Player streak-status setting and Broadcast BEST are separate, independent keys, and only the Broadcast key is published on `/config`.
+- **Unchanged:** milestones (thresholds including 25 and 50, dedup/TTL, `effect_enabled`), detection, ResultGate, stats and history writes, and the server's thread and route counts and process topology.
+
+Acceptance evidence:
+
+- **Automated.** Exact-head CI [36145969986](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36145969986) and exact-main CI 36230655908 both passed. In each:
+  - T0 passed;
+  - T1 42/42, 0 skipped, corpus `6cfc4873bd0aa2bd`;
+  - T2 passed, including the real round trip through UI-1A `7cc8ebe` (5/5) and headless-browser Broadcast geometry (9/9).
+- **T3 environment.** An OBS Browser Source at 1920×1080 and 30 FPS. The installer was 72,457 bytes with SHA-256 `623FD96A3CD4965151392BA06DD77AA4588A83ACE912EEEE45408C794E462AF2`. Installing and starting did not rewrite `preferences.json`, which was still version 1.
+- **OBS checks B1–B14 all passed:**
+  - transparency, placement and copy;
+  - BEST ON by default, then OFF and ON live;
+  - a `preferences.json` v2 with neither key in `config.json`;
+  - Settings usable;
+  - Player and Broadcast independent in both directions;
+  - a source refresh with no milestone replay.
+- **Real result.** One genuine match passed with no double count.
+- **Rollback round trip, with BEST saved OFF.**
+  - Rolling back to the exact UI-1A build `7cc8ebe` worked. It started healthy (`/health` ok), kept the unknown v2 key, and showed its old always-visible BEST.
+  - Re-upgrading restored OFF.
+  - `config.json` and `preferences.json` stayed byte-identical throughout, and no file was edited by hand.
+- **Shutdown.** 0 processes, 0 port listeners, 0 runtime files, and no named mutex held. The shortcut relaunch passed.
+- **Not observed or measured, and not claimed:**
+  - a natural streak-status word or milestone;
+  - CPU, frame time, OBS render lag or skipped frames (the #37 baseline is not implemented);
+  - the Windows display scaling;
+  - the match outcome and Lifetime counts.
+
+Known limitation, Low, accepted and non-blocking: on a Browser Source shorter than 300 px and narrower than about 1060 px, a shown health warning covers part of the stats panel. This keeps the warning visible instead of pushing it off the page, and the previous build also overlapped on narrow sources. It did not apply to the owner's 1920×1080 source. Separately, the PR #48 known limitations record a delta-review nit that the owner did not accept separately: on a source about 330 px wide or narrower and at least 300 px tall, the last warning can end below the page, which the previous build did not do. The other review nits are listed in the PR #48 description.
+
+**Future shared visibility settings** were decided on 2026-09-26 ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)):
+
+- 連勝ステータスを表示 and 最高連勝を表示 each become one user preference shared by the Player and Broadcast overlays. The renderers may remain separate; only the preference state is shared.
+- This supersedes the earlier assumption that these two toggles stay independent per overlay. It does not change what UI-1A and UI-1B delivered.
+- Today the Player Overlay has the streak-status toggle but never shows BEST, and the Broadcast Overlay has the BEST toggle but always shows the status.
+- **Open until the cleanup is authorized:**
+  - whether BEST returns to the Player Overlay;
+  - the shared defaults;
+  - how the existing keys combine with the other overlay's fixed behaviour, deterministically where a user's Player and Broadcast behaviour of the same setting differ.
+
+  The Player removal of BEST stays in force; any change to it is decided with the cleanup and takes effect only once implemented and accepted.
+- It is **not started and not authorized**. Its migration keeps one-generation rollback, never touches `config.json` and needs no hand edit.
+- Size, opacity, layout and position stay separately configurable; sharing any of them would need a separate owner decision. See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
+
 ## Implemented, accepted and merged — PR #46 (UI-1A Player Overlay)
 
 | | |
@@ -257,7 +326,7 @@ Adopted by the user, recorded here so they are recoverable from GitHub alone. Al
 | Area | Requirement | Issue | Status |
 |---|---|---|---|
 | Runtime isolation | App-local Python environment and dependency isolation. A venv is **not** a sandbox: `requirements.lock`, hash pinning and binary-only policy are unchanged. `pythonw` / worker actual-PID ownership is covered by automated and real-machine lifecycle evidence | [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24) | **ACCEPTED — UNRELEASED**; PR #40 merged, but v1.2.0 does not contain it |
-| UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | [UI-0 design spec](UI0_DESIGN_SPEC.md) **APPROVED + MERGED** (docs-only PR #42, `be77844`); **UI-1A ACCEPTED + MERGED — UNRELEASED** (PR #46, `c2b00dc`); UI-1B and later phases not started |
+| UI/UX | `Fluent shell × AC6 telemetry × Pachinko celebration`. Polish, not a rebuild. Player Overlay and Broadcast Overlay are separate audiences sharing one design system. Performance is a hard constraint; no framework migration as the opening move | [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) | [UI-0 design spec](UI0_DESIGN_SPEC.md) **APPROVED + MERGED** (docs-only PR #42, `be77844`); **UI-1A ACCEPTED + MERGED — UNRELEASED** (PR #46, `c2b00dc`); **UI-1B ACCEPTED + MERGED — UNRELEASED** (PR #48, `b64ce73`); UI-2 and later phases not started |
 | Tray / Launcher | A process-architecture change, not visual polish. Last phase, own issue and own PR. Not implemented unless its lifecycle safety can be demonstrated | [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) | BACKLOG |
 | Self-build linkage | Explicit `self_build_id` selection per match, never inferred; unset stays `unknown`. Enables self × opponent cross-analysis | [#27](https://github.com/TullysAC6/ac6-winloss-tracker/issues/27) | BACKLOG |
 | Seasonal rank / rating progression | The user's own rank and rating over time, separated by season and never carried forward. **The pre-S and S rating systems are not one scale** — the boundary is pre-S / non-S (UNRANKED through A4) vs S, with **A4 on the pre-S side** — and the pre-S → S boundary is not drawn as one continuous line without a justified basis. Event-driven recognition only; recognition failure never touches WIN/LOSE, ResultGate, streak or match persistence. Work lands in #15 (acquisition, persistence, `rating_mode`), #16 (progression, chart, Season High/Low, delta, transition markers, `S RANK REACHED`) and #25 (season selector, chart presentation) | [#28](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | PLANNED, gated on reliable self-rank recognition |
@@ -280,15 +349,17 @@ not yet confirmed. The approximate two-month / Friday cadence is never authorita
 1. **Issue [#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24), the app-local Python environment: ACCEPTED — UNRELEASED.** Fresh independent Codex Sol review gave GO with zero findings; real-machine T3 passed on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a`; PR #40 merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`; exact-main CI 35564747847 passed.
 2. [UI-0 design specification](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED**: docs-only PR #42 (exact head `587431d263b174b916efe42cae554e137fc54e93`) merged as `be77844dd86852f70e04d07b6885fbbdaa974fa8`. Owner decisions are in its §20, including the 2026-09-23 decision to keep the Broadcast primary text at the current 24 px bold baseline. UI-0 is a design state only, not Implemented, Accepted or Released.
 3. **UI-1A Player Overlay polish: ACCEPTED + MERGED — UNRELEASED.** Real-machine T3 passed on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`; exact-main CI 36132227642 passed. See the PR #46 section above.
-4. **UI-1B Broadcast Overlay polish is next, but NOT STARTED and NOT AUTHORIZED.** It needs a separate explicit owner authorization; neither UI-1A's acceptance nor its merge starts it. The owner's pre-authorization decisions for it are recorded in [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) §20, decision 8.
-5. Future Player personalization is adopted but not scheduled or authorized (see the PR #46 section).
+4. **UI-1B Broadcast Overlay polish: ACCEPTED + MERGED — UNRELEASED.** Real-machine T3 passed on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`; exact-main CI 36230655908 passed. See the PR #48 section above.
+5. **Next in the Sequencing order is #15**, the match metadata foundation, then #28-A and UI-2. None of them has started or is authorized, and each needs its own explicit owner authorization. Neither UI-1B's acceptance nor its merge starts any of them.
+6. The shared visibility settings (see the PR #48 section) and future Player personalization (see the PR #46 section) are adopted but **not started and not authorized**.
 
 **PR #35 (#14 formal T1 harness) has landed** (2026-09-18, `f9f5f0f`), and **#14 is closed**. Its §42 baseline item belongs to **#37** (OPEN, PLANNED), not to #24.
 
 **PR #38 (test-only T0 TEMP-leak cleanup) has landed** (2026-09-19, `3bd89a3`), with green `main` CI.
 
-PR #40, documentation PRs #41 / #42 / #44 / #45, test-only PR #43 and UI-1A PR #46 are merged;
-no product generation is active. No UI-1B implementation starts as part of this bookkeeping (§4).
+PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PR #43, UI-1A PR #46 and UI-1B
+PR #48 are merged; no product generation is active. No UI-2, shared-settings or other product work
+starts as part of this bookkeeping (items 5 and 6 above).
 The L-A / L-B harness follow-ups remain recorded, not scheduled.
 
 MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots as historical; this file remains the live position.
@@ -298,7 +369,7 @@ MASTER_REQUIREMENTS §34 / §36 now explicitly mark their older PR #5 snapshots 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
 ```text
-✓ UI-0 → ✓ UI-1A (merged, unreleased) → UI-1B → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
+✓ UI-0 → ✓ UI-1A (merged, unreleased) → ✓ UI-1B (merged, unreleased) → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A
    → #17 → #10/#11/#12 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 

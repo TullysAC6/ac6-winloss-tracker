@@ -418,6 +418,8 @@ They have genuinely different requirements. The Player Overlay is read mid-fight
 
 Components and colour tokens are shared. Font size, opacity, information density, animation, duration and layout are **not** forced to a single configuration.
 
+*Refined 2026-09-26, future work (not started, not authorized):* two visibility settings, the streak status and the best streak, become one shared user preference each; the renderers may remain separate. See [Shared visibility settings across the two overlays](#shared-visibility-settings-across-the-two-overlays).
+
 Rejected alternative: one overlay with one settings surface. It looked simpler, but every setting then has to compromise between "must not distract the player" and "must read at streaming distance", and both audiences get a worse result.
 
 ---
@@ -579,6 +581,16 @@ Evidence:
   3. a re-upgrade that restored OFF.
 
   `config.json` and `preferences.json` stayed byte-identical throughout.
+- UI-1B's real-machine T3 on 2026-09-26
+  ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5844417204))
+  exercised the one-version-newer rule with a previous build that itself reads `preferences.json`:
+  1. UI-1B saved Broadcast BEST OFF, which produced a `preferences_version` 2 file.
+  2. Rolling back to the exact UI-1A build `7cc8ebe` worked. That build started healthy, kept the
+     unknown `broadcast_show_best_streak` key, and showed its old always-visible BEST.
+  3. Re-upgrading restored OFF.
+
+  `config.json` and `preferences.json` stayed byte-identical throughout, and nothing was edited by
+  hand.
 
 Rejected alternatives:
 
@@ -586,3 +598,65 @@ Rejected alternatives:
 - **Relaxing `config.json` validation to ignore unknown keys.** It weakens the strictness that
   protects known settings.
 - **A general multi-version migration system.** It is unbounded for a one-generation need.
+
+---
+
+## Shared visibility settings across the two overlays
+
+**Decision (2026-09-26, future work): the two visibility settings that mean the same thing on both overlays become one shared user preference each. The renderers may remain separate; only the preference state is shared.**
+
+Requirement: the owner decision on
+[#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161), made
+during UI-1B T3, and the reconciliation note in [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md)
+§59. Also recorded on [PR #48](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5843053514).
+
+The two settings:
+
+- **連勝ステータスを表示** (show the streak status): one ON/OFF state, used by both the in-game Player
+  Overlay and the OBS Broadcast Overlay.
+- **最高連勝を表示** (show the best streak): one ON/OFF state, used by both overlays.
+
+Why: from the user's point of view each is one question, "do I want this shown?". Two separately
+saved answers to the same question are confusing. The overlays still differ in how they draw the
+information, so the renderers may remain technically separate; what is shared is the user's
+preference.
+
+This supersedes the earlier long-term assumption that these two toggles stay independently
+configurable per overlay (UI-0 spec §20, decisions 1 and 8). It does **not** rewrite what was
+delivered. UI-1A and UI-1B are accepted and merged with that asymmetry, which was the requirement
+at the time:
+
+| Setting | Player Overlay today | Broadcast Overlay today |
+|---|---|---|
+| Streak status | User toggle `player_streak_status_enabled` (UI-1A, default ON) | Always shown, static, no toggle |
+| Best streak | Never shown (spec §20 decision 1) | User toggle `broadcast_show_best_streak` (UI-1B, default ON) |
+
+The owner's wording implies that each overlay will honour a setting it does not honour today; the
+details are confirmed when the cleanup is authorized. These questions stay **open** until then, and
+are the owner's to decide:
+
+- whether BEST returns to the Player Overlay when 最高連勝を表示 is ON;
+- the shared defaults;
+- how each existing key combines with the other overlay's current fixed behaviour. That includes a
+  deterministic rule for a user whose current Player and Broadcast behaviour of the same setting
+  differ.
+
+Decision 1's removal of BEST from the Player Overlay stays in force; any change to it is decided with the cleanup and takes effect only once implemented and accepted.
+
+It also does **not** decide whether future size, opacity, layout or position settings are shared.
+The rule in [Two overlay audiences](#two-overlay-audiences) still applies to them; sharing any of
+them would need a separate owner decision.
+
+Status: **adopted, not started, not authorized.** When the cleanup is authorized, its migration
+must:
+
+- start from the existing keys `player_streak_status_enabled` and `broadcast_show_best_streak`;
+- preserve the user's existing choices where possible;
+- resolve differences between the Player and Broadcast behaviour of the same setting
+  deterministically;
+- follow [Additive settings live in `preferences.json`](#additive-settings-live-in-preferencesjson-configjson-is-frozen):
+  - a `preferences_version` bump when a key is added;
+  - the one-version-newer reader, with the old keys kept meaningful to the previous build, so that
+    the one-generation rollback keeps the user's choices;
+  - nothing added to `config.json`;
+  - no manual file edit.

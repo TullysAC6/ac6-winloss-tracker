@@ -96,7 +96,26 @@ The next product task at that date was [#24](https://github.com/TullysAC6/ac6-wi
 - UI-1A established the rollback architecture every later setting follows: `config.json` is frozen, and additive settings live in a versioned `preferences.json` (see [DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen)).
 - The owner accepted the 15% Player panel opacity for UI-1A.
 - Future Player personalization (text size, panel size/density, opacity, position, reset) was adopted on [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5831075818) as a future requirement. It is not scheduled or authorized.
-- Issue #25 remains open. **UI-1B is next, but NOT STARTED and NOT AUTHORIZED.** The owner's pre-authorization decisions for it are in [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) §20, decision 8. No product generation is active.
+- Issue #25 remains open. **UI-1B is next, but NOT STARTED and NOT AUTHORIZED.** The owner's pre-authorization decisions for it are in [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) §20, decision 8. No product generation is active. *(Superseded: UI-1B was authorized on 2026-09-25 and merged on 2026-09-26; see the next note.)*
+
+## Position note — 2026-09-26
+
+- **UI-1B (Broadcast Overlay polish) is `ACCEPTED — UNRELEASED`.**
+  - The owner authorized it on 2026-09-25 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5832871482)).
+  - [PR #48](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48) exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` passed independent review and real-machine T3 on a 1920×1080 OBS source ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5844417204)).
+  - It merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`, whose tree is identical to the accepted head. [Exact-main CI 36230655908](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36230655908) passed.
+  - Public stable v1.2.0 does **not** contain it.
+- **What merged:**
+  - the Broadcast BEST STREAK toggle `broadcast_show_best_streak` (`preferences.json` v2, default ON, live without restart);
+  - a static ordinary streak status with no blink;
+  - the 24 px bold text, existing copy and 22 px top-left default, all kept;
+  - safer warning handling on narrow sources.
+
+  The Player Overlay is unchanged.
+- The one-version-newer `preferences.json` rule held on a real machine: the exact UI-1A build kept the unknown v2 key through a UI-1B → UI-1A → UI-1B round trip with no hand edit.
+- Known limitation, Low and accepted: on a source shorter than 300 px and narrow, a shown health warning covers part of the panel.
+- **Shared visibility settings** were decided on 2026-09-26 ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)) as future work. 連勝ステータスを表示 and 最高連勝を表示 each become one preference shared by both overlays. It is not started and not authorized; see [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
+- Issue #25 remains open. No product generation is active. Next in the Sequencing order is #15; like UI-2, it is **not started and not authorized** and needs its own owner authorization.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -158,7 +177,7 @@ Not a competitor to the two tracks above; it interleaves with them. Requirements
 
 1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)): **ACCEPTED — UNRELEASED**, merged in PR #40
 2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`)
-3. UI-1A Player Overlay polish - **ACCEPTED — UNRELEASED**, merged in PR #46 (`c2b00dc`); then UI-1B Broadcast Overlay polish, which requires its own authorization
+3. UI-1A Player Overlay polish - **ACCEPTED — UNRELEASED**, merged in PR #46 (`c2b00dc`); then UI-1B Broadcast Overlay polish - **ACCEPTED — UNRELEASED**, merged in PR #48 (`b64ce73`)
 4. #28-A Season Catalog / Assignment Foundation - after #15 and before UI-2
 5. UI-2 Dashboard / History / Settings shell - after #15 and #28-A, including manual Season refresh
 6. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation - each following its own data
@@ -180,13 +199,14 @@ and **PR #35 (#14 formal T1 harness) accepted and merged to `main`** on 2026-09-
 and **PR #40 (#24 runtime isolation) accepted on exact head `9aa883cd0a09ad7940b0b38f95e94c701a203f7a` and merged as `216648741d2c193f8eeb9694e9ff9572dd825a3d`**, with exact-main CI 35564747847 green. It is not released.
 Revision 4 / §65 was merged in PR #31 as `e214ae0`; exact-main CI 35479744429 passed. Its manual-first Season requirements are not runtime implementation.
 The **UI-0 design specification is approved and merged** (PR #42 as `be77844`); it is a design state only.
-**UI-1A was accepted on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`** (PR #46), with exact-main CI 36132227642 green. It is not released. UI-1B is not started or authorized.
+**UI-1A was accepted on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`** (PR #46), with exact-main CI 36132227642 green. It is not released.
+**UI-1B was accepted on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` and merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`** (PR #48), with exact-main CI 36230655908 green. It is not released.
 From the current position:
 
 ```text
 ✓ UI-0                        design specification, no code change — APPROVED + MERGED (PR #42)
 ✓ UI-1A                       Player Overlay polish — ACCEPTED + MERGED (PR #46), unreleased
-→ UI-1B                       Broadcast Overlay polish
+✓ UI-1B                       Broadcast Overlay polish — ACCEPTED + MERGED (PR #48), unreleased
 → #15                         match metadata foundation
 → #28-A                       Season Catalog / Assignment Foundation
 → UI-2                        Dashboard / History / Settings shell + manual Season refresh
@@ -539,7 +559,8 @@ and History shell is built once against a settled match-metadata contract instea
 |---|---|---|---|
 | UI-0 | [Design specification](UI0_DESIGN_SPEC.md) — current framework survey, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility; Before → Proposed per item; Low/Medium/High classification; rollback plan; regression-test plan. **No code change. Approval does not authorize implementation** | **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`) | none |
 | UI-1A | Player Overlay polish — value over label, telemetry framing, thin background, DPI/aspect/safe-zone, minimal animation. Low-risk visual changes only. As merged, it also adds the user-toggleable Player streak status and the rollback-safe `preferences.json` | **ACCEPTED — UNRELEASED** (PR #46, merged as `c2b00dc`) | low |
-| UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance readability. Primary text keeps the current 24 px bold baseline unless real OBS evidence shows a readability problem (owner decision 2026-09-23, spec §20). Owner pre-authorization decisions of 2026-09-25 (spec §20, decision 8): BEST toggle default ON, existing wording and 22 px placement kept, the BEST toggle as the only new setting, reduced motion deferred. **Not started; needs separate owner authorization** | PLANNED | low |
+| UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance readability. Primary text keeps the current 24 px bold baseline unless real OBS evidence shows a readability problem (owner decision 2026-09-23, spec §20). Owner pre-authorization decisions of 2026-09-25 (spec §20, decision 8): BEST toggle default ON, existing wording and 22 px placement kept, the BEST toggle as the only new setting, reduced motion deferred. As merged: the Broadcast BEST toggle `broadcast_show_best_streak` in `preferences.json` v2, a static streak status, and safer narrow-source warning handling | **ACCEPTED — UNRELEASED** (PR #48, merged as `b64ce73`) | low |
+| Shared visibility settings | 連勝ステータスを表示 and 最高連勝を表示 each become one user preference shared by the Player and Broadcast overlays; the renderers may remain separate ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161), [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays)). Open questions: whether BEST returns to the Player Overlay, the shared defaults, and how `player_streak_status_enabled` / `broadcast_show_best_streak` migrate deterministically with one-generation rollback. **Not started; needs separate owner authorization** | BACKLOG | not classified |
 | Player personalization | Settings-based Player text size, panel size/density, opacity, position and reset to defaults, stored through `preferences.json` ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5831075818)). Ranges, widgets and anchor model are decided when it is authorized | BACKLOG | not classified |
 | UI-2 | Dashboard / History / Settings shell — top navigation (`OVERVIEW / HISTORY / STATISTICS / SETTINGS`), WIN RATE as primary KPI, date-grouped history, plus `SEASON INFORMATION`, cached Season, last checked, and `[ シーズン情報を更新 ]`. No gameplay modal or focus stealing | PLANNED | medium |
 | UI-3A | **Growth / Rank / Rating presentation.** Statistics page for the data from #16-A / #28-B: win-rate trend, rolling win rate, the **season selector**, and the Rank / Rating chart — with a separate scale or presentation where pre-S and S cannot be compared directly | PLANNED | medium |

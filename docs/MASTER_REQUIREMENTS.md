@@ -2082,6 +2082,29 @@ Components and colour tokens may be shared. **Font size, opacity, information de
 duration and layout must remain separately configurable.** Do not force one overlay's configuration
 onto the other.
 
+Reconciled 2026-09-26 by owner decision
+([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)): two
+visibility settings are the exception.
+
+- **連勝ステータスを表示** (show the streak status) is one user preference shared by the Player and
+  Broadcast overlays.
+- **最高連勝を表示** (show the best streak) is one user preference shared by both overlays.
+
+The renderers may remain separate; only the user's ON/OFF state is shared. This supersedes the
+earlier assumption that these two toggles stay independently configurable per overlay.
+
+It is **future work, not implemented**. UI-1A and UI-1B shipped them as separate, one-overlay
+settings:
+
+- `player_streak_status_enabled`: the Player Overlay's streak status.
+- `broadcast_show_best_streak`: the Broadcast Overlay's best streak.
+
+Today the Player Overlay never shows the best streak, and the Broadcast Overlay always shows the
+streak status. How the shared settings apply there is decided when the cleanup is authorized.
+
+The rule above still applies to size, opacity, layout and position. Sharing any of them would need
+a separate owner decision.
+
 ## Milestone presentation
 
 The existing escalation is kept: 5 / 10 / 15 / 20 / 30 / 35 / 40 / 45 / 50. The pachinko identity
