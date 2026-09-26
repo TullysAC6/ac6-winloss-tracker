@@ -26,7 +26,7 @@ Implementation status, 2026-09-26:
   decision 8. What it delivered is in §7 and in §20, decision 9.
 - **The two visibility settings will become shared** between the overlays (§20, decision 10).
   This is future work, not started and not authorized. It amends the future-facing independence
-  wording in §6, §7 and §20 for those two settings only.
+  wording in §6, §7, §17 (P-02, B-03) and §20 for those two settings only.
 - Sections marked *Before* describe the pre-UI-1A product and stay as historical evidence.
 - Live project state is in [PROJECT_STATE.md](PROJECT_STATE.md).
 
@@ -300,9 +300,9 @@ The diagram shows hierarchy, not copy. UI-1A keeps the existing labels `WIN / LO
   underlying BEST statistic, its calculation, or its persistence.
   *Amended for future work by §20 decision 10:* showing the streak status and showing BEST each
   become one user preference shared by both overlays. UI-1A and UI-1B shipped them as separate,
-  one-overlay settings. Until that cleanup is authorized and accepted, BEST stays off the Player
-  Overlay. Whether it returns there when the shared setting is ON is an open question of
-  decision 10.
+  one-overlay settings. BEST stays off the Player Overlay. Whether it returns there when the
+  shared setting is ON is an open question of decision 10, and any change takes effect only once
+  implemented and accepted.
 - A thin cyan leading rule and two corner ticks supply telemetry character. No faux AC6 copy.
 - Status degradation appears as a compact labelled chip on the right, not as a colour-only change.
   *(Deferred in UI-1A.)*
@@ -499,9 +499,12 @@ accepted but not released.
 They remain adopted proposals, unscheduled and not authorized. No second UI-1B scope is planned.
 
 **Known limitation (Low, accepted, non-blocking):** on a source shorter than 300 px and narrower
-than about 1060 px, a shown warning covers part of the panel. On a source about 330 px wide or
-narrower and at least 300 px tall, the last warning can end below the page. The owner's real
-1920×1080 source is not affected by either case.
+than about 1060 px, a shown warning covers part of the panel. The owner's real 1920×1080 source is
+not affected.
+
+The PR #48 known limitations also record a delta-review nit, which the owner did not accept
+separately: on a source about 330 px wide or narrower and at least 300 px tall, the last warning
+can end below the page.
 
 **Future:** the visibility settings become shared between the overlays (§20, decision 10).
 
@@ -823,7 +826,7 @@ Risk meanings:
 | DS-05 | System-aware reduced-motion behaviour | UI-1A/UI-1B; deferred in UI-1A and for UI-1B's first scope (§20 decision 8) | Medium | Motion adapter/settings default | Native/browser parity |
 | DS-06 | Text/icon/shape in addition to colour | Per surface | Low | Labels/styles | High-contrast/state matrix |
 | P-01 | Value-first four-metric layout | UI-1A | Low | Native Canvas layout | AC6/DPI screenshots |
-| P-02 | Remove BEST from always-on Player surface. *Stands until §20 decision 10 is implemented; whether BEST returns to the Player Overlay when the shared setting is ON is open* | UI-1A; owner-approved | Low | One rendered field | Glance test; value remains in Overview and optional Broadcast |
+| P-02 | Remove BEST from always-on Player surface. *Stays in force; whether BEST returns to the Player Overlay under §20 decision 10 is open, and any change takes effect only once implemented and accepted* | UI-1A; owner-approved | Low | One rendered field | Glance test; value remains in Overview and optional Broadcast |
 | P-03 | Thin telemetry rule/corner ticks | UI-1A | Low | Canvas primitives | Pixel/safe-zone review |
 | P-04 | Responsive DPI/aspect safe-zone placement | UI-1A | Medium | Placement calculation | 1080p/1440p/4K, 16:9/21:9 |
 | P-05 | 100–200 ms result acknowledgement | UI-1A | Low | One finite animation | Event/cleanup/performance test |
@@ -887,8 +890,8 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
 1. `BEST STREAK` is removed from the always-on Player Overlay, remains always visible in Dashboard
    Overview, and is independently user-toggleable in Broadcast. Player and Broadcast settings stay
    independent; the underlying statistic is unchanged. *The independence of the two visibility
-   settings is amended for future work by decision 10; the Player removal of BEST stands until
-   then.*
+   settings is amended for future work by decision 10; the Player removal of BEST stays in force
+   (see decision 10).*
 2. The production 25-win milestone is preserved exactly. Its omission from canonical §§57–63 is
    recorded as an existing requirement/code discrepancy and is not resolved in UI-0, UI-1A, or
    UI-1B.
@@ -960,15 +963,16 @@ triggered, is recorded as repository evidence but is not relabelled as a UI gate
       - the Broadcast Overlay has the BEST toggle `broadcast_show_best_streak` but always shows the
         static status.
 
-      Sharing therefore implies each overlay will honour a setting it does not honour today.
+      The owner's wording implies each overlay will honour a setting it does not honour today;
+      the details are confirmed when the cleanup is authorized.
     - **Open until the cleanup is authorized:**
       - whether BEST returns to the Player Overlay when ON;
       - the shared defaults;
       - how each existing key combines with the other overlay's fixed behaviour, including a
-        deterministic rule where the saved Player and Broadcast behaviour of the same setting
+        deterministic rule where the current Player and Broadcast behaviour of the same setting
         differ.
 
-      Decision 1's Player removal of BEST stands until then.
+      Decision 1's Player removal of BEST stays in force; any change to it is decided with the cleanup and takes effect only once implemented and accepted.
     - The migration keeps one-generation rollback under the `preferences.json` rules: the old keys
       stay meaningful to the previous build, nothing touches `config.json`, and no hand edit is
       needed.

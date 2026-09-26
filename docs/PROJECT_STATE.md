@@ -201,7 +201,7 @@ Acceptance evidence:
   - the Windows display scaling;
   - the match outcome and Lifetime counts.
 
-Known limitation, Low, accepted and non-blocking: on a Browser Source shorter than 300 px and narrower than about 1060 px, a shown health warning covers part of the stats panel. This keeps the warning visible instead of pushing it off the page, and the previous build also overlapped on narrow sources. It did not apply to the owner's 1920×1080 source. Also, on a source about 330 px wide or narrower and at least 300 px tall, the last warning can end below the page, which the previous build did not do. The other review nits are listed in the PR #48 description.
+Known limitation, Low, accepted and non-blocking: on a Browser Source shorter than 300 px and narrower than about 1060 px, a shown health warning covers part of the stats panel. This keeps the warning visible instead of pushing it off the page, and the previous build also overlapped on narrow sources. It did not apply to the owner's 1920×1080 source. Separately, the PR #48 known limitations record a delta-review nit that the owner did not accept separately: on a source about 330 px wide or narrower and at least 300 px tall, the last warning can end below the page, which the previous build did not do. The other review nits are listed in the PR #48 description.
 
 **Future shared visibility settings** were decided on 2026-09-26 ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)):
 
@@ -213,7 +213,7 @@ Known limitation, Low, accepted and non-blocking: on a Browser Source shorter th
   - the shared defaults;
   - how the existing keys combine with the other overlay's fixed behaviour, deterministically where a user's Player and Broadcast behaviour of the same setting differ.
 
-  The Player removal of BEST stands until then.
+  The Player removal of BEST stays in force; any change to it is decided with the cleanup and takes effect only once implemented and accepted.
 - It is **not started and not authorized**. Its migration keeps one-generation rollback, never touches `config.json` and needs no hand edit.
 - Size, opacity, layout and position stay separately configurable; sharing any of them would need a separate owner decision. See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
 

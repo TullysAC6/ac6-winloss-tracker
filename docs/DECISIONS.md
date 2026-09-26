@@ -631,16 +631,17 @@ at the time:
 | Streak status | User toggle `player_streak_status_enabled` (UI-1A, default ON) | Always shown, static, no toggle |
 | Best streak | Never shown (spec §20 decision 1) | User toggle `broadcast_show_best_streak` (UI-1B, default ON) |
 
-Sharing each setting therefore implies that each overlay will honour a setting it does not honour
-today. These questions stay **open** until the cleanup is authorized, and are the owner's to decide:
+The owner's wording implies that each overlay will honour a setting it does not honour today; the
+details are confirmed when the cleanup is authorized. These questions stay **open** until then, and
+are the owner's to decide:
 
 - whether BEST returns to the Player Overlay when 最高連勝を表示 is ON;
 - the shared defaults;
 - how each existing key combines with the other overlay's current fixed behaviour. That includes a
-  deterministic rule for a user whose saved Player and Broadcast behaviour of the same setting
+  deterministic rule for a user whose current Player and Broadcast behaviour of the same setting
   differ.
 
-Until then, decision 1's removal of BEST from the Player Overlay stands.
+Decision 1's removal of BEST from the Player Overlay stays in force; any change to it is decided with the cleanup and takes effect only once implemented and accepted.
 
 It also does **not** decide whether future size, opacity, layout or position settings are shared.
 The rule in [Two overlay audiences](#two-overlay-audiences) still applies to them; sharing any of
@@ -655,7 +656,7 @@ must:
   deterministically;
 - follow [Additive settings live in `preferences.json`](#additive-settings-live-in-preferencesjson-configjson-is-frozen):
   - a `preferences_version` bump when a key is added;
-  - the one-version-newer reader, with the old keys kept meaningful so that rolling back to UI-1B
-    still works;
+  - the one-version-newer reader, with the old keys kept meaningful to the previous build, so that
+    the one-generation rollback keeps the user's choices;
   - nothing added to `config.json`;
   - no manual file edit.

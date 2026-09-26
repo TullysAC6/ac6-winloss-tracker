@@ -139,7 +139,7 @@ Seven things in there are easy to erode and are the reason they are written down
 - **`config.json` is frozen; additive settings live in `preferences.json`** (UI-1A, #25). A new key in `config.json` makes the one-version-older build refuse to start. A dotted or nested preference, or a new key without a `preferences_version` bump, makes it reject the whole preferences file. Rolling back must never require a hand edit.
 - **Equivalent visibility settings will share one user state** (#25, 2026-09-26).
   - 連勝ステータスを表示 and 最高連勝を表示 are each one preference for both overlays; the renderers may remain separate.
-  - The merged UI-1A / UI-1B keys, and the Player Overlay's removal of BEST, stay until that cleanup is implemented and accepted.
+  - The merged UI-1A / UI-1B keys and the Player Overlay's removal of BEST stay in force; any change is decided with the cleanup and takes effect only once implemented and accepted.
   - Open questions: whether BEST returns to the Player Overlay, the shared defaults, and a deterministic migration rule. The migration keeps one-generation rollback.
   - Size, opacity, layout and position stay separately configurable unless the owner decides otherwise.
 
