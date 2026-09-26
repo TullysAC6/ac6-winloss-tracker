@@ -25,6 +25,7 @@ from history_store import ActiveSessionOverlap, HistoryStore, read_history_schem
 from result_detector import ResultDetector
 from result_gate import ResultGate
 from pending_history import PendingHistory
+import preferences
 from stats_manager import StatsCorruptError, StatsManager
 
 
@@ -456,6 +457,31 @@ def lifetime_payload():
 
 def publish_lifetime():
     publish("lifetime", lifetime_payload(), remember=False)
+
+
+# The Broadcast Overlay's own preferences.json keys. Only these leave the
+# process through /config: Player preferences never reach the browser.
+BROADCAST_PREFERENCE_KEYS = ("broadcast_show_best_streak",)
+broadcast_preferences_lock = threading.Lock()
+broadcast_preferences_last = {key: preferences.DEFAULTS[key] for key in BROADCAST_PREFERENCE_KEYS}
+
+
+def broadcast_preferences():
+    """Broadcast display preferences for /config, with last-known-good fallback.
+
+    preferences.json is read through its cached, strict reader. An invalid,
+    unreadable or too-new file never fails /config and is never written: each
+    key keeps its last valid value, which is the default until one was read.
+    """
+    with broadcast_preferences_lock:
+        for key in BROADCAST_PREFERENCE_KEYS:
+            try:
+                value = preferences.effective(key, broadcast_preferences_last[key])
+            except Exception:  # A display preference must never take /config down.
+                continue
+            if type(value) is type(preferences.DEFAULTS[key]):
+                broadcast_preferences_last[key] = value
+        return dict(broadcast_preferences_last)
 
 
 def publish_stats_active(s):
@@ -1184,6 +1210,7 @@ class Handler(BaseHTTPRequestHandler):
                     "effect_enabled": c["effect_enabled"],
                     "overlay_stats_scope": c["overlay_stats_scope"],
                     "config_health": get_config_health(),
+                    **broadcast_preferences(),
                 })
             except Exception as e:
                 self.json_response(

@@ -3,8 +3,9 @@
 config.json is validated strictly by every build, and a build refuses to start
 on a key it does not know.  A setting added to config.json therefore makes the
 immediately previous build unstartable once the user saves it.  New additive
-settings live here instead; the previous build never reads this file, so a
-one-version rollback needs no config edit.
+settings live here instead: a build older than this file never reads it, and a
+build that does read it accepts a file one version newer (below), so a
+one-version rollback needs no edit.
 
 Rules (one-generation forward compatibility, still strict):
 
@@ -37,11 +38,14 @@ from typing import Any
 
 import config_utils
 
-PREFERENCES_VERSION = 1
+PREFERENCES_VERSION = 2
 VERSION_KEY = "preferences_version"
 DEFAULTS: dict[str, Any] = {
-    # UI-1A: persistent Player streak-status wording (アツい … RUSH継続中).
+    # UI-1A (version 1): persistent Player streak-status wording (アツい … RUSH継続中).
     "player_streak_status_enabled": True,
+    # UI-1B (version 2): 最高連勝 line of the OBS Broadcast Overlay.  Broadcast-only;
+    # ON matches what every earlier build always showed.
+    "broadcast_show_best_streak": True,
 }
 MAX_BYTES = 64 * 1024
 _NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")

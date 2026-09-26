@@ -1,12 +1,14 @@
 """One-version rollback: the previous build starts on data the new build wrote.
 
-new build: record a result, save the new Player setting
-  -> previous build (real source from git): starts, keeps history, records
-  -> new build again: starts, keeps both results and the setting
+new build: record a result, save every new-build preference flipped from its default
+  -> previous build (real source from git): starts, reads the newer
+     preferences.json with its own reader, keeps history, records
+  -> previous build saves its own setting: the newer build's keys survive
+  -> new build again: starts, keeps every result and restores its settings
 
 Each phase runs the real server.main in a fresh interpreter with authenticated
 normal shutdown, against one isolated LOCALAPPDATA.  A negative control proves
-the check is not vacuous: the superseded design (the key inside config.json)
+the check is not vacuous: the superseded design (a new key inside config.json)
 makes the previous build refuse to start.
 
 PREVIOUS_VERSION is the one supported rollback target: the main commit this
@@ -27,8 +29,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-PREVIOUS_VERSION = "89f5f4a386e46081a38d993a535d3f3df4a3ef63"
+# UI-1B builds on main after UI-1A (PR #46) and its docs bookkeeping (PR #47).
+PREVIOUS_VERSION = "7cc8ebe4b4768ce6318b283d68a34b3697f26702"
 KEY = "player_streak_status_enabled"
+BROADCAST = "broadcast_show_best_streak"
+# The previous build's preferences contract: UI-1A, version 1, one boolean.
+PREVIOUS_CONTRACT = (1, {KEY: "bool"})
 
 # Runs inside the child with the chosen source tree first on sys.path.
 PHASE = r'''
@@ -56,6 +62,13 @@ try:
              "server_file": str(Path(server.__file__).resolve())}
     state["recorded"] = bool(server.record_result("win", "manual"))
     state["lifetime_after"] = server.history.lifetime_summary()["wins"]
+    if phase == "previous-save":
+        import preferences
+        import settings_window
+        # The previous build saves its own setting back to its default, through
+        # its own Settings code, on a file a newer build wrote.
+        settings_window.save_settings({key: default for key, default in preferences.DEFAULTS.items()
+                                       if isinstance(default, bool)})
     if phase == "new-install":
         import preferences
         import settings_window
@@ -70,6 +83,9 @@ try:
     if (Path(source) / "preferences.py").is_file():
         import settings_window
         state["settings"] = settings_window.read_settings()
+    # What this build's running server serves to the Broadcast Overlay, after any save.
+    with urllib.request.urlopen(f"http://127.0.0.1:{config['port']}/config", timeout=15) as response:
+        state["config_endpoint"] = json.loads(response.read().decode("utf-8"))
     (root / (phase + ".json")).write_text(json.dumps(state), encoding="utf-8")
 finally:
     request = urllib.request.Request(
@@ -177,6 +193,19 @@ class PreferencesContractRuleTests(unittest.TestCase):
             {key: type(value).__name__ for key, value in preferences.DEFAULTS.items()}))
 
 
+def assert_listener_released(port):
+    """Binding fails while anything still listens on the port.
+
+    Off Windows, SO_REUSEADDR lets the bind ignore TIME_WAIT connections left by
+    the phase's own HTTP requests (it still refuses a live listener), exactly as
+    server.py sets allow_reuse_address. On Windows the plain bind is unchanged.
+    """
+    with socket.socket() as probe:
+        if os.name != "nt":
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        probe.bind(("127.0.0.1", port))
+
+
 def history_rows(data):
     connection = sqlite3.connect(f"file:{data / 'history.db'}?mode=ro", uri=True)
     try:
@@ -198,7 +227,9 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         cls.previous = previous
         for name in ("app.py", "server.py", "config_utils.py"):
             assert (previous / name).is_file(), name
-        assert not (previous / "preferences.py").exists(), "rollback target predates preferences.json"
+        # The rollback target is UI-1A: it has preferences.py at version 1 and
+        # must carry, but never interpret, what this build adds.
+        assert preferences_contract(previous) == PREVIOUS_CONTRACT, preferences_contract(previous)
 
     @classmethod
     def tearDownClass(cls):
@@ -229,35 +260,43 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         if not expect_start:
             return child.returncode, output
         self.assertEqual(child.returncode, 0, output)
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", self.port))  # listener released
+        assert_listener_released(self.port)
         return json.loads((self.root / (name + ".json")).read_text(encoding="utf-8"))
 
     def test_preferences_contract_with_the_previous_build(self):
         problem = contract_violation(preferences_contract(self.previous), preferences_contract(ROOT))
         self.assertIsNone(problem, "one-version rollback contract broken")
 
+    def stored_preferences(self):
+        return json.loads((self.data / "preferences.json").read_text(encoding="utf-8"))
+
     def test_new_then_save_setting_then_previous_starts_then_new_again(self):
+        import preferences
+        new_version = preferences.PREFERENCES_VERSION
         installed = self.phase(ROOT, "new-install")
         self.assertTrue(Path(installed["server_file"]).is_relative_to(ROOT.resolve()))
         self.assertEqual((installed["lifetime_before"], installed["lifetime_after"]), (0, 1))
         self.assertIs(installed["settings"][KEY], False)
+        self.assertIs(installed["settings"][BROADCAST], False)
         self.assertEqual(installed["settings"]["overlay_stats_scope"], "lifetime")
         config_after_new = (self.data / "config.json").read_bytes()
         preferences_after_new = (self.data / "preferences.json").read_bytes()
-        self.assertNotIn(KEY.encode(), config_after_new, "the new setting never enters config.json")
+        self.assertEqual(self.stored_preferences(),
+                         {"preferences_version": new_version, KEY: False, BROADCAST: False})
+        for key in (KEY, BROADCAST):
+            self.assertNotIn(key.encode(), config_after_new, "a new setting never enters config.json")
+        self.assertIs(installed["config_endpoint"][BROADCAST], False, "/config serves the saved value")
+        self.assertNotIn(KEY, installed["config_endpoint"], "Player preferences never reach the browser")
         rows_after_new = history_rows(self.data)
         self.assertEqual(len(rows_after_new), 1)
 
         rolled_back = self.phase(self.previous, "previous-start")
         self.assertTrue(Path(rolled_back["server_file"]).is_relative_to(self.previous.resolve()),
                         "the previous build's own server.py ran")
-        previous_contract = preferences_contract(self.previous)
-        if previous_contract is not None:
-            self.assertIn("settings", rolled_back, "the previous build read preferences.json itself")
-            for key, type_name in previous_contract[1].items():
-                if type_name == "bool":  # new-install saved every bool flipped from its default
-                    self.assertIs(rolled_back["settings"][key], installed["settings"][key], key)
+        self.assertIn("settings", rolled_back, "the previous build read preferences.json itself")
+        self.assertIs(rolled_back["settings"][KEY], False, "the previous build reads its own key")
+        self.assertNotIn(BROADCAST, rolled_back["settings"], "and does not interpret the newer key")
+        self.assertNotIn(BROADCAST, rolled_back["config_endpoint"], "the previous /config is unchanged")
         self.assertEqual((rolled_back["lifetime_before"], rolled_back["recorded"],
                           rolled_back["lifetime_after"]), (1, True, 2))
         self.assertEqual((self.data / "config.json").read_bytes(), config_after_new,
@@ -266,26 +305,40 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
                          "the previous build leaves preferences.json alone")
         self.assertEqual(history_rows(self.data)[:1], rows_after_new, "history preserved")
 
+        # The previous build's own Settings writer, on the newer file: it may
+        # change only its own key and must keep the newer build's key and version.
+        resaved = self.phase(self.previous, "previous-save")
+        self.assertEqual((resaved["lifetime_before"], resaved["lifetime_after"]), (2, 3))
+        self.assertEqual(self.stored_preferences(),
+                         {"preferences_version": new_version, KEY: True, BROADCAST: False})
+        self.assertEqual((self.data / "config.json").read_bytes(), config_after_new)
+
         upgraded = self.phase(ROOT, "new-again")
-        self.assertEqual((upgraded["lifetime_before"], upgraded["lifetime_after"]), (2, 3))
-        self.assertIs(upgraded["settings"][KEY], False, "the saved setting survives the round trip")
+        self.assertEqual((upgraded["lifetime_before"], upgraded["lifetime_after"]), (3, 4))
+        self.assertIs(upgraded["settings"][KEY], True, "the previous build's own change is kept")
+        self.assertIs(upgraded["settings"][BROADCAST], False, "the Broadcast setting survives the round trip")
+        self.assertIs(upgraded["config_endpoint"][BROADCAST], False)
         self.assertEqual(upgraded["settings"]["overlay_stats_scope"], "lifetime")
-        self.assertEqual(len(history_rows(self.data)), 3)
+        self.assertEqual(len(history_rows(self.data)), 4)
         self.assertEqual(list(self.data.glob(".*runtime*.json")), [])
 
     def test_negative_control_the_superseded_design_breaks_the_previous_build(self):
-        config = json.loads((self.data / "config.json").read_text(encoding="utf-8"))
-        config[KEY] = False  # what the superseded candidate f2e4b4d wrote
-        (self.data / "config.json").write_text(json.dumps(config), encoding="utf-8")
-        before = (self.data / "config.json").read_bytes()
-        returncode, output = self.phase(self.previous, "previous-refuses", expect_start=False)
-        self.assertNotEqual(returncode, 0, output)
-        # Same config as the positive test except the key: the previous build
-        # fails closed at its config gate, before binding the port.
-        self.assertIn("ENV-CONFIG-INVALID", output)
-        self.assertEqual((self.data / "config.json").read_bytes(), before, "and changed nothing")
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", self.port))
+        original = (self.data / "config.json").read_bytes()
+        # KEY in config.json is what the superseded UI-1A candidate f2e4b4d wrote;
+        # BROADCAST there is the same mistake for UI-1B.
+        for key in (KEY, BROADCAST):
+            with self.subTest(key=key):
+                config = json.loads(original)
+                config[key] = False
+                (self.data / "config.json").write_text(json.dumps(config), encoding="utf-8")
+                before = (self.data / "config.json").read_bytes()
+                returncode, output = self.phase(self.previous, "previous-refuses", expect_start=False)
+                self.assertNotEqual(returncode, 0, output)
+                # Same config as the positive test except the key: the previous
+                # build fails closed at its config gate, before binding the port.
+                self.assertIn("ENV-CONFIG-INVALID", output)
+                self.assertEqual((self.data / "config.json").read_bytes(), before, "and changed nothing")
+                assert_listener_released(self.port)
 
 
 if __name__ == "__main__":

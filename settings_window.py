@@ -392,6 +392,7 @@ class SettingsWindow:
         self.effect_enabled = tk.BooleanVar(master=self.window)
         self.scope = tk.StringVar(master=self.window, value="session")
         self.streak_status = tk.BooleanVar(master=self.window, value=True)
+        self.broadcast_best = tk.BooleanVar(master=self.window, value=True)
         self.cutoff_date = tk.StringVar(master=self.window)
 
         self._build_display_tab(ttk, notebook)
@@ -443,6 +444,12 @@ class SettingsWindow:
         ttk.Checkbutton(frame, text="連勝ステータス（アツい／激アツ など）を常に表示する",
                         variable=self.streak_status).pack(anchor="w", pady=(2, 0))
         ttk.Label(frame, text="連勝演出のバナーとOBS用オーバーレイには影響しません。",
+                  wraplength=440).pack(anchor="w", pady=(2, 12))
+        ttk.Label(frame, text="OBS用オーバーレイ（配信画面）",
+                  font=("Segoe UI", 9, "bold")).pack(anchor="w")
+        ttk.Checkbutton(frame, text="最高連勝を表示する",
+                        variable=self.broadcast_best).pack(anchor="w", pady=(2, 0))
+        ttk.Label(frame, text="OBSのブラウザソースにだけ反映されます。ゲーム内オーバーレイには影響しません。",
                   wraplength=440).pack(anchor="w", pady=(2, 12))
         self.save_button = ttk.Button(frame, text="保存", command=self.save)
         self.save_button.pack(anchor="e")
@@ -602,6 +609,7 @@ class SettingsWindow:
                 self.effect_enabled.set(values["effect_enabled"])
                 self.scope.set(values["overlay_stats_scope"])
                 self.streak_status.set(values["player_streak_status_enabled"])
+                self.broadcast_best.set(values["broadcast_show_best_streak"])
                 self.toggle.config(state="normal")
                 self.save_button.config(state="normal")
                 self.status.config(text="保存すると、Trackerの再起動なしで反映されます。")
@@ -619,6 +627,7 @@ class SettingsWindow:
                 "effect_enabled": self.effect_enabled.get(),
                 "overlay_stats_scope": self.scope.get(),
                 "player_streak_status_enabled": self.streak_status.get(),
+                "broadcast_show_best_streak": self.broadcast_best.get(),
             })
             self.status.config(
                 text="保存しました。Trackerの再起動は不要です。試合中でも安全に反映されます。"
