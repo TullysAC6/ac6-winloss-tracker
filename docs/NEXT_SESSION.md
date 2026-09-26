@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-25 JST
+Last updated: 2026-09-26 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -39,13 +39,19 @@ Issue #6
 - PR #31 merged as `e214ae0` after independent review GO. [Exact-main CI 35479744429](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35479744429) is green. Its reconciliation and merge are complete; do not redo them.
 - MASTER_REQUIREMENTS §34 and §36 retain their dated snapshots with explicit current-status corrections: PR #5 is released in v1.2.0, #14 is closed, §42 belongs to #37, and #24 is accepted and merged but unreleased.
 - **UI-0 is DESIGN SPEC APPROVED + MERGED.** Docs-only PR #42 (exact head `587431d263b174b916efe42cae554e137fc54e93`) merged as `be77844dd86852f70e04d07b6885fbbdaa974fa8`; [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is canonical on `main`. It is a design state, not Implemented, Accepted or Released. No production code, tests, runtime, dependency, or framework changed. Issue #25 remains open.
-  - Owner decisions are in spec §20: BEST STREAK off the always-on Player Overlay, always in Dashboard Overview, independently toggleable in Broadcast; the production 25-win milestone preserved exactly, with its canonical omission kept as a recorded discrepancy; 50-win ≤4.5 s normal / ≤3.0 s reduced motion; solid dark UI-2 shell as baseline with optional, non-blocking Windows 11 Mica proof; and, since 2026-09-23, **Broadcast primary text kept at the current 24 px bold baseline** unless real OBS evidence shows a readability problem (the earlier 28–36 CSS px proposal is not approved).
+  - Owner decisions are in spec §20: BEST STREAK off the always-on Player Overlay, always in Dashboard Overview, independently toggleable in Broadcast (the per-overlay independence of the two visibility settings is amended for future work by decision 10, 2026-09-26); the production 25-win milestone preserved exactly, with its canonical omission kept as a recorded discrepancy; 50-win ≤4.5 s normal / ≤3.0 s reduced motion; solid dark UI-2 shell as baseline with optional, non-blocking Windows 11 Mica proof; and, since 2026-09-23, **Broadcast primary text kept at the current 24 px bold baseline** unless real OBS evidence shows a readability problem (the earlier 28–36 CSS px proposal is not approved).
 - **The source-install CI race is fixed (test-only).** The first exact-main CI of `be77844` failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun passed. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaced the sleep with a bounded 7 s readiness poll matching `launcher.pyw`, and merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`; [exact-main CI 35946104314](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35946104314) passed. Production runtime unchanged; T3 N/A.
 - **UI-1A (Player Overlay polish) is ACCEPTED + MERGED — UNRELEASED.** [PR #46](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46) exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` passed real-machine T3 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46#issuecomment-5831572036)) and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`; [exact-main CI 36132227642](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36132227642) passed. Public stable v1.2.0 does not contain it. Details are in `PROJECT_STATE.md`.
   - Player labels stay `WIN / LOSE / 勝率 / 連勝`; BEST left the Player panel only; the Player streak status is user-toggleable (ON with no saved preference), static, and set in a Japanese face; panel opacity defaults to 15%, which the owner accepted.
   - **New settings go into the versioned `preferences.json`, never into `config.json`.** Use a flat scalar key and bump `preferences_version` by one. See [DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen).
   - Future Player personalization (text size, panel size/density, opacity, position, reset) is adopted on [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5831075818) but **not scheduled or authorized**.
-- **UI-1B (Broadcast Overlay polish) is next, but NOT STARTED and NOT AUTHORIZED.** The owner's pre-authorization decisions are recorded in [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) §20, decision 8.
+- **UI-1B (Broadcast Overlay polish) is ACCEPTED + MERGED — UNRELEASED.** [PR #48](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48) exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` passed real-machine T3 on a 1920×1080 OBS source ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/48#issuecomment-5844417204)). It merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`, and [exact-main CI 36230655908](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36230655908) passed. Public stable v1.2.0 does not contain it. Details are in `PROJECT_STATE.md`.
+  - The Broadcast BEST toggle `broadcast_show_best_streak` lives in `preferences.json` v2. It is ON by default, including when missing, and applies live.
+  - The ordinary streak status is static. The 24 px bold text, existing copy and 22 px top-left default are kept.
+  - The Player Overlay is unchanged.
+  - The exact UI-1A build kept the unknown v2 key through a real UI-1B → UI-1A → UI-1B round trip, with no hand edit.
+  - Known limitation (Low, accepted): on a source shorter than 300 px and narrow, a shown health warning covers part of the panel.
+- **Shared visibility settings are decided as future work** (2026-09-26, [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)). 連勝ステータスを表示 and 最高連勝を表示 each become one preference shared by the Player and Broadcast overlays; the renderers stay separate. **Not started, not authorized.** See [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
 
 ## The rule that cost a release — do not lose it
 
@@ -79,26 +85,26 @@ Release publication and post-release verification are complete. See `PROJECT_STA
    - **Not Released:** public stable v1.2.0 does not contain #24.
 2. [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`).
 3. **UI-1A: ACCEPTED + MERGED — UNRELEASED.** PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; exact-main CI 36132227642 passed.
-4. **UI-1B: NOT STARTED, NOT AUTHORIZED.** Until the owner explicitly authorizes UI-1B:
-   - do not create a UI-1B branch or worktree;
-   - do not change `overlay.html`;
-   - do not add a Broadcast setting or bump `preferences_version`;
+4. **UI-1B: ACCEPTED + MERGED — UNRELEASED.** PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; exact-main CI 36230655908 passed.
+5. **Next in the Sequencing order is #15, then #28-A and UI-2. None of them is started or authorized.** The same applies to the shared visibility settings and Player personalization. Until the owner explicitly authorizes one of them:
+   - do not create its branch or worktree;
+   - do not bump `preferences_version`, add a setting, or migrate `player_streak_status_enabled` / `broadcast_show_best_streak`;
    - do not change milestone behaviour.
 
-   When it is authorized, a Broadcast setting goes into `preferences.json` under a flat scalar key, never into `config.json`.
+   Any new or changed setting goes into `preferences.json` under a flat scalar key, never into `config.json`.
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45, test-only PR #43 and UI-1A PR #46 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PR #43, UI-1A PR #46 and UI-1B PR #48 are merged. No product generation is active.
 
 ## Order after that — dependency, not preference
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.2.0, PR #13, PR #5, PR #35, PR #40 and PR #46 are complete at their recorded states. PR #40 / #24 and PR #46 / UI-1A are accepted and merged, but not released. UI-0 is design-approved and merged (PR #42); UI-1B is not started or authorized. From here:
+v1.2.0, PR #13, PR #5, PR #35, PR #40, PR #46 and PR #48 are complete at their recorded states. PR #40 / #24, PR #46 / UI-1A and PR #48 / UI-1B are accepted and merged, but not released. UI-0 is design-approved and merged (PR #42). From here:
 
 ```text
-✓ UI-0 → ✓ UI-1A (merged, unreleased) → UI-1B
+✓ UI-0 → ✓ UI-1A (merged, unreleased) → ✓ UI-1B (merged, unreleased)
 → #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12 → UI-3B
 → #16-B → #18 → #27 → UI-4
 ```
@@ -110,7 +116,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PR #40, PR #42, PR #43 and PR #46 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PR #40, PR #42, PR #43, PR #46 and PR #48 are merged. No product generation is active.
 
 ## What is newly recorded and must not be lost
 
@@ -123,7 +129,7 @@ At most two unmerged generations exist at a time (§4). PR #40, PR #42, PR #43 a
 | Seasonal rank / rating progression — per season, never carried forward, A/S not one scale | [#28-B](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §64 |
 | Season Catalog / Assignment — manual-first, retrospective, multi-season and transition-safe | [#28-A](https://github.com/TullysAC6/ac6-winloss-tracker/issues/28) | §65 |
 
-Six things in there are easy to erode and are the reason they are written down:
+Seven things in there are easy to erode and are the reason they are written down:
 
 - **A venv is not a sandbox.** `requirements.lock`, hash pinning and binary-only policy survive the runtime-isolation migration untouched, and `pythonw` worker PID ownership must be re-proved, not assumed.
 - **A UI change may not cost game performance**, and UI polish is never a reason to touch Detector, ResultGate, WGC or process lifecycle.
@@ -131,6 +137,7 @@ Six things in there are easy to erode and are the reason they are written down:
 - **The pre-S → S rating boundary is not one continuous line.** The ladder is `UNRANKED → … → A4 → S`, and the boundary is **pre-S / non-S (through A4) vs S** — A4 is on the pre-S side, so never write "below A" for it. The game presents rating differently on each side, so the obvious-looking single-line chart asserts a comparison the game does not support, and it fails silently. Rank/Rating recognition is event-driven, never a continuous OCR loop, and a failed read is recorded as a failed read — never as a rating change.
 - **Season synchronization is manual-first catalog reconciliation, not cadence inference.** Unknown and transition records stay unresolved; a long absence fetches every missing Season definition; failure keeps cached data and never affects result persistence.
 - **`config.json` is frozen; additive settings live in `preferences.json`** (UI-1A, #25). A new key in `config.json` makes the one-version-older build refuse to start. A dotted or nested preference, or a new key without a `preferences_version` bump, makes it reject the whole preferences file. Rolling back must never require a hand edit.
+- **Equivalent visibility settings will share one user state** (#25, 2026-09-26). 連勝ステータスを表示 and 最高連勝を表示 are each one preference for both overlays, with the renderers kept separate. The merged UI-1A / UI-1B keys stay separate until that cleanup is authorized. The cleanup's migration must resolve a Player/Broadcast disagreement deterministically and keep one-generation rollback. It does not decide whether size, opacity or position settings are shared.
 
 ## STOP conditions
 
