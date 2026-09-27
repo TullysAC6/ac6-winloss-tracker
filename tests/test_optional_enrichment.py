@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -200,16 +201,41 @@ class FacadeTests(unittest.TestCase):
         self.assertEqual(other.save_binding(ticket).status, "rejected")
 
     def test_late_write_is_hidden_and_conditionally_removed(self):
-        ticket = self.add()
+        self.add("survivor")  # Initialize the real v1 store, without binding A.
+        self.history.record_result("A", "win", "test", {}, created_at=3)
+        prepared = self.service.prepare_binding("A")
+        self.assertEqual(prepared.status, "prepared", prepared)
+        ticket = prepared.ticket
+        self.assertEqual(self.raw(), [("survivor",)])
         original = storage._Store.save
+        late_calls = []
         def late(store, binding, deadline):
-            self.history.discard_result("A")
+            # save_binding has already checked the real parent. Interleave the
+            # committed deletion here, before the real store's INSERT/commit.
+            self.assertEqual(binding, ticket.binding)
+            self.assertEqual(self.raw(), [("survivor",)])
+            self.assertTrue(self.history.discard_result("A"))
             self.service.invalidate_history()
-            return original(store, binding, deadline)
+            result = original(store, binding, deadline)
+            # A fresh connection sees the newly committed row, not pending SQL.
+            self.assertEqual(self.raw(), [("A",), ("survivor",)])
+            late_calls.append(binding.event_id)
+            return result
         with patch.object(storage._Store, "save", late):
-            self.assertEqual(self.service.save_binding(ticket).status, "rejected")
-        self.assertEqual(self.visible(), ())
-        self.assertEqual(self.service.cleanup_step().deleted, 1)
+            response = self.service.save_binding(ticket)
+        self.assertEqual(late_calls, ["A"])
+        self.assertEqual((response.status, response.health.reason), ("rejected", "stale"))
+        self.assertEqual(response.bindings, ())
+        self.assertEqual(self.raw(), [("A",), ("survivor",)])
+        self.assertFalse(self.history.discard_result("A"), "late save restored authoritative history")
+        lookup = self.service.lookup("A")
+        self.assertEqual((lookup.status, lookup.bindings), ("unknown", ()))
+        cleaned = self.service.cleanup_step()
+        self.assertEqual((cleaned.status, cleaned.deleted), ("cleaned", 1))
+        self.assertEqual(self.raw(), [("survivor",)])
+        repeated = self.service.cleanup_step()
+        self.assertEqual((repeated.status, repeated.deleted), ("cleaned", 0))
+        self.assertEqual(self.visible("survivor"), ("survivor",))
 
     def test_bounds_and_dormant_dependency_boundary(self):
         self.add()
@@ -225,19 +251,60 @@ class FacadeTests(unittest.TestCase):
                 names = ([node.module] if isinstance(node, ast.ImportFrom) else
                          [a.name for a in node.names] if isinstance(node, ast.Import) else [])
                 self.assertTrue(all(name not in ("enrichment_store", "optional_enrichment") for name in names), path)
-        # Unrelated future observations are a test-local model, never a v1 table.
-        observations = {"independent": {"event_id": "missing", "rank": "fixture"}}
-        before = dict(observations)
-        self.service.cleanup_step()
-        self.assertEqual(observations, before)
-        original = storage._Store.remove
-        def generic_sweep(store, *args, **kwargs):
-            observations.clear()  # broken test-local extension sweeps an unrelated domain
-            return original(store, *args, **kwargs)
-        with patch.object(storage._Store, "remove", generic_sweep):
-            self.service.cleanup_step()
-        with self.assertRaises(AssertionError):
-            self.assertEqual(observations, before)
+
+    def test_cleanup_scope_preserves_unrelated_sql_observations(self):
+        orphan = self.add("A").binding
+        survivor = self.add("B").binding
+        self.assertTrue(self.history.discard_result("A"))
+        store = self.service._store
+        observations = [("independent-A", "A"), ("independent-B", "B")]
+
+        def assert_cleanup_scope(cleaner):
+            # Separate test-only SQL domain. The open seam tests the real DELETE
+            # mechanics without adding a table to v1 or relaxing its validator.
+            connection = sqlite3.connect(":memory:")
+            try:
+                for ddl in storage._DDL:
+                    connection.execute(ddl)
+                connection.execute("INSERT INTO maintenance_state VALUES (1,NULL)")
+                connection.executemany("INSERT INTO match_bindings VALUES (?,?,?,?)",
+                                       [orphan.values(), survivor.values()])
+                connection.execute("CREATE TABLE future_observations (observation_id TEXT PRIMARY KEY, event_id TEXT)")
+                connection.executemany("INSERT INTO future_observations VALUES (?,?)", observations)
+                connection.commit()
+
+                @contextmanager
+                def fixture_open(deadline, *, write=False):
+                    self.assertTrue(write)
+                    with connection:
+                        yield connection
+
+                with patch.object(store, "open", fixture_open):
+                    self.assertEqual(cleaner((orphan,), storage._Deadline()), 1)
+                self.assertEqual(connection.execute("SELECT event_id FROM match_bindings").fetchall(), [("B",)])
+                self.assertEqual(connection.execute(
+                    "SELECT observation_id,event_id FROM future_observations ORDER BY observation_id").fetchall(),
+                    observations, "unrelated observations must survive match cleanup")
+            finally:
+                connection.close()
+
+        def generic_sweep(bindings, deadline):
+            deleted = store.remove(bindings, deadline)
+            with store.open(deadline, write=True) as connection:
+                # Deliberately broken: discover every event-related domain and
+                # apply match deletion semantics even to independent observations.
+                tables = connection.execute("SELECT name FROM sqlite_schema WHERE type='table'").fetchall()
+                for (name,) in tables:
+                    quoted = '"' + name.replace('"', '""') + '"'
+                    columns = connection.execute(f"PRAGMA table_info({quoted})").fetchall()
+                    if any(column[1] == "event_id" for column in columns):
+                        connection.executemany(f"DELETE FROM {quoted} WHERE event_id=?",
+                                               [(binding.event_id,) for binding in bindings])
+            return deleted
+
+        assert_cleanup_scope(store.remove)
+        with self.assertRaisesRegex(AssertionError, "unrelated observations must survive"):
+            assert_cleanup_scope(generic_sweep)
 
     def test_operation_lock_deadline_and_malformed_authority(self):
         self.add()
