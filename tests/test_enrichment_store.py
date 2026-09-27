@@ -18,6 +18,15 @@ from optional_enrichment import OptionalEnrichmentService
 
 class StorageTests(unittest.TestCase):
     def setUp(self):
+        # Production keeps the 100 ms cooperative budget. These T0 cases test
+        # storage/schema behavior rather than shared-runner wall-clock latency,
+        # so give test operations deterministic headroom. Deadline behavior is
+        # still exercised explicitly by forcing an already-expired deadline.
+        self.assertEqual(storage._BUDGET, 0.100)
+        budget_patch = patch.object(storage, "_BUDGET", 2.0)
+        budget_patch.start()
+        self.addCleanup(budget_patch.stop)
+
         self.directory = tempfile.TemporaryDirectory(prefix="ac6-enrichment-t0-")
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
