@@ -67,6 +67,8 @@ PLAYER_OVERLAY_PURE = ("PlayerMetricsTests", "PlayerRenderTests", "LayoutAndSafe
 # Order within a gate is execution order. T0 keeps the relative order the
 # pre-#14 tests/run_all_tests.py used; T2 runs the launcher first, as CI did.
 ENTRIES = (
+    Entry("tests/test_enrichment_store.py", T0, "dormant sidecar format, validation and atomic storage"),
+    Entry("tests/test_optional_enrichment.py", T0, "parent identity, bounded cleanup and publication contracts"),
     Entry("tests/test_python_spawn.py", T0, "pure executable/environment and launch identity contracts"),
     # ------------------------------------------------------------------ T0
     Entry("tests/test_game_capture.py", T0, "capture validation with mocked workers and the gap loop",
@@ -131,6 +133,7 @@ ENTRIES = (
           selectors=("RealTkCanvasTests",)),
     Entry("tests/test_rollback_previous_version.py", T2,
           "the real previous build starts on data the new build wrote (one-version rollback)"),
+    Entry("tests/test_enrichment_rollback.py", T2, "exact-base unaware rollback, deletion and re-upgrade"),
     Entry("tests/test_broadcast_overlay.py", T2, "real Broadcast layout in a headless Chrome or Edge process",
           selectors=("BroadcastGeometryTests",)),
     Entry("tests/test_launcher_gui_lifecycle.py", T2, "launcher GUI and processes"),
