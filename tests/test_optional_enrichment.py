@@ -21,6 +21,16 @@ import enrichment_store as storage
 
 class FacadeTests(unittest.TestCase):
     def setUp(self):
+        # Production keeps the 100 ms cooperative budget. These T0 cases test
+        # identity/cleanup/publication contracts rather than shared-runner
+        # wall-clock latency, so give test operations deterministic headroom.
+        # test_operation_lock_deadline_and_malformed_authority restores the
+        # real budget around its own explicit busy-lock timing measurement.
+        self.assertEqual(storage._BUDGET, 0.100)
+        budget_patch = patch.object(storage, "_BUDGET", 2.0)
+        budget_patch.start()
+        self.addCleanup(budget_patch.stop)
+
         self.directory = tempfile.TemporaryDirectory(prefix="ac6-facade-t0-")
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
@@ -308,7 +318,9 @@ class FacadeTests(unittest.TestCase):
 
     def test_operation_lock_deadline_and_malformed_authority(self):
         self.add()
-        with self.service._operation_lock:
+        # Restore the real production budget for this block only: it is the
+        # one place in this file that measures the deadline mechanism itself.
+        with patch.object(storage, "_BUDGET", 0.100), self.service._operation_lock:
             started = time.monotonic()
             self.assertEqual(self.service.lookup("A").health.reason, "busy")
             self.assertLess(time.monotonic() - started, 1.0)  # generous OS scheduling tolerance
