@@ -51,6 +51,14 @@ def dormant():
     with patch.object(Path, "stat", guard(Path.stat)), patch.object(sqlite3, "connect", guard(sqlite3.connect)), \
             patch.object(builtins, "open", guard(builtins.open)):
         yield
+def relax_enrichment_budget():
+    # Test-only: shared CI runners cannot guarantee the real 100 ms cooperative
+    # deadline for fixture setup that is not itself measuring timing. Give this
+    # child process deterministic headroom instead; production and the explicit
+    # forced-expiry coverage in test_enrichment_store.py are both untouched.
+    import enrichment_store
+    assert enrichment_store._BUDGET == 0.100
+    patch.object(enrichment_store, "_BUDGET", 2.0).start()
 if phase == "seed":
     from history_store import HistoryStore
     store = HistoryStore(data)
@@ -87,6 +95,7 @@ state = {"pid":os.getpid(), "server_file":str(Path(server.__file__).resolve()),
          "server_sha256":hashlib.sha256(Path(server.__file__).read_bytes()).hexdigest(), "before":rows()}
 try:
     if phase == "seed":
+        relax_enrichment_budget()
         assert not (data / "enrichment.db").exists()
         from optional_enrichment import OptionalEnrichmentService
         service = OptionalEnrichmentService(data, active=True)
@@ -140,6 +149,7 @@ try:
                 assert server.settle_uncounted_results(server.history)
                 assert rows() == before and not server.uncounted_event_ids
     elif phase == "again":
+        relax_enrichment_budget()
         from optional_enrichment import OptionalEnrichmentService
         import enrichment_store
         service = OptionalEnrichmentService(data, active=True)
@@ -168,6 +178,7 @@ try:
         state["deleted"] = first.deleted
         assert sorted(b.event_id for b in service.lookup_many(["A","B","C"]).bindings) == expected
     elif phase == "bad":
+        relax_enrichment_budget()
         from optional_enrichment import OptionalEnrichmentService
         import enrichment_store
         service = OptionalEnrichmentService(data, active=True)
