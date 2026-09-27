@@ -161,12 +161,16 @@ for index, result in enumerate(("win", "win", "loss", "win")):
     store.record_result(f"rollback-seed-{index}", result, "test",
                         {"streak": 0, "wins": 0, "losses": 0}, created_at=now + index)
 from optional_enrichment import OptionalEnrichmentService
-service = OptionalEnrichmentService(data_dir(), active=True)
-for index in range(4):
-    ticket = service.prepare_binding(f"rollback-seed-{index}").ticket
-    result = service.save_binding(ticket, create_missing=True)
-    assert result.status == "saved", result
-assert len(service.lookup_many([f"rollback-seed-{index}" for index in range(4)]).bindings) == 4
+from pathlib import Path
+sys.path.insert(0, str(Path(sys.argv[1]) / "tests"))
+from enrichment_test_clock import fixture_clock
+with fixture_clock():
+    service = OptionalEnrichmentService(data_dir(), active=True)
+    for index in range(4):
+        ticket = service.prepare_binding(f"rollback-seed-{index}").ticket
+        result = service.save_binding(ticket, create_missing=True)
+        assert result.status == "saved", result
+    assert len(service.lookup_many([f"rollback-seed-{index}" for index in range(4)]).bindings) == 4
 '''
 
 
@@ -487,11 +491,15 @@ class Run:
 
     def check_enrichment_visible(self, label):
         visible = json.loads(self.in_app(
-            "import json; from app_paths import data_dir; "
-            "from optional_enrichment import OptionalEnrichmentService; "
-            "response=OptionalEnrichmentService(data_dir(), active=True).lookup_many("
-            "[f'rollback-seed-{i}' for i in range(4)]); "
-            "print(json.dumps(sorted(row.event_id for row in response.bindings)))"))
+            "import json, sys; from pathlib import Path\n"
+            "from app_paths import data_dir\n"
+            "from optional_enrichment import OptionalEnrichmentService\n"
+            "sys.path.insert(0, str(Path.cwd() / 'tests'))\n"
+            "from enrichment_test_clock import fixture_clock\n"
+            "with fixture_clock():\n"
+            "    response=OptionalEnrichmentService(data_dir(), active=True).lookup_many("
+            "[f'rollback-seed-{i}' for i in range(4)])\n"
+            "    print(json.dumps(sorted(row.event_id for row in response.bindings)))"))
         check(visible == [f"rollback-seed-{i}" for i in range(4)], f"{label}: bindings not visible: {visible}")
         self.evidence[label + "_visible_bindings"] = visible
 

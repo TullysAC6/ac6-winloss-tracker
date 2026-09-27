@@ -17,19 +17,13 @@ sys.path.insert(0, str(ROOT))
 from history_store import HistoryStore
 from optional_enrichment import OptionalEnrichmentService
 import enrichment_store as storage
+from enrichment_test_clock import fixture_clock, real_clock
 
 
 class FacadeTests(unittest.TestCase):
     def setUp(self):
-        # Production keeps the 100 ms cooperative budget. These T0 cases test
-        # identity/cleanup/publication contracts rather than shared-runner
-        # wall-clock latency, so give test operations deterministic headroom.
-        # test_operation_lock_deadline_and_malformed_authority restores the
-        # real budget around its own explicit busy-lock timing measurement.
         self.assertEqual(storage._BUDGET, 0.100)
-        budget_patch = patch.object(storage, "_BUDGET", 2.0)
-        budget_patch.start()
-        self.addCleanup(budget_patch.stop)
+        self.enterContext(fixture_clock())
 
         self.directory = tempfile.TemporaryDirectory(prefix="ac6-facade-t0-")
         self.addCleanup(self.directory.cleanup)
@@ -318,9 +312,10 @@ class FacadeTests(unittest.TestCase):
 
     def test_operation_lock_deadline_and_malformed_authority(self):
         self.add()
-        # Restore the real production budget for this block only: it is the
-        # one place in this file that measures the deadline mechanism itself.
-        with patch.object(storage, "_BUDGET", 0.100), self.service._operation_lock:
+        # This block measures the deadline itself: use the real clock/budget.
+        with real_clock(), self.service._operation_lock:
+            self.assertEqual(storage._BUDGET, 0.100)
+            self.assertIs(storage.time, time)
             started = time.monotonic()
             self.assertEqual(self.service.lookup("A").health.reason, "busy")
             self.assertLess(time.monotonic() - started, 1.0)  # generous OS scheduling tolerance

@@ -184,11 +184,17 @@ The rules:
 - DRAW persistence is unchanged and remains outside #15-0;
 - every sidecar operation runs under a 100 ms cooperative budget (`enrichment_store._BUDGET = 0.100`).
   That is a production constant, not a test-speed target:
-  - tests must not make an expected-success fixture depend on finishing within it on a shared runner;
-  - such tests assert the constant, give the fixture test-only headroom, and restore the real budget
-    wherever they measure the deadline itself;
-  - test-only PRs #52 and #53 applied this after the budget caused intermittent CI failures in three
-    enrichment test files; no product defect was involved.
+  - expected-success enrichment fixtures must not depend on elapsed wall-clock deadlines at all;
+  - assert the production constant and use the test-only fixed storage clock for non-timing
+    assertions. Keep the real deadline class, facade, serialization and SQLite correctness checks;
+  - tests intentionally validating deadlines explicitly opt back into the real production clock.
+    Reach the intended SQL mutations before forcing expiry, so rollback coverage cannot pass early;
+  - inventory every same-pattern call site before changing a timing harness, including parent and
+    child processes and manual-only paths. Require exact-head and exact-main CI before saying fixed;
+  - PRs #52/#53 added 2.0 s test headroom, and PR #53's exact-main CI passed. PR #51's final-main
+    CI 36332063475 then proved this was still scheduler-dependent, not deterministic. The subsequent
+    test-only maintenance correction uses `tests/enrichment_test_clock.py` across the audited T0,
+    T2 and manual public rollback paths. Production `_BUDGET` remained 0.100; no product defect was found.
 
 Why: adding optional metadata directly to the authoritative DB makes rollback and optional-feature
 failure share the same schema/failure boundary as WIN/LOSE history. The sidecar isolates that risk,

@@ -51,14 +51,6 @@ def dormant():
     with patch.object(Path, "stat", guard(Path.stat)), patch.object(sqlite3, "connect", guard(sqlite3.connect)), \
             patch.object(builtins, "open", guard(builtins.open)):
         yield
-def relax_enrichment_budget():
-    # Test-only: shared CI runners cannot guarantee the real 100 ms cooperative
-    # deadline for fixture setup that is not itself measuring timing. Give this
-    # child process deterministic headroom instead; production and the explicit
-    # forced-expiry coverage in test_enrichment_store.py are both untouched.
-    import enrichment_store
-    assert enrichment_store._BUDGET == 0.100
-    patch.object(enrichment_store, "_BUDGET", 2.0).start()
 if phase == "seed":
     from history_store import HistoryStore
     store = HistoryStore(data)
@@ -93,9 +85,14 @@ def post(path, payload):
         return error.code, json.loads(error.read())
 state = {"pid":os.getpid(), "server_file":str(Path(server.__file__).resolve()),
          "server_sha256":hashlib.sha256(Path(server.__file__).read_bytes()).hexdigest(), "before":rows()}
+fixture = contextlib.ExitStack()
 try:
+    if phase in ("seed", "again", "bad"):
+        # Only candidate phases, after the dormant-startup import assertion.
+        sys.path.insert(0, str(source / "tests"))
+        from enrichment_test_clock import fixture_clock
+        fixture.enter_context(fixture_clock())
     if phase == "seed":
-        relax_enrichment_budget()
         assert not (data / "enrichment.db").exists()
         from optional_enrichment import OptionalEnrichmentService
         service = OptionalEnrichmentService(data, active=True)
@@ -149,7 +146,6 @@ try:
                 assert server.settle_uncounted_results(server.history)
                 assert rows() == before and not server.uncounted_event_ids
     elif phase == "again":
-        relax_enrichment_budget()
         from optional_enrichment import OptionalEnrichmentService
         import enrichment_store
         service = OptionalEnrichmentService(data, active=True)
@@ -178,7 +174,6 @@ try:
         state["deleted"] = first.deleted
         assert sorted(b.event_id for b in service.lookup_many(["A","B","C"]).bindings) == expected
     elif phase == "bad":
-        relax_enrichment_budget()
         from optional_enrichment import OptionalEnrichmentService
         import enrichment_store
         service = OptionalEnrichmentService(data, active=True)
@@ -208,6 +203,7 @@ try:
     state["after"] = rows()
     (root / (phase + ".json")).write_text(json.dumps(state), encoding="utf-8")
 finally:
+    fixture.close()
     assert post("/api/system/shutdown", {})[0] == 200
     worker.join(20)
     assert not worker.is_alive()
@@ -380,6 +376,8 @@ class EnrichmentRollbackTests(unittest.TestCase):
 
     def test_native_journal_recovery_after_owned_process_exit(self):
         from optional_enrichment import OptionalEnrichmentService
+        from enrichment_test_clock import fixture_clock
+        self.enterContext(fixture_clock())
         root, data, port = self.profile("journal")
         self.phase(ROOT, root, "seed", "journal", port)
         output = self.phase(ROOT, root, "crash", "journal", port, expect_success=False)
