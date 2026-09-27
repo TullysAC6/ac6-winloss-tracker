@@ -29,12 +29,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-# UI-1B builds on main after UI-1A (PR #46) and its docs bookkeeping (PR #47).
-PREVIOUS_VERSION = "7cc8ebe4b4768ce6318b283d68a34b3697f26702"
+# Dormant #15-0 builds on the exact main after UI-1B bookkeeping (PR #49).
+PREVIOUS_VERSION = "8d91588bf8057a5756a40cc0d1a98521f7bd00c4"
 KEY = "player_streak_status_enabled"
 BROADCAST = "broadcast_show_best_streak"
-# The previous build's preferences contract: UI-1A, version 1, one boolean.
-PREVIOUS_CONTRACT = (1, {KEY: "bool"})
+# This generation adds no preference: both builds understand the same v2 keys.
+PREVIOUS_CONTRACT = (2, {KEY: "bool", BROADCAST: "bool"})
 
 # Runs inside the child with the chosen source tree first on sys.path.
 PHASE = r'''
@@ -227,8 +227,7 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         cls.previous = previous
         for name in ("app.py", "server.py", "config_utils.py"):
             assert (previous / name).is_file(), name
-        # The rollback target is UI-1A: it has preferences.py at version 1 and
-        # must carry, but never interpret, what this build adds.
+        # Verify the actual predecessor's complete contract, not a stale UI-1A assumption.
         assert preferences_contract(previous) == PREVIOUS_CONTRACT, preferences_contract(previous)
 
     @classmethod
@@ -295,8 +294,8 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
                         "the previous build's own server.py ran")
         self.assertIn("settings", rolled_back, "the previous build read preferences.json itself")
         self.assertIs(rolled_back["settings"][KEY], False, "the previous build reads its own key")
-        self.assertNotIn(BROADCAST, rolled_back["settings"], "and does not interpret the newer key")
-        self.assertNotIn(BROADCAST, rolled_back["config_endpoint"], "the previous /config is unchanged")
+        self.assertIs(rolled_back["settings"][BROADCAST], False, "previous build knows both v2 keys")
+        self.assertIs(rolled_back["config_endpoint"][BROADCAST], False)
         self.assertEqual((rolled_back["lifetime_before"], rolled_back["recorded"],
                           rolled_back["lifetime_after"]), (1, True, 2))
         self.assertEqual((self.data / "config.json").read_bytes(), config_after_new,
@@ -305,19 +304,18 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
                          "the previous build leaves preferences.json alone")
         self.assertEqual(history_rows(self.data)[:1], rows_after_new, "history preserved")
 
-        # The previous build's own Settings writer, on the newer file: it may
-        # change only its own key and must keep the newer build's key and version.
+        # Both preferences belong to the actual previous build, so it resets both.
         resaved = self.phase(self.previous, "previous-save")
         self.assertEqual((resaved["lifetime_before"], resaved["lifetime_after"]), (2, 3))
         self.assertEqual(self.stored_preferences(),
-                         {"preferences_version": new_version, KEY: True, BROADCAST: False})
+                         {"preferences_version": new_version, KEY: True, BROADCAST: True})
         self.assertEqual((self.data / "config.json").read_bytes(), config_after_new)
 
         upgraded = self.phase(ROOT, "new-again")
         self.assertEqual((upgraded["lifetime_before"], upgraded["lifetime_after"]), (3, 4))
         self.assertIs(upgraded["settings"][KEY], True, "the previous build's own change is kept")
-        self.assertIs(upgraded["settings"][BROADCAST], False, "the Broadcast setting survives the round trip")
-        self.assertIs(upgraded["config_endpoint"][BROADCAST], False)
+        self.assertIs(upgraded["settings"][BROADCAST], True, "the previous build's Broadcast change is kept")
+        self.assertIs(upgraded["config_endpoint"][BROADCAST], True)
         self.assertEqual(upgraded["settings"]["overlay_stats_scope"], "lifetime")
         self.assertEqual(len(history_rows(self.data)), 4)
         self.assertEqual(list(self.data.glob(".*runtime*.json")), [])

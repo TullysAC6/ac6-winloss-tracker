@@ -29,7 +29,8 @@ try {
     $runtimeFileNames = @('.runtime.json', '.runtime.json.tmp', '.overlay-runtime.json', '.overlay-runtime.json.tmp', '.dashboard-runtime.json', '.dashboard-runtime.json.tmp')
     New-Item -ItemType Directory -Path $installPath -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dataPath 'diagnostics') -Force | Out-Null
-    foreach ($name in @('history.db', 'config.json', 'stats.json')) { Set-Content -LiteralPath (Join-Path $dataPath $name) -Value 'fixture' }
+    $preservedFiles = @('history.db', 'config.json', 'stats.json', 'enrichment.db', 'enrichment.db-journal', 'enrichment.db-wal', 'enrichment.db-shm')
+    foreach ($name in $preservedFiles) { Set-Content -LiteralPath (Join-Path $dataPath $name) -Value 'fixture' }
     foreach ($name in $runtimeFileNames) { Set-Content -LiteralPath (Join-Path $dataPath $name) -Value '{}' }
     Set-Content -LiteralPath (Join-Path $dataPath '.overlay-runtime.json.4242.tmp') -Value '{}'
     Set-Content -LiteralPath (Join-Path $installPath 'app.py') -Value '# fixture'
@@ -55,7 +56,10 @@ try {
     if (Test-Path -LiteralPath $installPath) { throw 'application source remains' }
     if (Test-Path -LiteralPath "$installPath.previous") { throw 'previous application source remains' }
     if ((Test-Path -LiteralPath $ownedRoot) -or (Test-Path -LiteralPath $legacyPath)) { throw 'owned environment or legacy source remains' }
-    foreach ($name in @('history.db', 'config.json', 'stats.json', 'diagnostics')) { if (-not (Test-Path -LiteralPath (Join-Path $dataPath $name))) { throw "user data removed: $name" } }
+    foreach ($name in $preservedFiles) {
+        if ((Get-Content -LiteralPath (Join-Path $dataPath $name) -Raw).Trim() -ne 'fixture') { throw "user data changed: $name" }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $dataPath 'diagnostics'))) { throw 'diagnostics removed' }
 
     New-Item -ItemType Directory -Path $installPath -Force | Out-Null
     Set-Content -LiteralPath (Join-Path $installPath 'app.py') -Value '# reinstalled'

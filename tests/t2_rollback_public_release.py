@@ -125,7 +125,7 @@ $child = {
         (New-Object Text.UTF8Encoding($hasBom)))
     $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $fixture)
     if ($SelectedMode -eq 'Install') { $arguments += @('-SourceTag', $VerifiedReleaseTag) }
-    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -PassThru `
+    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput "$Evidence.stdout" -RedirectStandardError "$Evidence.stderr"
     try { $process.WaitForExit(); $code = [int]$process.ExitCode } finally { $process.Dispose() }
     [IO.File]::WriteAllText($Evidence, (@{ verified_installer_sha256 = $hash; mode = $SelectedMode;
@@ -160,6 +160,13 @@ now = time.time() - 3600
 for index, result in enumerate(("win", "win", "loss", "win")):
     store.record_result(f"rollback-seed-{index}", result, "test",
                         {"streak": 0, "wins": 0, "losses": 0}, created_at=now + index)
+from optional_enrichment import OptionalEnrichmentService
+service = OptionalEnrichmentService(data_dir(), active=True)
+for index in range(4):
+    ticket = service.prepare_binding(f"rollback-seed-{index}").ticket
+    result = service.save_binding(ticket, create_missing=True)
+    assert result.status == "saved", result
+assert len(service.lookup_many([f"rollback-seed-{index}" for index in range(4)]).bindings) == 4
 '''
 
 
@@ -365,7 +372,9 @@ class Run:
 
     def digests(self):
         return {name: hashlib.sha256((self.data / name).read_bytes()).hexdigest()
-                if (self.data / name).exists() else None for name in ("config.json", "preferences.json")}
+                if (self.data / name).exists() else None for name in (
+                    "config.json", "preferences.json", "enrichment.db", "enrichment.db-journal",
+                    "enrichment.db-wal", "enrichment.db-shm")}
 
     def installer_with_seam(self, text, name):
         count = text.count(DESKTOP_CALL)
@@ -474,7 +483,17 @@ class Run:
         check(self.lifetime() == lifetime, f"{label}: lifetime changed")
         check(self.history_ids()[:len(ids)] == ids, f"{label}: history changed")
         after = self.digests()
-        check(after == digests, f"{label}: config/preferences changed: {digests} -> {after}")
+        check(after == digests, f"{label}: config/preferences/sidecar changed: {digests} -> {after}")
+
+    def check_enrichment_visible(self, label):
+        visible = json.loads(self.in_app(
+            "import json; from app_paths import data_dir; "
+            "from optional_enrichment import OptionalEnrichmentService; "
+            "response=OptionalEnrichmentService(data_dir(), active=True).lookup_many("
+            "[f'rollback-seed-{i}' for i in range(4)]); "
+            "print(json.dumps(sorted(row.event_id for row in response.bindings)))"))
+        check(visible == [f"rollback-seed-{i}" for i in range(4)], f"{label}: bindings not visible: {visible}")
+        self.evidence[label + "_visible_bindings"] = visible
 
     def main(self):
         # Both layouts live under Programs\AC6WinLossTracker* (app-local and legacy);
@@ -548,6 +567,8 @@ class Run:
 
         # This build again: the setting and all history survive.
         self.evidence["install_2"] = self.install_candidate("install-2")
+        self.check_data_kept("install-2", lifetime, ids, digests)
+        self.check_enrichment_visible("install-2")
         check(self.evidence["install_2"].get("environment_path") == self.evidence["install_1"].get("environment_path"),
               "re-upgrade did not reuse the app-local environment")
         settings = json.loads(self.in_app("import json, settings_window; print(json.dumps(settings_window.read_settings()))"))
@@ -592,6 +613,8 @@ class Run:
 
         # This build a third time.
         self.evidence["install_3"] = self.install_candidate("install-3")
+        self.check_data_kept("install-3", lifetime, ids, digests)
+        self.check_enrichment_visible("install-3")
         settings = json.loads(self.in_app("import json, settings_window; print(json.dumps(settings_window.read_settings()))"))
         check(settings[KEY] is False, f"setting lost across the second round trip: {settings}")
         check(self.lifetime() == lifetime, "lifetime changed across the second round trip")

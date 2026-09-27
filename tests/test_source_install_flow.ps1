@@ -18,6 +18,11 @@ $installed = Join-Path $ownedRoot 'app'
 $legacy = Join-Path $fixture 'Programs\AC6WinLossTrackerSource'
 $data = Join-Path $fixture 'AC6WinLossTracker'
 $utf8 = New-Object System.Text.UTF8Encoding($true)
+function Assert-EnrichmentPreserved {
+    foreach ($name in $script:enrichmentHashes.Keys) {
+        if ((Get-FileHash -LiteralPath (Join-Path $data $name)).Hash -ne $script:enrichmentHashes[$name]) { throw "Optional sidecar changed: $name" }
+    }
+}
 function Assert-NoOwnedProcess {
     $owned = @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and ($_.CommandLine.Contains($installed) -or $_.CommandLine.Contains($legacy)) -and $_.Name -match '^pythonw?\.exe$' })
     if ($owned.Count) { throw "Owned processes remain: $($owned.ProcessId -join ',')" }
@@ -83,6 +88,7 @@ function Check-Rollback {
     if ($Stage -in @('venv-create','pip-install','venv-verify','python-verification','stop-running-app') -and $restored.pid -ne $beforeRuntime.pid) { throw "$Stage stopped the previous application too early" }
     if (Test-Path "$installed.previous") { throw "$Stage leaked previous source" }
     if ((Get-FileHash (Join-Path $data 'preferences.json')).Hash -ne $script:preferencesHash) { throw "$Stage changed preferences" }
+    Assert-EnrichmentPreserved
     Write-Output "Rollback $Stage / source / environment / shortcut / metadata / running state: PASS"
 }
 function Run-Installer {
@@ -99,6 +105,7 @@ function Run-Installer {
     if ($summary.lifetime.matches -ne 4 -or $summary.lifetime.wins -ne 3 -or $summary.lifetime.losses -ne 1) { throw 'Lifetime data lost' }
     if ((Get-Content (Join-Path $data 'config.json') -Raw) -ne $script:configBefore) { throw 'Config changed' }
     if ((Get-FileHash (Join-Path $data 'preferences.json')).Hash -ne $script:preferencesHash) { throw 'Preferences changed' }
+    Assert-EnrichmentPreserved
     if (Test-Path "$installed.previous") { throw 'Backup source remains after successful install' }
     if (Test-Path (Join-Path $fixture 'forbidden-pip-target')) { throw 'Host pip configuration escaped the owned environment' }
     $metadata = Get-Content (Join-Path $data 'installed-version.json') -Raw | ConvertFrom-Json
@@ -118,6 +125,7 @@ function Run-Uninstaller {
         if (-not (Test-Path (Join-Path $data $name))) { throw "Preserved data missing: $name" }
     }
     if (@(Get-ChildItem $data -Filter '.*runtime*').Count) { throw 'Runtime files remain' }
+    Assert-EnrichmentPreserved
 }
 function Check-Report {
     $code = @'
@@ -182,6 +190,11 @@ try {
     # update, injected-failure rollback, uninstall and reinstall untouched.
     [IO.File]::WriteAllText((Join-Path $data 'preferences.json'),'{"preferences_version": 1, "player_streak_status_enabled": false}',(New-Object System.Text.UTF8Encoding($false)))
     $script:preferencesHash = (Get-FileHash (Join-Path $data 'preferences.json')).Hash
+    $script:enrichmentHashes = @{}
+    foreach ($name in @('enrichment.db','enrichment.db-journal','enrichment.db-wal','enrichment.db-shm')) {
+        [IO.File]::WriteAllText((Join-Path $data $name), "dormant retention sentinel: $name", (New-Object Text.UTF8Encoding($false)))
+        $script:enrichmentHashes[$name] = (Get-FileHash -LiteralPath (Join-Path $data $name)).Hash
+    }
     $seed = @'
 import os,sys
 from pathlib import Path
