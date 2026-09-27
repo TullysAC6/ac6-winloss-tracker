@@ -181,7 +181,14 @@ The rules:
 - sidecar schema evolution is explicit and versioned. #15-0 v1 deliberately contains only the
   binding/maintenance foundation — no Ranked/Custom fields, Rank/Rating observations, confidence,
   recognition provenance, Season data, score vectors or Autopilot-specific schema;
-- DRAW persistence is unchanged and remains outside #15-0.
+- DRAW persistence is unchanged and remains outside #15-0;
+- every sidecar operation runs under a 100 ms cooperative budget (`enrichment_store._BUDGET = 0.100`).
+  That is a production constant, not a test-speed target:
+  - tests must not make an expected-success fixture depend on finishing within it on a shared runner;
+  - such tests assert the constant, give the fixture test-only headroom, and restore the real budget
+    wherever they measure the deadline itself;
+  - test-only PRs #52 and #53 applied this after the budget caused intermittent CI failures in three
+    enrichment test files; no product defect was involved.
 
 Why: adding optional metadata directly to the authoritative DB makes rollback and optional-feature
 failure share the same schema/failure boundary as WIN/LOSE history. The sidecar isolates that risk,

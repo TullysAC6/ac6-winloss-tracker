@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-27 JST
+Last updated: 2026-09-28 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -41,6 +41,12 @@ Issue #6
 - **UI-0 is DESIGN SPEC APPROVED + MERGED.** Docs-only PR #42 (exact head `587431d263b174b916efe42cae554e137fc54e93`) merged as `be77844dd86852f70e04d07b6885fbbdaa974fa8`; [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is canonical on `main`. It is a design state, not Implemented, Accepted or Released. No production code, tests, runtime, dependency, or framework changed. Issue #25 remains open.
   - Owner decisions are in spec §20: BEST STREAK off the always-on Player Overlay, always in Dashboard Overview, independently toggleable in Broadcast (the per-overlay independence of the two visibility settings is amended for future work by decision 10, 2026-09-26); the production 25-win milestone preserved exactly, with its canonical omission kept as a recorded discrepancy; 50-win ≤4.5 s normal / ≤3.0 s reduced motion; solid dark UI-2 shell as baseline with optional, non-blocking Windows 11 Mica proof; and, since 2026-09-23, **Broadcast primary text kept at the current 24 px bold baseline** unless real OBS evidence shows a readability problem (the earlier 28–36 CSS px proposal is not approved).
 - **The source-install CI race is fixed (test-only).** The first exact-main CI of `be77844` failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun passed. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaced the sleep with a bounded 7 s readiness poll matching `launcher.pyw`, and merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`; [exact-main CI 35946104314](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35946104314) passed. Production runtime unchanged; T3 N/A.
+- **The enrichment deadline test harness is fixed (test-only).** Some enrichment tests ran expected-success fixture operations under the production 100 ms budget, and shared runners could fail them with `reason='deadline'`. [PR #52](https://github.com/TullysAC6/ac6-winloss-tracker/pull/52) fixed `test_enrichment_store.py` (T0) and the child processes of `test_enrichment_rollback.py` (T2) and merged as `a8085ea6d5b951569effe728195a4fdec9717957`. Its exact-main CI then exposed the same coupling in a third file, `test_optional_enrichment.py`. [PR #53](https://github.com/TullysAC6/ac6-winloss-tracker/pull/53) fixed it and merged as `806df8e4ed14f96cbbdc27431ecb74fcd82efbd4`; [exact-main CI 36329835286](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36329835286) passed.
+  - Production `_BUDGET` stays 0.100.
+  - The forced-expiry test and a real-budget busy-lock assertion remain.
+  - No product defect was found; T3 N/A.
+  - **Rule for new tests:** do not make an expected-success fixture depend on finishing within a production deadline on a shared runner. Assert `_BUDGET == 0.100`, give the fixture test-only headroom, and restore the real budget wherever the test measures the deadline itself.
+  - **Before the next manual run of `tests/t2_rollback_public_release.py` (`ci=False`):** its `SEED` still uses the real budget and needs the same test-only treatment.
 - **UI-1A (Player Overlay polish) is ACCEPTED + MERGED — UNRELEASED.** [PR #46](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46) exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` passed real-machine T3 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46#issuecomment-5831572036)) and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`; [exact-main CI 36132227642](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36132227642) passed. Public stable v1.2.0 does not contain it. Details are in `PROJECT_STATE.md`.
   - Player labels stay `WIN / LOSE / 勝率 / 連勝`; BEST left the Player panel only; the Player streak status is user-toggleable (ON with no saved preference), static, and set in a Japanese face; panel opacity defaults to 15%, which the owner accepted.
   - **New settings go into the versioned `preferences.json`, never into `config.json`.** Use a flat scalar key and bump `preferences_version` by one. See [DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen).
@@ -86,7 +92,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 2. [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`).
 3. **UI-1A: ACCEPTED + MERGED — UNRELEASED.** PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; exact-main CI 36132227642 passed.
 4. **UI-1B: ACCEPTED + MERGED — UNRELEASED.** PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; exact-main CI 36230655908 passed.
-5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Exact-main CI run 36315443975 passed on attempt 2 on the unchanged merge SHA; attempt 1 had two Python 3.13 T0 initialization failures, while Python 3.14 passed the full gate path. T3 was N/A because the slice is dormant: ordinary startup does not access `enrichment.db`.
+5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Exact-main CI run 36315443975 passed on attempt 2 on the unchanged merge SHA; attempt 1 had two Python 3.13 T0 initialization failures, while Python 3.14 passed the full gate path. Those failures were a test-harness deadline coupling, later fixed test-only by PRs #52 and #53, not a product defect. T3 was N/A because the slice is dormant: ordinary startup does not access `enrichment.db`.
 6. **Next inside #15 is #15-1, then the remaining #15 recognition/data slices; only after #15 completes do #28-A and UI-2 follow. #15-1 is not started or authorized.** The same applies to the shared visibility settings and Player personalization. Until the owner explicitly authorizes one of them:
    - do not create its branch or worktree;
    - do not bump `preferences_version`, add a setting, or migrate `player_streak_status_enabled` / `broadcast_show_best_streak`;
@@ -96,7 +102,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PR #43, UI-1A PR #46, UI-1B PR #48 and #15-0 PR #50 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PRs #43 / #52 / #53, UI-1A PR #46, UI-1B PR #48 and #15-0 PR #50 are merged. No product generation is active.
 
 ## Order after that — dependency, not preference
 
@@ -117,7 +123,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PRs #40 to #48 are all merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PRs #40 to #53 are all merged, including this bookkeeping PR #51. No product generation is active.
 
 ## What is newly recorded and must not be lost
 

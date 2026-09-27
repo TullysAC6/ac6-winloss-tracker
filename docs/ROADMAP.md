@@ -202,6 +202,7 @@ The **UI-0 design specification is approved and merged** (PR #42 as `be77844`); 
 **UI-1A was accepted on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`** (PR #46), with exact-main CI 36132227642 green. It is not released.
 **UI-1B was accepted on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` and merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`** (PR #48), with exact-main CI 36230655908 green. It is not released.
 **#15-0 was accepted on exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7` and merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`** (PR #50). Exact-main CI 36315443975 passed on attempt 2 on the unchanged merge SHA after an attempt-1 Python 3.13 T0-only failure. It is not released and is dormant in ordinary production startup.
+That failure was a test-harness coupling to the 100 ms production deadline, not a product defect. It was fixed test-only in [PR #52](https://github.com/TullysAC6/ac6-winloss-tracker/pull/52) (`a8085ea6d5b951569effe728195a4fdec9717957`, T0 + T2) and [PR #53](https://github.com/TullysAC6/ac6-winloss-tracker/pull/53) (`806df8e4ed14f96cbbdc27431ecb74fcd82efbd4`, a third file, also T0). [Exact-main CI 36329835286](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36329835286) passed. Production `_BUDGET` stays 0.100, and explicit deadline tests remain.
 From the current position:
 
 ```text
