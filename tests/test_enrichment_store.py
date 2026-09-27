@@ -6,26 +6,24 @@ import sqlite3
 import struct
 import sys
 import tempfile
+import time
 import unittest
+from contextlib import ExitStack
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import enrichment_store as storage
 from history_store import HistoryStore
 from optional_enrichment import OptionalEnrichmentService
+from enrichment_test_clock import fixture_clock, real_clock
 
 
 class StorageTests(unittest.TestCase):
     def setUp(self):
-        # Production keeps the 100 ms cooperative budget. These T0 cases test
-        # storage/schema behavior rather than shared-runner wall-clock latency,
-        # so give test operations deterministic headroom. Deadline behavior is
-        # still exercised explicitly by forcing an already-expired deadline.
         self.assertEqual(storage._BUDGET, 0.100)
-        budget_patch = patch.object(storage, "_BUDGET", 2.0)
-        budget_patch.start()
-        self.addCleanup(budget_patch.stop)
+        self.enterContext(fixture_clock())
 
         self.directory = tempfile.TemporaryDirectory(prefix="ac6-enrichment-t0-")
         self.addCleanup(self.directory.cleanup)
@@ -187,7 +185,8 @@ class StorageTests(unittest.TestCase):
         lock = sqlite3.connect(self.path)
         try:
             lock.execute("BEGIN EXCLUSIVE")
-            self.assertEqual(self.service.lookup("A").health.reason, "busy")
+            with real_clock():
+                self.assertEqual(self.service.lookup("A").health.reason, "busy")
         finally:
             lock.rollback()
             lock.close()
@@ -217,8 +216,9 @@ class StorageTests(unittest.TestCase):
             disabled.invalidate_history()
             disabled.deactivate()
         # Reload changes private class identity; create a fresh service afterwards.
-        relative = optional_enrichment.OptionalEnrichmentService(Path("relative"), active=True)
-        self.assertEqual(relative.inspect().health.reason, "unsafe_path")
+        with fixture_clock():
+            relative = optional_enrichment.OptionalEnrichmentService(Path("relative"), active=True)
+            self.assertEqual(relative.inspect().health.reason, "unsafe_path")
 
     def test_hardlink_and_expired_transaction_do_not_mutate(self):
         self.create()
@@ -229,13 +229,44 @@ class StorageTests(unittest.TestCase):
         finally:
             alias.unlink()
         deadline = storage._Deadline()
-        with self.assertRaises(storage._Unavailable):
-            with self.service._store.open(deadline, write=True) as connection:
-                connection.execute("DELETE FROM match_bindings")
-                connection.execute("UPDATE maintenance_state SET after_event_id='A'")
-                deadline.end = 0  # Expiry before commit must roll back both changes.
+        # SQL setup is not a timing test. Opt into real expiry only after both
+        # mutations, and keep that clock active through the transaction exit.
+        with ExitStack() as clocks:
+            with self.assertRaisesRegex(storage._Unavailable, "^deadline$"):
+                with self.service._store.open(deadline, write=True) as connection:
+                    connection.execute("DELETE FROM match_bindings")
+                    connection.execute("UPDATE maintenance_state SET after_event_id='A'")
+                    self.assertEqual(connection.execute("SELECT count(*) FROM match_bindings").fetchone(), (0,))
+                    self.assertEqual(connection.execute("SELECT after_event_id FROM maintenance_state").fetchone(), ("A",))
+                    deadline.end = 0
+                    clocks.enter_context(real_clock())
         self.assertEqual(self.sql("SELECT event_id FROM match_bindings"), [("A",)])
         self.assertEqual(self.sql("SELECT * FROM maintenance_state"), [(1, None)])
+
+    def test_fixture_clock_survives_stall_without_changing_real_deadline(self):
+        now = [10.0]
+        wall = SimpleNamespace(monotonic=lambda: now[0])
+        monotonic = time.monotonic
+        with patch.object(storage, "time", wall):
+            real_deadline = storage._Deadline()
+            with fixture_clock():
+                deadline = storage._Deadline()
+                self.create()
+                now[0] += 86400  # Controlled descheduling; no sleep or larger budget.
+                self.assertEqual(deadline.remaining(), 0.100)
+                self.assertEqual(self.service.lookup("A").status, "visible")
+                with self.service._store.open(deadline) as connection:
+                    # Exercise the real SQLite progress handler after the stall.
+                    total = connection.execute("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL "
+                                               "SELECT x+1 FROM n WHERE x<2000) SELECT sum(x) FROM n").fetchone()
+                    self.assertEqual(total, (2001000,))
+                self.assertIs(time.monotonic, monotonic)
+            self.assertIs(storage.time, wall)
+            with self.assertRaisesRegex(storage._Unavailable, "^deadline$"):
+                real_deadline.remaining()
+        with real_clock():
+            self.assertIs(storage.time, time)
+        self.assertEqual(storage._BUDGET, 0.100)
 
 
 if __name__ == "__main__":
