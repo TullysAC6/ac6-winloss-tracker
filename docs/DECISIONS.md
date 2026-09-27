@@ -153,6 +153,46 @@ it silently corrupts every statistic derived from it afterwards.
 
 ---
 
+## Optional match enrichment uses a dormant sidecar
+
+**Decision (2026-09-27, accepted and merged in PR #50): match-bound optional enrichment lives in
+`enrichment.db`; `history.db` remains the authoritative match source.**
+
+This is the #15-0 foundation adopted from the E1 investigation and implemented on exact head
+`1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as
+`59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`.
+
+The rules:
+
+- ordinary production startup does **not** stat, open, create, migrate or clean `enrichment.db`;
+  #15-0 is dormant until a later explicitly authorized slice uses it;
+- match-bound sidecar identity is `event_id` plus an immutable witness derived from authoritative
+  history (v1 uses the exact binary64 `created_at` value plus `result`); the internal integer
+  `matches.id` is never the cross-database identity;
+- every supported match-bound read checks the authoritative parent before publishing enrichment;
+  a missing parent makes the enrichment immediately logically invisible;
+- an unaware rollback build may leave physical sidecar orphans after deleting history. That is
+  accepted. A capable build later removes them with bounded, idempotent cleanup;
+- history unreadable / incompatible is **not** treated as empty history, so cleanup must not delete
+  sidecar rows merely because the authority could not be read;
+- sidecar corruption, incompatibility, lock, disk-full, migration or cleanup failure is optional
+  degradation only. It never blocks or rolls back authoritative WIN/LOSE persistence;
+- there is no distributed transaction between `history.db` and `enrichment.db`;
+- sidecar schema evolution is explicit and versioned. #15-0 v1 deliberately contains only the
+  binding/maintenance foundation — no Ranked/Custom fields, Rank/Rating observations, confidence,
+  recognition provenance, Season data, score vectors or Autopilot-specific schema;
+- DRAW persistence is unchanged and remains outside #15-0.
+
+Why: adding optional metadata directly to the authoritative DB makes rollback and optional-feature
+failure share the same schema/failure boundary as WIN/LOSE history. The sidecar isolates that risk,
+while the parent-check rule prevents rollback or stale rows from resurrecting deleted match data.
+
+See Issue #15 owner decision
+[#5845998621](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5845998621),
+PR #50, and the merge checkpoint on Issue #15.
+
+---
+
 ## Every-match opponent build independence
 
 **Decision: opponent build data belongs to one match and is never carried forward. CRITICAL.**
