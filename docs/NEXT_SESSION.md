@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-26 JST
+Last updated: 2026-09-27 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -86,7 +86,8 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 2. [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`).
 3. **UI-1A: ACCEPTED + MERGED — UNRELEASED.** PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; exact-main CI 36132227642 passed.
 4. **UI-1B: ACCEPTED + MERGED — UNRELEASED.** PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; exact-main CI 36230655908 passed.
-5. **Next in the Sequencing order is #15, then #28-A and UI-2. None of them is started or authorized.** The same applies to the shared visibility settings and Player personalization. Until the owner explicitly authorizes one of them:
+5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Exact-main CI run 36315443975 passed on attempt 2 on the unchanged merge SHA; attempt 1 had two Python 3.13 T0 initialization failures, while Python 3.14 passed the full gate path. T3 was N/A because the slice is dormant: ordinary startup does not access `enrichment.db`.
+6. **Next inside #15 is #15-1, then the remaining #15 recognition/data slices; only after #15 completes do #28-A and UI-2 follow. #15-1 is not started or authorized.** The same applies to the shared visibility settings and Player personalization. Until the owner explicitly authorizes one of them:
    - do not create its branch or worktree;
    - do not bump `preferences_version`, add a setting, or migrate `player_streak_status_enabled` / `broadcast_show_best_streak`;
    - do not change milestone behaviour.
@@ -95,23 +96,23 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PR #43, UI-1A PR #46 and UI-1B PR #48 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PR #43, UI-1A PR #46, UI-1B PR #48 and #15-0 PR #50 are merged. No product generation is active.
 
 ## Order after that — dependency, not preference
 
 The authoritative interleaved order is under **Sequencing** in [ROADMAP.md](ROADMAP.md):
 
-v1.2.0, PR #13, PR #5, PR #35, PR #40, PR #46 and PR #48 are complete at their recorded states. PR #40 / #24, PR #46 / UI-1A and PR #48 / UI-1B are accepted and merged, but not released. UI-0 is design-approved and merged (PR #42). From here:
+v1.2.0, PR #13, PR #5, PR #35, PR #40, PR #46, PR #48 and PR #50 are complete at their recorded states. PR #40 / #24, PR #46 / UI-1A, PR #48 / UI-1B and PR #50 / #15-0 are accepted and merged, but not released. UI-0 is design-approved and merged (PR #42). From here:
 
 ```text
-✓ UI-0 → ✓ UI-1A (merged, unreleased) → ✓ UI-1B (merged, unreleased)
-→ #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12 → UI-3B
-→ #16-B → #18 → #27 → UI-4
+✓ UI-0 → ✓ UI-1A (merged, unreleased) → ✓ UI-1B (merged, unreleased) → ✓ #15-0 (merged, unreleased)
+→ #15-1 / remaining #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12
+→ UI-3B → #16-B → #18 → #27 → UI-4
 ```
 
 Four placements in it are load-bearing and will look wrong to anyone reading only the phase tables:
 
-- **#15 → #28-A → UI-2.** #15 supplies match / observation timestamps; #28-A settles catalog reconciliation and derived Season assignment; only then does UI-2 add Settings manual refresh and History Season state.
+- **#15-1 / remaining #15 → #28-A → UI-2.** #15-0 only establishes the dormant optional-storage foundation. The remaining #15 slices supply the actual match / observation contracts and timestamps; #28-A then settles catalog reconciliation and derived Season assignment; only then does UI-2 add Settings manual refresh and History Season state.
 - **#16 owns the data, #25 owns the charts.** #16 computes periods, rolling win rate, per-season rank/rating series, deltas and achievements. UI-3A / UI-3B render them. Neither implements the other's half.
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
