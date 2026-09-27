@@ -115,7 +115,7 @@ The next product task at that date was [#24](https://github.com/TullysAC6/ac6-wi
 - The one-version-newer `preferences.json` rule held on a real machine: the exact UI-1A build kept the unknown v2 key through a UI-1B → UI-1A → UI-1B round trip with no hand edit.
 - Known limitation, Low and accepted: on a source shorter than 300 px and narrow, a shown health warning covers part of the panel.
 - **Shared visibility settings** were decided on 2026-09-26 ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161)) as future work. 連勝ステータスを表示 and 最高連勝を表示 each become one preference shared by both overlays. It is not started and not authorized; see [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays).
-- Issue #25 remains open. No product generation is active. Next in the Sequencing order is #15; like UI-2, it is **not started and not authorized** and needs its own owner authorization.
+- Issue #25 remains open. No product generation is active. #15-0 is now **ACCEPTED + MERGED — UNRELEASED** in PR #50; the next #15 slice (#15-1) is **not started and not authorized**. #28-A and UI-2 remain later in the Sequencing order.
 
 ## Phase numbering — 2026-09-09 reorganisation
 
@@ -201,13 +201,16 @@ Revision 4 / §65 was merged in PR #31 as `e214ae0`; exact-main CI 35479744429 p
 The **UI-0 design specification is approved and merged** (PR #42 as `be77844`); it is a design state only.
 **UI-1A was accepted on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`** (PR #46), with exact-main CI 36132227642 green. It is not released.
 **UI-1B was accepted on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` and merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`** (PR #48), with exact-main CI 36230655908 green. It is not released.
+**#15-0 was accepted on exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7` and merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`** (PR #50). Exact-main CI 36315443975 passed on attempt 2 on the unchanged merge SHA after an attempt-1 Python 3.13 T0-only failure. It is not released and is dormant in ordinary production startup.
+That failure was a test-harness coupling to the 100 ms production deadline, not a product defect. It was fixed test-only in [PR #52](https://github.com/TullysAC6/ac6-winloss-tracker/pull/52) (`a8085ea6d5b951569effe728195a4fdec9717957`, T0 + T2) and [PR #53](https://github.com/TullysAC6/ac6-winloss-tracker/pull/53) (`806df8e4ed14f96cbbdc27431ecb74fcd82efbd4`, a third file, also T0). [Exact-main CI 36329835286](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36329835286) passed. Production `_BUDGET` stays 0.100, and explicit deadline tests remain.
 From the current position:
 
 ```text
 ✓ UI-0                        design specification, no code change — APPROVED + MERGED (PR #42)
 ✓ UI-1A                       Player Overlay polish — ACCEPTED + MERGED (PR #46), unreleased
 ✓ UI-1B                       Broadcast Overlay polish — ACCEPTED + MERGED (PR #48), unreleased
-→ #15                         match metadata foundation
+✓ #15-0                       dormant enrichment storage foundation — ACCEPTED + MERGED (PR #50), unreleased
+→ #15-1 / remaining #15       match metadata / recognition foundation
 → #28-A                       Season Catalog / Assignment Foundation
 → UI-2                        Dashboard / History / Settings shell + manual Season refresh
 → #16-A / #28-B               growth + seasonal rank/rating analytics data
@@ -362,7 +365,7 @@ Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any 
 
 ## Phase 7 — Match metadata and growth analytics
 
-Everything below is **PLANNED**. Nothing here is implemented, and the whole phase depends on 7A.
+Phase 7A is now **partially implemented**: the dormant #15-0 optional-enrichment storage foundation is accepted and merged but unreleased. The user-visible metadata, recognition, Rank/Rating and category-aware analytics work remains planned. Phase 7B still depends on completion of 7A.
 
 ### Phase 7A — Match metadata foundation
 
@@ -370,6 +373,7 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 
 | Item | Status | Notes |
 |---|---|---|
+| #15-0 optional enrichment storage foundation (`enrichment.db`) | **ACCEPTED — UNRELEASED** | PR #50 exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Dormant: ordinary startup does not open/create/migrate/clean the sidecar. `history.db` remains authoritative; match-bound bindings are parent-checked and missing parents are logically invisible. T3 N/A |
 | `match_type` — ranked / custom / unknown | PLANNED | |
 | `match_format` — single / team / unknown | PLANNED | |
 | `self_rank` | PLANNED | Single and Team, where reliable |
