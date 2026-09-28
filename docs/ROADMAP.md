@@ -374,8 +374,8 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | Item | Status | Notes |
 |---|---|---|
 | #15-0 optional enrichment storage foundation (`enrichment.db`) | **ACCEPTED — UNRELEASED** | PR #50 exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Dormant: ordinary startup does not open/create/migrate/clean the sidecar. `history.db` remains authoritative; match-bound bindings are parent-checked and missing parents are logically invisible. T3 N/A |
-| `match_type` — ranked / custom / unknown | PLANNED | |
-| `match_format` — single / team / unknown | PLANNED | |
+| `match_type` — ranked / custom / unknown | **DORMANT STORAGE IMPLEMENTED (#15-1)** | [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md); owner-authorized gated workflow, live acceptance state on Issue #6. Recognition/UI/statistics remain planned |
+| `match_format` — single / team / unknown | **DORMANT STORAGE IMPLEMENTED (#15-1)** | [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md); owner-authorized gated workflow, live acceptance state on Issue #6. Recognition/UI/statistics remain planned |
 | `self_rank` | PLANNED | Single and Team, where reliable |
 | `opponent_rank` | PLANNED | Single only. Team opponent ranks deferred |
 | `metadata_recognition_status` / `metadata_recognition_version` | PLANNED | |

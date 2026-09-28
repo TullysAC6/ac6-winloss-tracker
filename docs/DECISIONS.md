@@ -153,6 +153,16 @@ it silently corrupts every statistic derived from it afterwards.
 
 ---
 
+## #15-1 keeps category persistence separate from recognition
+
+[#15-1 scope/authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5866557707) authorizes only the next dormant storage contract: the two already-defined category enums,
+explicit atomic sidecar v1-to-v2 migration, parent-checked reads and compare-and-set writes. [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md)
+records the APIs and rollback contract. Recognition/rank/provenance decisions are not inferred from storage work.
+Ordinary startup, authoritative history, DRAW, preferences and worker lifecycle remain unchanged. Acceptance,
+exact-head/main CI and merge evidence live on Issue #6 and the slice PR. No later slice or release is authorized.
+
+---
+
 ## Optional match enrichment uses a dormant sidecar
 
 **Decision (2026-09-27, accepted and merged in PR #50): match-bound optional enrichment lives in

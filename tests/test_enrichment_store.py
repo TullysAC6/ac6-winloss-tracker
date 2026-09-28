@@ -52,10 +52,10 @@ class StorageTests(unittest.TestCase):
         self.assertFalse(self.path.exists())
         ticket = self.create()
         self.assertEqual(self.sql("PRAGMA application_id"), [(0x41433645,)])
-        self.assertEqual(self.sql("PRAGMA user_version"), [(1,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(2,)])
         self.assertEqual(self.sql("PRAGMA page_size"), [(4096,)])
         self.assertEqual(self.sql("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name"),
-                         [("maintenance_state",), ("match_bindings",)])
+                         [("maintenance_state",), ("match_bindings",), ("match_metadata",)])
         self.assertEqual(self.sql("SELECT * FROM match_bindings"), [("A", 1, struct.pack(">d", 2.125), "win")])
         before = self.path.read_bytes()
         self.assertEqual(self.service.save_binding(ticket).status, "saved")
@@ -72,7 +72,7 @@ class StorageTests(unittest.TestCase):
                 self.service.save_binding(self.service.prepare_binding("A").ticket, create_missing=True)
                 self.assertEqual(self.path.read_bytes(), data)
                 self.path.unlink()
-        for statement in ("PRAGMA user_version=0", "PRAGMA user_version=2", "PRAGMA user_version=-1",
+        for statement in ("PRAGMA user_version=0", "PRAGMA user_version=3", "PRAGMA user_version=-1",
                           "PRAGMA application_id=7"):
             with self.subTest(statement=statement):
                 self.create()
@@ -149,9 +149,9 @@ class StorageTests(unittest.TestCase):
             with self.service._store.open(storage._Deadline(), write=True) as connection:
                 connection.execute("DELETE FROM match_bindings")
                 connection.execute("UPDATE maintenance_state SET after_event_id='A'")
-                # Synthetic future migration only; there is no v2 product schema.
+                # Synthetic future migration only; there is no v3 product schema.
                 connection.execute("CREATE TABLE future_fixture(x)")
-                connection.execute("PRAGMA user_version=2")
+                connection.execute("PRAGMA user_version=3")
                 raise RuntimeError("fault")
         self.assertEqual(self.service.inspect().status, "ready")
         self.assertEqual(self.sql("SELECT event_id FROM match_bindings"), [("A",)])
@@ -160,7 +160,7 @@ class StorageTests(unittest.TestCase):
     def test_partial_initialization_never_publishes(self):
         connect = sqlite3.connect
         targets = (*storage._DDL, "INSERT INTO maintenance_state VALUES (1,NULL)",
-                   f"PRAGMA application_id={storage._APPLICATION_ID}", "PRAGMA user_version=1")
+                   f"PRAGMA application_id={storage._APPLICATION_ID}", "PRAGMA user_version=2")
         for target in targets:
             with self.subTest(target=target):
                 class FaultConnection(sqlite3.Connection):

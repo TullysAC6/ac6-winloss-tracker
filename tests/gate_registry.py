@@ -69,6 +69,7 @@ PLAYER_OVERLAY_PURE = ("PlayerMetricsTests", "PlayerRenderTests", "LayoutAndSafe
 ENTRIES = (
     Entry("tests/test_enrichment_store.py", T0, "dormant sidecar format, validation and atomic storage"),
     Entry("tests/test_optional_enrichment.py", T0, "parent identity, bounded cleanup and publication contracts"),
+    Entry("tests/test_match_metadata.py", T0, "dormant category metadata, explicit v1 migration and parent isolation"),
     Entry("tests/test_python_spawn.py", T0, "pure executable/environment and launch identity contracts"),
     # ------------------------------------------------------------------ T0
     Entry("tests/test_game_capture.py", T0, "capture validation with mocked workers and the gap loop",

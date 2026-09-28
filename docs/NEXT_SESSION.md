@@ -91,7 +91,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 3. **UI-1A: ACCEPTED + MERGED — UNRELEASED.** PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; exact-main CI 36132227642 passed.
 4. **UI-1B: ACCEPTED + MERGED — UNRELEASED.** PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; exact-main CI 36230655908 passed.
 5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Exact-main CI run 36315443975 passed on attempt 2 on the unchanged merge SHA; attempt 1 had two Python 3.13 T0 initialization failures, while Python 3.14 passed the full gate path. Those failures were a test-harness deadline coupling, not a product defect. PRs #52/#53 added 2.0 s headroom, but PR #51's exact-main CI exposed its remaining wall-clock dependency; the deterministic test-only correction and closure gates are recorded above. T3 was N/A because the slice is dormant: ordinary startup does not access `enrichment.db`.
-6. **Next inside #15 is #15-1, then the remaining #15 recognition/data slices; only after #15 completes do #28-A and UI-2 follow. #15-1 is not started or authorized.** The same applies to the shared visibility settings and Player personalization. Until the owner explicitly authorizes one of them:
+6. **#15-1 is owner-authorized for dormant match-category persistence**, including its gated merge and bookkeeping. Follow [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md) and [#15-1 scope/authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5866557707); resolve final state on Issue #6 / the slice PR. **STOP after #15-1.** Remaining #15 recognition/data slices, #28-A, UI-2, shared visibility settings and Player personalization are not authorized. Until the owner authorizes one of those later scopes:
    - do not create its branch or worktree;
    - do not bump `preferences_version`, add a setting, or migrate `player_streak_status_enabled` / `broadcast_show_best_streak`;
    - do not change milestone behaviour.
@@ -100,7 +100,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PRs #43 / #52 / #53, UI-1A PR #46, UI-1B PR #48 and #15-0 PR #50 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PRs #43 / #52 / #53, UI-1A PR #46, UI-1B PR #48 and #15-0 PR #50 are merged. #15-1 is the only separately authorized product slice; resolve Issue #6 / open PRs for its live completion state. No following generation is authorized.
 
 ## Order after that — dependency, not preference
 
@@ -121,7 +121,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PRs #40 to #53 are all merged, including this bookkeeping PR #51. No product generation is active.
+At most two unmerged generations exist at a time (§4). PRs #40 to #53 are all merged, including this bookkeeping PR #51. #15-1 is the only separately authorized product slice; resolve Issue #6 / open PRs for its live completion state. No following generation is authorized.
 
 ## What is newly recorded and must not be lost
 

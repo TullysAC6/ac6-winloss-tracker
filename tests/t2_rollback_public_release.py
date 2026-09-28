@@ -160,7 +160,7 @@ now = time.time() - 3600
 for index, result in enumerate(("win", "win", "loss", "win")):
     store.record_result(f"rollback-seed-{index}", result, "test",
                         {"streak": 0, "wins": 0, "losses": 0}, created_at=now + index)
-from optional_enrichment import OptionalEnrichmentService
+from optional_enrichment import MatchMetadata, OptionalEnrichmentService
 from pathlib import Path
 sys.path.insert(0, str(Path(sys.argv[1]) / "tests"))
 from enrichment_test_clock import fixture_clock
@@ -169,6 +169,10 @@ with fixture_clock():
     for index in range(4):
         ticket = service.prepare_binding(f"rollback-seed-{index}").ticket
         result = service.save_binding(ticket, create_missing=True)
+        assert result.status == "saved", result
+        kind, form = (("ranked","single"), ("custom","team"), ("unknown","team"), ("ranked","unknown"))[index]
+        result = service.save_metadata(ticket, MatchMetadata(f"rollback-seed-{index}", kind, form),
+                                       expected=MatchMetadata(f"rollback-seed-{index}"))
         assert result.status == "saved", result
     assert len(service.lookup_many([f"rollback-seed-{index}" for index in range(4)]).bindings) == 4
 '''
@@ -491,17 +495,21 @@ class Run:
 
     def check_enrichment_visible(self, label):
         visible = json.loads(self.in_app(
-            "import json, sys; from pathlib import Path\n"
+            "import json, sys; from pathlib import Path; from dataclasses import asdict\n"
             "from app_paths import data_dir\n"
             "from optional_enrichment import OptionalEnrichmentService\n"
             "sys.path.insert(0, str(Path.cwd() / 'tests'))\n"
             "from enrichment_test_clock import fixture_clock\n"
             "with fixture_clock():\n"
-            "    response=OptionalEnrichmentService(data_dir(), active=True).lookup_many("
+            "    response=OptionalEnrichmentService(data_dir(), active=True).lookup_metadata_many("
             "[f'rollback-seed-{i}' for i in range(4)])\n"
-            "    print(json.dumps(sorted(row.event_id for row in response.bindings)))"))
-        check(visible == [f"rollback-seed-{i}" for i in range(4)], f"{label}: bindings not visible: {visible}")
-        self.evidence[label + "_visible_bindings"] = visible
+            "    print(json.dumps([asdict(row) for row in sorted(response.metadata, key=lambda row: row.event_id)]))"))
+        expected = [dict(event_id=f"rollback-seed-{i}", match_type=kind, match_format=form)
+                    for i, (kind, form) in enumerate((("ranked","single"), ("custom","team"),
+                                                      ("unknown","team"), ("ranked","unknown")))]
+        check(visible == expected, f"{label}: metadata not preserved/visible: {visible}")
+        self.evidence[label + "_visible_bindings"] = [row["event_id"] for row in visible]
+        self.evidence[label + "_visible_metadata"] = visible
 
     def main(self):
         # Both layouts live under Programs\AC6WinLossTracker* (app-local and legacy);
