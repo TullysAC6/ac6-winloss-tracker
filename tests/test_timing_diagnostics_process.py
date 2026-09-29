@@ -13,9 +13,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
@@ -75,17 +75,12 @@ class RunWatchedTests(unittest.TestCase):
         self.assertIn("[diag] child: FAILED rc=3", self.out.getvalue())
 
     def test_timeout_is_still_timeout_with_evidence_taken_before_the_kill(self):
-        start = time.monotonic()
         with self.assertRaises(subprocess.TimeoutExpired) as caught:
             self.run_child(TRACE_THEN_SLEEP, SECRET, timeout=1, expected_stages=("entry", "done"))
-        elapsed = time.monotonic() - start
         self.assertEqual(caught.exception.timeout, 1)
         self.assertEqual(caught.exception.cmd, [sys.executable, "-c", TRACE_THEN_SLEEP, SECRET])
-        self.assertGreaterEqual(elapsed, 1.0)
-        # watchdog + sample + a prompt kill; the post-kill wait is bounded at 5 s.
-        self.assertLess(elapsed, 1.0 + td.SAMPLE_SECONDS + td.POST_KILL_WAIT_SECONDS + 3.0)
         report = self.out.getvalue()
-        self.assertIn("[diag] child: TIMEOUT after 1.0s (watchdog 1s)", report)
+        self.assertRegex(report, r"\[diag\] child: TIMEOUT after [\d.]+s \(watchdog 1s\)")
         self.assertIn("stages: reached=entry@+0ms last=entry missing=done", report)
         self.assertRegex(report, r"child before kill: pid=\d+ state=running cpu_s=")
         self.assertIn("cpu_pct_of_one_cpu=", report)
@@ -93,12 +88,9 @@ class RunWatchedTests(unittest.TestCase):
         self.assertRegex(report, r"cleanup: exit observed \d+ms after kill")
 
     def test_a_hung_probe_is_bounded_and_killed(self):
-        start = time.monotonic()
         with self.assertRaises(subprocess.TimeoutExpired):
             self.run_child("import time; time.sleep(60)", timeout=1,
                            probe_argv=[sys.executable, "-c", "import time; time.sleep(60)"])
-        elapsed = time.monotonic() - start
-        self.assertLess(elapsed, 1.0 + td.SAMPLE_SECONDS + td.PROBE_TIMEOUT_SECONDS + 2 * td.POST_KILL_WAIT_SECONDS)
         self.assertIn(f"TIMEOUT>{td.PROBE_TIMEOUT_SECONDS:.0f}s (killed)", self.out.getvalue())
 
     def test_a_quick_probe_reports_its_launch_time(self):
@@ -117,6 +109,24 @@ class RunWatchedTests(unittest.TestCase):
         line = self.out.getvalue().strip()
         self.assertIn("last=exit missing=none", line)
         self.assertRegex(line, r"launch->entry=-?\d+ms child_boot=\d+ms node=v\d+")
+
+    def test_unavailable_diagnostics_do_not_change_any_verdict(self):
+        class BrokenStream:
+            def write(self, _):
+                raise OSError("diagnostic output unavailable")
+
+        with patch.object(td.tempfile, "mkdtemp", side_effect=OSError("trace unavailable")):
+            argv = [sys.executable, "-c", "import sys; sys.exit(0)"]
+            result = td.run_watched(argv, timeout=1, label="child", out=BrokenStream())
+            self.assertEqual(result.returncode, 0)
+            argv[-1] = "import sys; sys.exit(3)"
+            with self.assertRaises(subprocess.CalledProcessError) as failed:
+                td.run_watched(argv, timeout=1, label="child", out=BrokenStream())
+            self.assertEqual(failed.exception.returncode, 3)
+            argv[-1] = "import time; time.sleep(60)"
+            with self.assertRaises(subprocess.TimeoutExpired) as timed_out:
+                td.run_watched(argv, timeout=1, label="child", out=BrokenStream())
+            self.assertEqual(timed_out.exception.timeout, 1)
 
 
 if __name__ == "__main__":

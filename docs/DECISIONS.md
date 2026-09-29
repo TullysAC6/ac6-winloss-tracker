@@ -406,6 +406,29 @@ Why: a longer timeout or an automatic retry would hide the next occurrence witho
 believe it fixed anything. PRs #52/#53 → #54 showed that finite headroom does not make
 wall-clock-dependent tests deterministic.
 
+### PR #60 initial CI failure and correction
+
+The first exact-head run, [36585510001](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36585510001)
+on `9df190a1`, failed on Python 3.13 and 3.14 in the new
+`test_every_verdict_and_duration_matches_the_previous_function` test. It required a
+failed readiness scenario to finish before `timeout * 1000 + 3000` ms (4000 ms for
+the one-second fixtures); the 503 scenario took 4625 and 5459 ms. This was a
+**test-design defect in PR #60**, not evidence of a product readiness regression.
+The runner's scheduling time is not a readiness result. Raising the 3000 ms
+allowance would repeat the finite-headroom mistake from #52/#53.
+
+The replacement evidence is deterministic: the previous function is pinned and
+compared with the instrumented function after removing only the diagnostic
+statements; the old and new functions each return exactly one Boolean with the
+same verdict across the isolated failure and success scenarios; static tests pin
+the 15-second call site, deadline, sleeps, conditions and rollback trigger.
+The Node runner's success, nonzero exit and timeout exceptions, diagnostic
+failure isolation, redaction and process cleanup have direct tests. No new test
+makes correctness depend on a finite allowance around measured wall time.
+Issue #59 already excluded arbitrary timeout and assertion increases, and #54
+provided the precedent. The initial assertion was an implementation miss, not
+a gap in the owner's instruction.
+
 ---
 
 ## Performance and security regressions are measured, not asserted

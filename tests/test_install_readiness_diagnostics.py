@@ -4,8 +4,8 @@ The real Wait-AppRuntimeReady and its helpers are loaded from install.ps1 throug
 the PowerShell AST and run beside the pre-#59 function pinned in
 tests/test_timing_diagnostics.py, against the same local scenarios: a missing,
 unparsable or foreign runtime file, a dead PID, a closed port, a 503 health
-answer and a ready one. Both must return the same single Boolean in the same
-time; only the instrumented log may differ, and it must name the stage and
+answer and a ready one. Both must return the same single Boolean; only the
+instrumented log may differ, and it must name the stage and
 outcome while never echoing the control token or a nonce. Windows PowerShell 5.1
 always runs; PowerShell 7 runs where installed (always on CI). A second class
 runs the source-install harness's failure dump and proves it still rethrows the
@@ -61,13 +61,11 @@ foreach ($scenario in $scenarios) {
     $script:logPath = $scenario.log
     $script:installNonce = $scenario.nonce
     $script:launcherProcess = $null
-    $watch = [Diagnostics.Stopwatch]::StartNew()
     $value = @(Wait-AppRuntimeReady -TimeoutSeconds ([int]$scenario.timeout))
-    $watch.Stop()
     $types = @($value | ForEach-Object { if ($null -eq $_) { 'null' } else { $_.GetType().Name } }) -join ','
     $text = ''
     if ($value.Count -eq 1) { $text = [string]$value[0] }
-    $results += [pscustomobject]@{ name = $scenario.name; count = $value.Count; types = $types; value = $text; elapsed_ms = $watch.ElapsedMilliseconds }
+    $results += [pscustomobject]@{ name = $scenario.name; count = $value.Count; types = $types; value = $text }
 }
 ConvertTo-Json -InputObject @($results) -Compress
 """
@@ -190,11 +188,11 @@ class ReadinessDiagnosticsTests(unittest.TestCase):
         text = self.log(shell, "instrumented", name).read_text(encoding="utf-8-sig")
         return text, [line for line in text.splitlines() if PREFIX in line]
 
-    def test_every_verdict_and_duration_matches_the_previous_function(self):
+    def test_every_verdict_matches_the_previous_function(self):
         expected = {name: "False" for name in self.scenarios}
         expected["ready"] = "True"
         for shell, _ in self.shells:
-            for name, item in self.scenarios.items():
+            for name in self.scenarios:
                 with self.subTest(shell=shell, scenario=name):
                     old = self.results[(shell, "baseline")][name]
                     new = self.results[(shell, "instrumented")][name]
@@ -202,11 +200,6 @@ class ReadinessDiagnosticsTests(unittest.TestCase):
                         # Exactly one Boolean: a helper that leaked pipeline output would
                         # turn $false into an array, which `-not (...)` reads as ready.
                         self.assertEqual((row["count"], row["types"], row["value"]), (1, "Boolean", expected[name]))
-                    if expected[name] == "False":
-                        for row in (old, new):
-                            self.assertGreaterEqual(row["elapsed_ms"], item["timeout"] * 1000 - 50)
-                            self.assertLess(row["elapsed_ms"], item["timeout"] * 1000 + 3000)
-                    self.assertLess(abs(new["elapsed_ms"] - old["elapsed_ms"]), 1500)
 
     def test_baseline_logs_are_unchanged_lines_only(self):
         for shell, _ in self.shells:

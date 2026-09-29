@@ -32,19 +32,27 @@ function Write-FailureDiagnostics {
     # Diagnostics only (#59), on the failure path, before finally deletes the
     # fixture: the installer's readiness evidence may sit above the log tails,
     # and a bounded snapshot of the machine and the owned processes. Never throws.
+    $diagnostics = @()
     try {
         $sourceLog = Join-Path $data 'source-install.log'
         if (Test-Path -LiteralPath $sourceLog) {
-            $diagnostics = @(Get-Content -LiteralPath $sourceLog | Where-Object { $_ -like '*application readiness diagnostics:*' })
+            $diagnostics = @(Get-Content -LiteralPath $sourceLog -Tail 200 | Where-Object { $_ -like '*application readiness diagnostics:*' })
             Write-Host 'readiness diagnostics (last timeout lines, then the last successful readiness baselines)'
             $diagnostics | Where-Object { $_ -notlike '*result=ready*' } | Select-Object -Last 24 | ForEach-Object { Write-Host $_ }
             $diagnostics | Where-Object { $_ -like '*result=ready*' } | Select-Object -Last 3 | ForEach-Object { Write-Host $_ }
         }
     } catch { Write-Host "[diag] source-install readiness lines unavailable: $($_.Exception.GetType().Name)" }
     try {
-        $owned = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^pythonw?\.exe$' -and $_.CommandLine -and ($_.CommandLine.Contains($installed) -or $_.CommandLine.Contains($legacy)) } | Select-Object -First 6)
+        # The isolated installer's timeout lines already identify its observed
+        # runtime and overlay PIDs. Reuse those instead of an unbounded WMI scan.
+        $pids = New-Object 'System.Collections.Generic.HashSet[int]'
+        foreach ($line in @($diagnostics | Where-Object { $_ -like '*application readiness diagnostics: pids*' } | Select-Object -Last 2)) {
+            foreach ($match in [regex]::Matches($line, '(?:\bruntime|\bhealth\.server|\boverlay)=(\d+)\b')) {
+                [void]$pids.Add([int]$match.Groups[1].Value)
+            }
+        }
         $arguments = @(('"{0}"' -f (Join-Path $root 'tests\timing_diagnostics.py')), 'snapshot', '--label', 'source-install')
-        foreach ($process in $owned) { $arguments += @('--pid', [string]$process.ProcessId) }
+        foreach ($processId in @($pids | Select-Object -First 6)) { $arguments += @('--pid', [string]$processId) }
         $info = New-Object Diagnostics.ProcessStartInfo
         $info.FileName = $PythonPath
         $info.Arguments = $arguments -join ' '

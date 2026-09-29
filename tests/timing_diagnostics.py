@@ -200,15 +200,16 @@ def _process_cpu_100ns(kernel, pid):
 
 def process_state(pid):
     """Bounded facts about one process: state, CPU, memory, handles, I/O. Never raises."""
-    facts = {"pid": int(pid)}
-    kernel = _kernel32()
-    if kernel is None:
-        facts["supported"] = False
-        return facts
-    import ctypes
-    from ctypes import wintypes
-
+    facts = {}
     try:
+        facts["pid"] = int(pid)
+        kernel = _kernel32()
+        if kernel is None:
+            facts["supported"] = False
+            return facts
+        import ctypes
+        from ctypes import wintypes
+
         memory_counters, io_counters, _, _ = _Structs.get()
         access = 0x1000 | 0x0010 | 0x00100000  # QUERY_LIMITED | VM_READ | SYNCHRONIZE
         handle = kernel.OpenProcess(access, False, int(pid))
@@ -253,13 +254,13 @@ def process_state(pid):
 
 def process_table():
     """{pid: (threads, parent pid, exe name)}, plus whether the walk ended normally."""
-    kernel = _kernel32()
     table = {}
-    if kernel is None:
-        return table, "unsupported"
-    import ctypes
-
     try:
+        kernel = _kernel32()
+        if kernel is None:
+            return table, "unsupported"
+        import ctypes
+
         entry_type = _Structs.get()[3]
         snapshot = kernel.CreateToolhelp32Snapshot(0x2, 0)
         if not snapshot or snapshot == ctypes.c_void_p(-1).value:
@@ -286,17 +287,18 @@ def process_table():
 
 def system_snapshot(pids=(), include_names=None):
     """Machine CPU/memory plus CPU deltas for ``pids`` over one short sample. Never raises."""
-    if include_names is None:
-        include_names = os.environ.get("CI", "").lower() == "true"
-    result = {"sample_ms": int(SAMPLE_SECONDS * 1000), "logical_cpus": os.cpu_count() or 0}
-    kernel = _kernel32()
-    if kernel is None:
-        result["supported"] = False
-        return result
-    import ctypes
-    from ctypes import wintypes
-
+    result = {}
     try:
+        if include_names is None:
+            include_names = os.environ.get("CI", "").lower() == "true"
+        result = {"sample_ms": int(SAMPLE_SECONDS * 1000), "logical_cpus": os.cpu_count() or 0}
+        kernel = _kernel32()
+        if kernel is None:
+            result["supported"] = False
+            return result
+        import ctypes
+        from ctypes import wintypes
+
         memory_status = _Structs.get()[2]
 
         def system_times():
@@ -391,13 +393,18 @@ def _probe(argv):
     try:
         out, _ = child.communicate(timeout=PROBE_TIMEOUT_SECONDS)
         return f"rc={child.returncode} in {1000 * (time.monotonic() - start):.0f}ms out={token(out.decode('utf-8', 'replace').strip())}"
-    except subprocess.TimeoutExpired:
-        child.kill()
+    except Exception as error:
+        try:
+            child.kill()
+        except Exception:
+            pass
         try:
             child.communicate(timeout=POST_KILL_WAIT_SECONDS)
-        except subprocess.TimeoutExpired:
-            return f"TIMEOUT>{PROBE_TIMEOUT_SECONDS:.0f}s and not reaped"
-        return f"TIMEOUT>{PROBE_TIMEOUT_SECONDS:.0f}s (killed)"
+        except Exception:
+            return f"{type(error).__name__} and not reaped"
+        if isinstance(error, subprocess.TimeoutExpired):
+            return f"TIMEOUT>{PROBE_TIMEOUT_SECONDS:.0f}s (killed)"
+        return f"error={type(error).__name__} (reaped)"
 
 
 def run_watched(argv, *, timeout, label, expected_stages=(), probe_argv=None, env=None, out=None):
@@ -412,12 +419,21 @@ def run_watched(argv, *, timeout, label, expected_stages=(), probe_argv=None, en
     stream = sys.stdout if out is None else out
 
     def emit(line):
-        print(line, file=stream, flush=True)
+        try:
+            print(line, file=stream, flush=True)
+        except Exception:
+            pass  # an unavailable diagnostic stream cannot change the verdict
 
-    trace_dir = tempfile.mkdtemp(prefix="ac6-diag-")
-    trace_path = os.path.join(trace_dir, "trace.jsonl")
+    try:
+        trace_dir = tempfile.mkdtemp(prefix="ac6-diag-")
+    except Exception:
+        trace_dir = None
+    trace_path = os.path.join(trace_dir, "trace.jsonl") if trace_dir else None
     environment = dict(os.environ if env is None else env)
-    environment[TRACE_ENV] = trace_path
+    if trace_path:
+        environment[TRACE_ENV] = trace_path
+    else:
+        environment.pop(TRACE_ENV, None)
     name = " ".join(os.path.basename(str(part)) for part in argv[:2])
     try:
         launch_wall_ms = time.time() * 1000
@@ -434,18 +450,21 @@ def run_watched(argv, *, timeout, label, expected_stages=(), probe_argv=None, en
                 snapshot = system_snapshot([child.pid])
                 state["cpu_pct_of_one_cpu"] = snapshot.get("watched", {}).get(child.pid)
                 machine = machine_lines(label, snapshot)
-                records, malformed, truncated = read_trace(trace_path)
+                records, malformed, truncated = read_trace(trace_path) if trace_path else ([], 0, False)
                 summary = stage_summary(records, launch_wall_ms, expected_stages)
             except Exception as error:  # evidence is best effort; the verdict is not
                 state, machine, summary = {"error": type(error).__name__}, [], None
                 malformed = truncated = 0
-            child.kill()
             kill_sent = time.monotonic()
             try:
-                child.wait(timeout=POST_KILL_WAIT_SECONDS)
-                cleanup = f"exit observed {1000 * (time.monotonic() - kill_sent):.0f}ms after kill (rc={child.returncode})"
-            except subprocess.TimeoutExpired:
-                cleanup = f"NO exit observed within {POST_KILL_WAIT_SECONDS:.0f}s of kill"
+                child.kill()
+                try:
+                    child.wait(timeout=POST_KILL_WAIT_SECONDS)
+                    cleanup = f"exit observed {1000 * (time.monotonic() - kill_sent):.0f}ms after kill (rc={child.returncode})"
+                except subprocess.TimeoutExpired:
+                    cleanup = f"NO exit observed within {POST_KILL_WAIT_SECONDS:.0f}s of kill"
+            except Exception as error:
+                cleanup = f"kill-error={type(error).__name__}"
             emit(f"{PREFIX} {label}: TIMEOUT after {waited:.1f}s (watchdog {timeout}s) "
                  f"pid={child.pid} popen={popen_ms:.0f}ms cmd={token(name, 80)}")
             if summary is not None:
@@ -459,12 +478,20 @@ def run_watched(argv, *, timeout, label, expected_stages=(), probe_argv=None, en
                 emit(line)
             emit(f"{PREFIX} {label} cleanup: {cleanup}")
             if probe_argv:
+                try:
+                    probe = _probe(probe_argv)
+                except Exception as error:
+                    probe = f"error={type(error).__name__}"
                 emit(f"{PREFIX} {label} probe {token(' '.join(os.path.basename(str(p)) for p in probe_argv), 60)}: "
-                     f"{_probe(probe_argv)}")
+                     f"{probe}")
             raise
         total_ms = 1000 * (time.monotonic() - launch_begin)
-        records, malformed, truncated = read_trace(trace_path)
-        summary = stage_summary(records, launch_wall_ms, expected_stages)
+        try:
+            records, _, _ = read_trace(trace_path) if trace_path else ([], 0, False)
+            summary = stage_summary(records, launch_wall_ms, expected_stages)
+        except Exception:
+            summary = {"reached": "unavailable", "last": "unavailable", "missing": "unavailable",
+                       "details": "diagnostics-unavailable"}
         if returncode:
             emit(f"{PREFIX} {label}: FAILED rc={returncode} after {total_ms:.0f}ms pid={child.pid} "
                  f"popen={popen_ms:.0f}ms cmd={token(name, 80)}")
@@ -475,7 +502,11 @@ def run_watched(argv, *, timeout, label, expected_stages=(), probe_argv=None, en
              f"last={summary['last']} missing={summary['missing']}")
         return subprocess.CompletedProcess(argv, returncode)
     finally:
-        shutil.rmtree(trace_dir, ignore_errors=True)
+        if trace_dir:
+            try:
+                shutil.rmtree(trace_dir, ignore_errors=True)
+            except Exception:
+                pass
 
 
 def main(argv=None):
