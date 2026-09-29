@@ -1,6 +1,6 @@
 # Next session
 
-Last updated: 2026-09-28 JST
+Last updated: 2026-09-29 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
@@ -20,6 +20,7 @@ Issue #6
 ## Current handoff
 
 - Public stable is **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`. PR #33 merged, [main CI passed](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34792826474), public digests and both README one-liner smokes passed. Release bookkeeping advances `main` again; resolve `origin/main` for the current SHA.
+- Current `main` is **`17b42e8c35306024b613d6d8d0ba8968998a6095`** from PR #54, the deterministic #15-0 test-harness closure. [Exact-main CI 36354725793](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36354725793) is **SUCCESS**. PR #54 changed tests/coordination only; production runtime is unchanged.
 - **v1.1.0 is superseded.** Its runtime was accepted and it was published, but its formal release acceptance was never completed: the README one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the published Git blob bytes, so the command failed closed. The tag was not moved and the Release was not edited.
 - v1.1.1 (now superseded by v1.2.0) ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
@@ -42,9 +43,9 @@ Issue #6
   - Owner decisions are in spec §20: BEST STREAK off the always-on Player Overlay, always in Dashboard Overview, independently toggleable in Broadcast (the per-overlay independence of the two visibility settings is amended for future work by decision 10, 2026-09-26); the production 25-win milestone preserved exactly, with its canonical omission kept as a recorded discrepancy; 50-win ≤4.5 s normal / ≤3.0 s reduced motion; solid dark UI-2 shell as baseline with optional, non-blocking Windows 11 Mica proof; and, since 2026-09-23, **Broadcast primary text kept at the current 24 px bold baseline** unless real OBS evidence shows a readability problem (the earlier 28–36 CSS px proposal is not approved).
 - **The source-install CI race is fixed (test-only).** The first exact-main CI of `be77844` failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun passed. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaced the sleep with a bounded 7 s readiness poll matching `launcher.pyw`, and merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`; [exact-main CI 35946104314](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35946104314) passed. Production runtime unchanged; T3 N/A.
 - **Enrichment deadline harness: deterministic test-only correction.** [PR #52](https://github.com/TullysAC6/ac6-winloss-tracker/pull/52) added 2.0 s test headroom to storage T0 and rollback T2; [PR #53](https://github.com/TullysAC6/ac6-winloss-tracker/pull/53) applied it to facade T0 after that third file failed. [Exact-main CI 36329835286](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36329835286) passed at that checkpoint. However, after docs PR #51 merged as `8a693d26f3571aa8d88cde6596b5002c9abc1b1f`, [exact-main CI 36332063475](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36332063475) failed again: Python 3.13 had two expected-success facade `add()` failures with `reason='deadline'`; Python 3.12 (static/PowerShell subset) and 3.14 succeeded. Finite headroom still depended on runner scheduling and was not deterministic.
-  - The deterministic maintenance correction replaces that headroom with `tests/enrichment_test_clock.py`: only the storage module's clock reference is fixed for non-timing assertions; the real `_Deadline` class, facade, serialization and SQLite checks still run. The breadth audit covers both T0 files, rollback T2 children and parent journal recovery, and the manual public rollback seed and installed-candidate visibility checks. Busy-lock and forced-expiry controls explicitly restore the real clock. Production `_BUDGET` remained 0.100 throughout; no product defect was found or production code changed. T3 N/A.
+  - The deterministic maintenance correction was completed in **PR #54** using `tests/enrichment_test_clock.py`: only the storage module clock is fixed for non-timing assertions; real busy-lock and forced-expiry controls restore the real clock. Production `_BUDGET` remained 0.100; product runtime unchanged; T3 N/A.
   - **Rule:** expected-success fixtures must not depend on elapsed wall time at all. Assert `_BUDGET == 0.100`; tests of deadlines explicitly opt back into the real production clock. Inventory all same-pattern locations first, and require exact-head plus exact-main green before saying fixed.
-  - This is #15-0 test-harness closure only. Exact-head review/CI and exact-main CI are required before declaring closure; their final immutable SHAs and runs belong in the maintenance PR and [Issue #6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6), not in a recursive follow-up commit merely to name this document's own merge SHA.
+  - Closure is complete: independent review **GO** on exact head `68d88d6884c1db1a91ba9a586a955b2e8eec48ab`; [exact-head CI 36353522053](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36353522053) **SUCCESS**; merged as `17b42e8c35306024b613d6d8d0ba8968998a6095`; [exact-main CI 36354725793](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36354725793) **SUCCESS**. Public v1.2.0 rollback round trips PASS.
 - **UI-1A (Player Overlay polish) is ACCEPTED + MERGED — UNRELEASED.** [PR #46](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46) exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198` passed real-machine T3 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/pull/46#issuecomment-5831572036)) and merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28`; [exact-main CI 36132227642](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36132227642) passed. Public stable v1.2.0 does not contain it. Details are in `PROJECT_STATE.md`.
   - Player labels stay `WIN / LOSE / 勝率 / 連勝`; BEST left the Player panel only; the Player streak status is user-toggleable (ON with no saved preference), static, and set in a Japanese face; panel opacity defaults to 15%, which the owner accepted.
   - **New settings go into the versioned `preferences.json`, never into `config.json`.** Use a flat scalar key and bump `preferences_version` by one. See [DECISIONS.md](DECISIONS.md#additive-settings-live-in-preferencesjson-configjson-is-frozen).
@@ -90,8 +91,8 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 2. [UI0_DESIGN_SPEC.md](UI0_DESIGN_SPEC.md) is **DESIGN SPEC APPROVED + MERGED** (PR #42, `be77844`).
 3. **UI-1A: ACCEPTED + MERGED — UNRELEASED.** PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; exact-main CI 36132227642 passed.
 4. **UI-1B: ACCEPTED + MERGED — UNRELEASED.** PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; exact-main CI 36230655908 passed.
-5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Exact-main CI run 36315443975 passed on attempt 2 on the unchanged merge SHA; attempt 1 had two Python 3.13 T0 initialization failures, while Python 3.14 passed the full gate path. Those failures were a test-harness deadline coupling, not a product defect. PRs #52/#53 added 2.0 s headroom, but PR #51's exact-main CI exposed its remaining wall-clock dependency; the deterministic test-only correction and closure gates are recorded above. T3 was N/A because the slice is dormant: ordinary startup does not access `enrichment.db`.
-6. **Next inside #15 is #15-1, then the remaining #15 recognition/data slices; only after #15 completes do #28-A and UI-2 follow. #15-1 is not started or authorized.** The same applies to the shared visibility settings and Player personalization. Until the owner explicitly authorizes one of them:
+5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Its deadline-sensitive test-harness follow-up is fully closed by PR #54 (`17b42e8`), with exact-head CI 36353522053 and exact-main CI 36354725793 both SUCCESS. Production runtime unchanged; T3 N/A for the dormant #15-0 slice.
+6. **#15-1 is START AUTHORIZED / IN PROGRESS; remaining #15 is not authorized.** [PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55) is open as Draft on exact head `ae6a1e3a36e6d7e2ede257afa6f697865af4f085`, based on `main` `17b42e8`. It implements only dormant `match_type` / `match_format` persistence and sidecar v1→v2 upgrade. [Windows CI 36401134171](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36401134171) is SUCCESS on Python 3.12 / 3.13 / 3.14 plus aggregate. Independent review has not yet occurred; T3 is provisional N/A; Accepted NO · Merged NO · Released NO. The owner authorization permits the gated flow through #15-1 only and explicitly requires **STOP after #15-1**. #15-2 / remaining recognition, #28-A, UI-2 and release work are not authorized. The same remains true for shared visibility settings and Player personalization. Until separately authorized:
    - do not create its branch or worktree;
    - do not bump `preferences_version`, add a setting, or migrate `player_streak_status_enabled` / `broadcast_show_best_streak`;
    - do not change milestone behaviour.
@@ -100,7 +101,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PR #40, documentation PRs #41 / #42 / #44 / #45 / #47, test-only PRs #43 / #52 / #53, UI-1A PR #46, UI-1B PR #48 and #15-0 PR #50 are merged. No product generation is active.
+At most two unmerged generations exist at a time (§4). PRs through #54 that precede the current slice are merged. **One product generation is active: #15-1 / PR #55.** No later product generation is authorized.
 
 ## Order after that — dependency, not preference
 
@@ -110,18 +111,18 @@ v1.2.0, PR #13, PR #5, PR #35, PR #40, PR #46, PR #48 and PR #50 are complete at
 
 ```text
 ✓ UI-0 → ✓ UI-1A (merged, unreleased) → ✓ UI-1B (merged, unreleased) → ✓ #15-0 (merged, unreleased)
-→ #15-1 / remaining #15 → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12
+→ #15-1 [IN PROGRESS] → STOP / remaining #15 [NOT AUTHORIZED] → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12
 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 
 Four placements in it are load-bearing and will look wrong to anyone reading only the phase tables:
 
-- **#15-1 / remaining #15 → #28-A → UI-2.** #15-0 only establishes the dormant optional-storage foundation. The remaining #15 slices supply the actual match / observation contracts and timestamps; #28-A then settles catalog reconciliation and derived Season assignment; only then does UI-2 add Settings manual refresh and History Season state.
+- **#15-1 → STOP / remaining #15 → #28-A → UI-2.** #15-0 only establishes the dormant optional-storage foundation. #15-1 supplies dormant match-category persistence only. Later #15 slices must separately settle recognition / Rank / Rating / observation contracts and timestamps before #28-A can settle catalog reconciliation and derived Season assignment; only then does UI-2 add Settings manual refresh and History Season state. The dependency order does not authorize those later slices.
 - **#16 owns the data, #25 owns the charts.** #16 computes periods, rolling win rate, per-season rank/rating series, deltas and achievements. UI-3A / UI-3B render them. Neither implements the other's half.
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PRs #40 to #53 are all merged, including this bookkeeping PR #51. No product generation is active.
+At most two unmerged generations exist at a time (§4). PRs #40 through #54 are merged. **#15-1 / PR #55 is the one active product generation.** No remaining #15 slice or later phase starts without separate owner authorization.
 
 ## What is newly recorded and must not be lost
 
