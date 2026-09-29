@@ -28,6 +28,37 @@ function Assert-NoOwnedProcess {
     if ($owned.Count) { throw "Owned processes remain: $($owned.ProcessId -join ',')" }
 }
 function Read-Runtime { Get-Content -LiteralPath (Join-Path $data '.runtime.json') -Raw | ConvertFrom-Json }
+function Write-FailureDiagnostics {
+    # Diagnostics only (#59), on the failure path, before finally deletes the
+    # fixture: the installer's readiness evidence may sit above the log tails,
+    # and a bounded snapshot of the machine and the owned processes. Never throws.
+    try {
+        $sourceLog = Join-Path $data 'source-install.log'
+        if (Test-Path -LiteralPath $sourceLog) {
+            $diagnostics = @(Get-Content -LiteralPath $sourceLog | Where-Object { $_ -like '*application readiness diagnostics:*' })
+            Write-Host 'readiness diagnostics (last timeout lines, then the last successful readiness baselines)'
+            $diagnostics | Where-Object { $_ -notlike '*result=ready*' } | Select-Object -Last 24 | ForEach-Object { Write-Host $_ }
+            $diagnostics | Where-Object { $_ -like '*result=ready*' } | Select-Object -Last 3 | ForEach-Object { Write-Host $_ }
+        }
+    } catch { Write-Host "[diag] source-install readiness lines unavailable: $($_.Exception.GetType().Name)" }
+    try {
+        $owned = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^pythonw?\.exe$' -and $_.CommandLine -and ($_.CommandLine.Contains($installed) -or $_.CommandLine.Contains($legacy)) } | Select-Object -First 6)
+        $arguments = @(('"{0}"' -f (Join-Path $root 'tests\timing_diagnostics.py')), 'snapshot', '--label', 'source-install')
+        foreach ($process in $owned) { $arguments += @('--pid', [string]$process.ProcessId) }
+        $info = New-Object Diagnostics.ProcessStartInfo
+        $info.FileName = $PythonPath
+        $info.Arguments = $arguments -join ' '
+        $info.UseShellExecute = $false
+        $snapshot = [Diagnostics.Process]::Start($info)
+        try {
+            if (-not $snapshot.WaitForExit(20000)) {
+                $snapshot.Kill()
+                [void]$snapshot.WaitForExit(5000)
+                Write-Host '[diag] source-install snapshot did not finish within 20 s'
+            }
+        } finally { $snapshot.Dispose() }
+    } catch { Write-Host "[diag] source-install snapshot unavailable: $($_.Exception.GetType().Name)" }
+}
 function Stop-FixtureProcess {
     param($ProcessInfo)
     if (-not $ProcessInfo -or -not $ProcessInfo.CommandLine -or
@@ -421,6 +452,7 @@ function Invoke-WebRequest {
     foreach ($log in @(@(Get-ChildItem -LiteralPath $fixture -File -Filter '*.err' -ErrorAction SilentlyContinue).FullName + (Join-Path $fixture 'last-install.log'), (Join-Path $data 'source-install.log'), (Join-Path $data 'startup.log'), (Join-Path $data 'dashboard.log'))) {
         if (Test-Path -LiteralPath $log) { Write-Host (Split-Path -Leaf $log); Get-Content -LiteralPath $log -Tail 18 | ForEach-Object { Write-Host $_ } }
     }
+    Write-FailureDiagnostics
     throw
 } finally {
     # All targets are verified descendants of this unique fixture directory.

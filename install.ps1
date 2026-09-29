@@ -1115,31 +1115,264 @@ function Restore-PreviousSource {
     $script:sourceSwapped = $false
 }
 
+# Readiness diagnostics (maintenance issue #59). Diagnostics only: these helpers
+# record what Wait-AppRuntimeReady observed, so a timeout says which condition
+# failed. Every helper catches its own errors and emits nothing to the pipeline,
+# and every call site discards output with $null = ... . They never log a token,
+# a nonce value or the raw runtime file, and they never change the loop's
+# conditions, sleeps, deadline or result. tests/test_timing_diagnostics.py proves
+# that the function minus its diagnostic statements is the previous function.
+function ConvertTo-ReadinessToken {
+    param($Value, [int]$Limit = 24)
+    try {
+        if ($null -eq $Value) { return '-' }
+        $text = ([string]$Value) -replace '[^A-Za-z0-9_.:-]', '_'
+        if ($text.Length -gt $Limit) { $text = $text.Substring(0, $Limit) }
+        if ($text.Length -eq 0) { return '-' }
+        return $text
+    } catch { return '?' }
+}
+
+function Get-ReadinessField {
+    param($Object, [string[]]$Path)
+    try {
+        $value = $Object
+        foreach ($name in $Path) {
+            if ($null -eq $value) { return $null }
+            $property = $value.PSObject.Properties[$name]
+            if ($null -eq $property) { return $null }
+            $value = $property.Value
+        }
+        return $value
+    } catch { return $null }
+}
+
+function Get-ReadinessHealthSummary {
+    param($Health)
+    try {
+        $fields = @(
+            @('ok', 'bool'), @('server.pid', 'int'), @('overlay.ok', 'bool'), @('overlay.state', 'word'),
+            @('overlay.pid', 'int'), @('overlay.server_pid', 'int'), @('overlay.heartbeat_age', 'number'),
+            @('detector.ok', 'bool'), @('detector.status', 'word'), @('dashboard.open', 'bool'))
+        $parts = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($field in $fields) {
+            $value = Get-ReadinessField $Health ($field[0] -split '\.')
+            $text = '-'
+            if ($null -ne $value) {
+                try {
+                    if ($field[1] -eq 'bool') { $text = [string][bool]$value }
+                    elseif ($field[1] -eq 'int') { $text = [string][int64]$value }
+                    elseif ($field[1] -eq 'number') { $text = ([double]$value).ToString('0.###', [Globalization.CultureInfo]::InvariantCulture) }
+                    else { $text = ConvertTo-ReadinessToken $value }
+                } catch { $text = '?' }
+            }
+            $parts.Add(('{0}={1}' -f $field[0], $text))
+        }
+        return ($parts -join ' ')
+    } catch { return 'unavailable' }
+}
+
+function Get-ReadinessErrorCategory {
+    param($ErrorRecord, [string]$Stage)
+    try {
+        $exception = $ErrorRecord.Exception
+        $status = $null
+        try { $status = [int]$exception.Response.StatusCode } catch { $status = $null }
+        if ($status) { return ('http-{0}' -f $status) }
+        $webStatus = $null
+        $inner = $exception
+        for ($depth = 0; $depth -lt 6 -and $null -ne $inner; $depth++) {
+            $typeName = $inner.GetType().Name
+            if ($typeName -eq 'SocketException') { return ('socket-{0}' -f $inner.SocketErrorCode) }
+            if ($typeName -eq 'TimeoutException' -or $typeName -eq 'TaskCanceledException') { return 'http-timeout' }
+            if ($typeName -eq 'WebException' -and $null -eq $webStatus) { $webStatus = [string]$inner.Status }
+            $inner = $inner.InnerException
+        }
+        if ($webStatus) { return ('web-{0}' -f (ConvertTo-ReadinessToken $webStatus)) }
+        if ($exception.GetType().Name -eq 'ProcessCommandException') { return 'process-not-found' }
+        return ('{0}-error:{1}' -f $Stage, (ConvertTo-ReadinessToken $exception.GetType().Name 40))
+    } catch { return 'unclassified' }
+}
+
+function Add-ReadinessOutcome {
+    param($State, [string]$Outcome)
+    try {
+        $State.Last = $Outcome
+        if ($State.Counts.ContainsKey($Outcome)) { $State.Counts[$Outcome] = $State.Counts[$Outcome] + 1 }
+        elseif ($State.Counts.Count -lt 16) { $State.Counts[$Outcome] = 1 }
+    } catch { }
+}
+
+function Set-ReadinessStage {
+    param($State, [string]$Stage)
+    try {
+        $order = @('none', 'runtime-file', 'runtime-parsed', 'nonce-matched', 'pid-port-valid', 'process-alive', 'http-response', 'health-ok')
+        $State.Stage = $Stage
+        if (-not $State.First.ContainsKey($Stage)) { $State.First[$Stage] = $State.Watch.ElapsedMilliseconds }
+        if ([array]::IndexOf($order, $Stage) -gt [array]::IndexOf($order, $State.Best)) { $State.Best = $Stage }
+    } catch { }
+}
+
+function Set-ReadinessHealth {
+    param($State, $Health)
+    try {
+        $State.LastHealth = Get-ReadinessHealthSummary $Health
+        $State.HealthServerPid = Get-ReadinessField $Health @('server', 'pid')
+        $State.OverlayPid = Get-ReadinessField $Health @('overlay', 'pid')
+        $State.OverlayServerPid = Get-ReadinessField $Health @('overlay', 'server_pid')
+    } catch { }
+}
+
+function New-ReadinessDiagnostic {
+    try {
+        return @{
+            Watch = [Diagnostics.Stopwatch]::StartNew(); WallStart = [DateTime]::UtcNow; Attempts = 0
+            Stage = 'none'; Best = 'none'; Last = 'none'; First = @{}; Counts = @{}; LastHealth = $null
+            ObservedPid = $null; ObservedPort = $null; HealthServerPid = $null; OverlayPid = $null; OverlayServerPid = $null
+        }
+    } catch { return $null }
+}
+
+function Add-ReadinessDiagnostic {
+    param($State, [string]$Stage, $Runtime = $null, $Response = $null, $Health = $null, $ErrorRecord = $null)
+    try {
+        if ($null -eq $State) { return }
+        if ($Stage -eq 'attempt') {
+            $State.Attempts = $State.Attempts + 1
+            $State.Stage = 'none'
+            return
+        }
+        if ($Stage -eq 'nonce') {
+            # The nonce value is never recorded: only whether it was absent, empty or different.
+            $outcome = 'nonce-mismatch'
+            try {
+                $property = $Runtime.PSObject.Properties['install_nonce']
+                if ($null -eq $property) { $outcome = 'nonce-missing' }
+                elseif ([string]::IsNullOrEmpty([string]$property.Value)) { $outcome = 'nonce-empty' }
+            } catch { $outcome = 'nonce-unreadable' }
+            Add-ReadinessOutcome $State $outcome
+            return
+        }
+        if ($Stage -eq 'error') {
+            $outcome = Get-ReadinessErrorCategory $ErrorRecord $State.Stage
+            Add-ReadinessOutcome $State $outcome
+            if ($outcome -like 'http-*' -and $outcome -ne 'http-timeout') {
+                # A 503 is an answer: the server responded, with its reason in the body.
+                Set-ReadinessStage $State 'http-response'
+                try {
+                    $body = $ErrorRecord.ErrorDetails.Message
+                    if ($body) { Set-ReadinessHealth $State ($body | ConvertFrom-Json) }
+                } catch { }
+            }
+            return
+        }
+        Set-ReadinessStage $State $Stage
+        if ($null -ne $Runtime) {
+            $State.ObservedPid = Get-ReadinessField $Runtime @('pid')
+            $State.ObservedPort = Get-ReadinessField $Runtime @('port')
+        }
+        if ($Stage -eq 'http-response') {
+            $code = '?'
+            try { $code = [int]$Response.StatusCode } catch { }
+            Add-ReadinessOutcome $State ('http-{0}' -f $code)
+            Set-ReadinessHealth $State $Health
+        }
+    } catch { }
+}
+
+function Get-ReadinessProcessFacts {
+    param($ProcessId)
+    try {
+        if ($null -eq $ProcessId -or [int64]$ProcessId -le 0) { return 'pid=-' }
+        $process = Get-Process -Id ([int]$ProcessId) -ErrorAction Stop
+        $invariant = [Globalization.CultureInfo]::InvariantCulture
+        $cpu = '-'
+        try { $cpu = $process.TotalProcessorTime.TotalSeconds.ToString('0.00', $invariant) } catch { }
+        $age = '-'
+        try { $age = ((Get-Date) - $process.StartTime).TotalSeconds.ToString('0.0', $invariant) } catch { }
+        $threads = '-'
+        try { $threads = $process.Threads.Count } catch { }
+        $handles = '-'
+        try { $handles = $process.HandleCount } catch { }
+        $workingSet = '-'
+        try { $workingSet = ($process.WorkingSet64 / 1MB).ToString('0.0', $invariant) } catch { }
+        return ('pid={0} alive cpu_s={1} ws_mb={2} threads={3} handles={4} age_s={5}' -f [int]$ProcessId, $cpu, $workingSet, $threads, $handles, $age)
+    } catch { return ('pid={0} not-found' -f (ConvertTo-ReadinessToken $ProcessId)) }
+}
+
+function Get-ReadinessLauncherFacts {
+    try {
+        $process = $script:launcherProcess
+        if ($null -eq $process) { return 'none' }
+        if ($process.HasExited) { return ('pid={0} exited exit_code={1}' -f $process.Id, $process.ExitCode) }
+        return ('pid={0} running' -f $process.Id)
+    } catch { return 'unavailable' }
+}
+
+function Write-ReadinessDiagnostic {
+    param($State, [string]$Result)
+    try {
+        if ($null -eq $State) { return }
+        $prefix = 'application readiness diagnostics:'
+        if ($Result -eq 'ready') { Set-ReadinessStage $State 'health-ok' }
+        $firstParts = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($stage in @('runtime-file', 'runtime-parsed', 'nonce-matched', 'pid-port-valid', 'process-alive', 'http-response', 'health-ok')) {
+            if ($State.First.ContainsKey($stage)) { $firstParts.Add(('{0}={1}' -f $stage, $State.First[$stage])) }
+            else { $firstParts.Add(('{0}=-' -f $stage)) }
+        }
+        $outcomeParts = New-Object 'System.Collections.Generic.List[string]'
+        foreach ($key in @($State.Counts.Keys | Sort-Object)) { $outcomeParts.Add(('{0}:{1}' -f $key, $State.Counts[$key])) }
+        $outcomes = 'none'
+        if ($outcomeParts.Count -gt 0) { $outcomes = $outcomeParts -join ',' }
+        $wallElapsed = [int64]([DateTime]::UtcNow - $State.WallStart).TotalMilliseconds
+        $headline = '{0} result={1} elapsed_ms={2} wall_elapsed_ms={3} attempts={4} best_stage={5} last_outcome={6} first_ms {7} outcomes {8}' -f $prefix, $Result, $State.Watch.ElapsedMilliseconds, $wallElapsed, $State.Attempts, $State.Best, $State.Last, ($firstParts -join ' '), $outcomes
+        Write-InstallLog $headline
+        if ($Result -ne 'ready') {
+            $lastHealth = 'none'
+            if ($State.LastHealth) { $lastHealth = $State.LastHealth }
+            Write-InstallLog ('{0} pids runtime={1} port={2} health.server={3} overlay={4} overlay.server={5} launcher={6}' -f $prefix, (ConvertTo-ReadinessToken $State.ObservedPid), (ConvertTo-ReadinessToken $State.ObservedPort), (ConvertTo-ReadinessToken $State.HealthServerPid), (ConvertTo-ReadinessToken $State.OverlayPid), (ConvertTo-ReadinessToken $State.OverlayServerPid), (Get-ReadinessLauncherFacts))
+            Write-InstallLog ('{0} last_health {1}' -f $prefix, $lastHealth)
+            Write-InstallLog ('{0} process server {1}' -f $prefix, (Get-ReadinessProcessFacts $State.ObservedPid))
+            Write-InstallLog ('{0} process overlay {1}' -f $prefix, (Get-ReadinessProcessFacts $State.OverlayPid))
+        }
+    } catch { }
+}
+
 function Wait-AppRuntimeReady {
     param([int]$TimeoutSeconds = 15)
 
     $runtimePath = Join-Path $dataPath '.runtime.json'
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    $readinessDiagnostic = New-ReadinessDiagnostic
     while ([DateTime]::UtcNow -lt $deadline) {
+        $null = Add-ReadinessDiagnostic $readinessDiagnostic 'attempt'
         try {
             if (Test-Path -LiteralPath $runtimePath -PathType Leaf) {
+                $null = Add-ReadinessDiagnostic $readinessDiagnostic 'runtime-file'
                 $runtime = Get-Content -LiteralPath $runtimePath -Raw -ErrorAction Stop | ConvertFrom-Json
+                $null = Add-ReadinessDiagnostic $readinessDiagnostic 'runtime-parsed' -Runtime $runtime
                 $runtimePid = [int]$runtime.pid
                 $runtimePort = [int]$runtime.port
                 if (-not $runtime.PSObject.Properties['install_nonce'] -or $runtime.install_nonce -cne $script:installNonce) {
+                    $null = Add-ReadinessDiagnostic $readinessDiagnostic 'nonce' -Runtime $runtime
                     Start-Sleep -Milliseconds 100
                     continue
                 }
+                $null = Add-ReadinessDiagnostic $readinessDiagnostic 'nonce-matched'
                 if ($runtimePid -gt 0 -and $runtimePort -ge 1 -and $runtimePort -le 65535) {
+                    $null = Add-ReadinessDiagnostic $readinessDiagnostic 'pid-port-valid'
                     $runtimeProcess = Get-Process -Id $runtimePid -ErrorAction Stop
                     if ($runtimeProcess -and -not $runtimeProcess.HasExited) {
+                        $null = Add-ReadinessDiagnostic $readinessDiagnostic 'process-alive'
                         $response = Invoke-WebRequest -Uri ("http://127.0.0.1:{0}/health" -f $runtimePort) -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
                         $health = $response.Content | ConvertFrom-Json
+                        $null = Add-ReadinessDiagnostic $readinessDiagnostic 'http-response' -Response $response -Health $health
                         if ([int]$response.StatusCode -eq 200 -and $health.ok -eq $true) {
                             Write-InstallLog "application runtime path: $runtimePath"
                             Write-InstallLog "application runtime PID: $runtimePid"
                             Write-InstallLog "application runtime port: $runtimePort"
                             Write-InstallLog 'application HTTP /health status: 200; overall health ready'
+                            $null = Write-ReadinessDiagnostic $readinessDiagnostic 'ready'
                             return $true
                         }
                     }
@@ -1147,10 +1380,12 @@ function Wait-AppRuntimeReady {
             }
         } catch {
             # Startup is asynchronous. Keep polling until the deadline.
+            $null = Add-ReadinessDiagnostic $readinessDiagnostic 'error' -ErrorRecord $_
         }
         Start-Sleep -Milliseconds 250
     }
     Write-InstallLog "application runtime readiness timed out after $TimeoutSeconds seconds"
+    $null = Write-ReadinessDiagnostic $readinessDiagnostic 'timeout'
     return $false
 }
 
