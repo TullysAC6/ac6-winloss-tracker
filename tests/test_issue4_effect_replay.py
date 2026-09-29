@@ -4,7 +4,6 @@ import http.client
 import os
 import queue
 import shutil
-import subprocess
 import socket
 import sys
 import time
@@ -16,7 +15,11 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests"))
 from event_bus import EventBus
+from timing_diagnostics import run_watched
+
+OVERLAY_JS_STAGES = ("entry", "source_loaded", "vm_start", "vm_done", "assertions_done", "exit")
 
 
 def effect(n, created=100000):
@@ -86,7 +89,10 @@ class ReplayTests(unittest.TestCase):
             # suite instead of an unrelated hard failure.
             self.assertFalse(os.environ.get("CI"), "Node.js is required to execute overlay.html regression")
             self.skipTest("Node.js not found; set AC6_TEST_NODE to run the overlay.html regression")
-        subprocess.run([node, str(Path(__file__).with_name("test_issue4_overlay.js"))], check=True, timeout=15)
+        # Same 15 s watchdog and verdicts as subprocess.run(check=True); the
+        # wrapper only records stage and process evidence (maintenance #59).
+        run_watched([node, str(Path(__file__).with_name("test_issue4_overlay.js"))], timeout=15,
+                    label="overlay.js", expected_stages=OVERLAY_JS_STAGES, probe_argv=[node, "--version"])
 
     @patch("time.monotonic", return_value=100)
     @patch("time.time", return_value=100)

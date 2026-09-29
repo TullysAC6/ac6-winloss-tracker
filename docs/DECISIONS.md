@@ -379,6 +379,58 @@ the field most often omitted.
 
 ---
 
+## An unexplained timeout is instrumented before it is changed
+
+**Decision (2026-09-29, maintenance [#59](https://github.com/TullysAC6/ac6-winloss-tracker/issues/59)):
+when a timeout fails on unchanged code and an unchanged rerun passes, the next step is to retain
+evidence. Timeouts, sleeps, retries and assertions stay as they are until that evidence shows where
+the time went.**
+
+- Two Python 3.14 CI jobs each ran out of a 15-second window on unchanged code: `install.ps1`
+  readiness and the T0 Node watchdog. Neither log could say which condition failed.
+- The instrumentation leaves every verdict unchanged:
+  - The watchdog, readiness deadline, sleeps and results are untouched.
+  - `tests/test_timing_diagnostics.py` pins `Wait-AppRuntimeReady` minus its diagnostic
+    statements to the previous function.
+  - Diagnostics are bounded and never raise.
+  - They never log a token, a nonce or the raw runtime file.
+  - A full report is written only on a timeout or failure path. Success adds one line.
+- Evidence to read next time:
+  - `[diag]` lines in T0 output: stages reached, child state and CPU before the kill, the
+    machine, and a second launch probe.
+  - `application readiness diagnostics:` lines in `source-install.log` or the source-install CI
+    step: the best stage, outcome counts, the health summary and our own processes.
+- A rerun that passes is recorded as unchanged-rerun success, not as a fix or a proven flake.
+
+Why: a longer timeout or an automatic retry would hide the next occurrence without any reason to
+believe it fixed anything. PRs #52/#53 → #54 showed that finite headroom does not make
+wall-clock-dependent tests deterministic.
+
+### PR #60 initial CI failure and correction
+
+The first exact-head run, [36585510001](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36585510001)
+on `9df190a1`, failed on Python 3.13 and 3.14 in the new
+`test_every_verdict_and_duration_matches_the_previous_function` test. It required a
+failed readiness scenario to finish before `timeout * 1000 + 3000` ms (4000 ms for
+the one-second fixtures); the 503 scenario took 4625 and 5459 ms. This was a
+**test-design defect in PR #60**, not evidence of a product readiness regression.
+The runner's scheduling time is not a readiness result. Raising the 3000 ms
+allowance would repeat the finite-headroom mistake from #52/#53.
+
+The replacement evidence is deterministic: the previous function is pinned and
+compared with the instrumented function after removing only the diagnostic
+statements; the old and new functions each return exactly one Boolean with the
+same verdict across the isolated failure and success scenarios; static tests pin
+the 15-second call site, deadline, sleeps, conditions and rollback trigger.
+The Node runner's success, nonzero exit and timeout exceptions, diagnostic
+failure isolation, redaction and process cleanup have direct tests. No new test
+makes correctness depend on a finite allowance around measured wall time.
+Issue #59 already excluded arbitrary timeout and assertion increases, and #54
+provided the precedent. The initial assertion was an implementation miss, not
+a gap in the owner's instruction.
+
+---
+
 ## Performance and security regressions are measured, not asserted
 
 **Decision: significant recognition / telemetry / analytics changes are compared against a baseline.**
