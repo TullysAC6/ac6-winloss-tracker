@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from enrichment_store import (_BATCH, _Binding, _Deadline, _Store, _Unavailable,
-                              _connection, _key, _time_bits)
+                              _connection, _key, _metadata, _time_bits)
 
-__all__ = ("OptionalEnrichmentService", "EnrichmentHealth", "Response", "BindingTicket")
+__all__ = ("OptionalEnrichmentService", "EnrichmentHealth", "Response", "BindingTicket", "MatchMetadata")
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,14 @@ class BindingTicket:
 
 
 @dataclass(frozen=True)
+class MatchMetadata:
+    """Explicit category values; no recognition or inference is performed."""
+    event_id: str
+    match_type: str = "unknown"
+    match_format: str = "unknown"
+
+
+@dataclass(frozen=True)
 class Response:
     status: str
     health: EnrichmentHealth
@@ -44,6 +52,7 @@ class Response:
     examined: int = 0
     deleted: int = 0
     pass_complete: bool = False
+    metadata: tuple[MatchMetadata, ...] = ()
 
 
 def _ids(values):
@@ -198,21 +207,78 @@ class OptionalEnrichmentService:
             return Response("prepared", EnrichmentHealth("ready"), ticket=ticket, stamp=stamp)
         return self._call(work)
 
+    def _binding_for_write(self, ticket, deadline, stamp):
+        if not isinstance(ticket, BindingTicket) or (ticket.activation, ticket.revision) != stamp:
+            raise _Unavailable("stale")
+        binding = _Binding.from_row(ticket.binding.values())
+        parent = self._parents((binding.event_id,), deadline).get(binding.event_id)
+        if parent is not None and parent != binding:
+            raise _Unavailable("identity_mismatch")
+        if not self._current(stamp):
+            raise _Unavailable("stale")
+        return binding if parent is not None else None
+
     def save_binding(self, ticket, *, create_missing=False):
         def work(deadline, stamp):
-            if not isinstance(ticket, BindingTicket) or (ticket.activation, ticket.revision) != stamp:
-                raise _Unavailable("stale")
-            binding = _Binding.from_row(ticket.binding.values())
-            parent = self._parents((binding.event_id,), deadline).get(binding.event_id)
-            if parent is None:
+            binding = self._binding_for_write(ticket, deadline, stamp)
+            if binding is None:
                 return Response("unknown", EnrichmentHealth("ready", cleanup="pending"), stamp=stamp)
-            if parent != binding:
-                raise _Unavailable("identity_mismatch")
-            if not self._current(stamp):
-                raise _Unavailable("stale")
             if create_missing is True:
                 self._store.initialize(deadline)
             self._store.save(binding, deadline)
+            return Response("saved", EnrichmentHealth("ready", writable=True), stamp=stamp)
+        return self._call(work)
+
+    def upgrade_storage(self):
+        """Opt in to atomic v1 -> v2 migration; reads never migrate a store."""
+        def work(deadline, stamp):
+            self._store.upgrade(deadline)
+            return Response("ready", EnrichmentHealth("ready", writable=True), stamp=stamp)
+        return self._call(work)
+
+    def lookup_metadata(self, event_id):
+        return self.lookup_metadata_many([event_id])
+
+    def lookup_metadata_many(self, event_ids):
+        """Return only parent-checked bindings; absent/unbound metadata is unknown.
+
+        As with lookup_many(), consumers must honor stamps/invalidate_history.
+        Empty metadata is not evidence for any concrete category.
+        """
+        def work(deadline, stamp):
+            ids = _ids(event_ids)
+            rows = self._store.read_metadata(ids, deadline)
+            parents = self._parents(ids, deadline)
+            visible = tuple(MatchMetadata(binding.event_id, *values) for binding, values in rows
+                            if parents.get(binding.event_id) == binding)
+            mismatch = any(binding.event_id in parents and parents[binding.event_id] != binding
+                           for binding, _ in rows)
+            health = EnrichmentHealth("degraded" if mismatch else "ready",
+                                      "identity_mismatch" if mismatch else "",
+                                      "pending" if len(visible) != len(rows) else "unknown")
+            return Response("visible" if visible else "unknown", health, stamp=stamp, metadata=visible)
+        return self._call(work)
+
+    def save_metadata(self, ticket, metadata, *, expected, create_missing=False):
+        """Atomically store explicit values for a checked binding.
+
+        expected is the caller's prior MatchMetadata (unknown/unknown if absent).
+        A different current value rejects with metadata_conflict; equal target
+        values are idempotent retries. This does not decide recognition precedence.
+        Existing v1 files require a separate explicit upgrade_storage() call.
+        """
+        def work(deadline, stamp):
+            binding = self._binding_for_write(ticket, deadline, stamp)
+            if binding is None:
+                return Response("unknown", EnrichmentHealth("ready", cleanup="pending"), stamp=stamp)
+            if (not isinstance(metadata, MatchMetadata) or not isinstance(expected, MatchMetadata)
+                    or metadata.event_id != binding.event_id or expected.event_id != binding.event_id):
+                raise _Unavailable("invalid_metadata")
+            values = _metadata((metadata.match_type, metadata.match_format))
+            prior = _metadata((expected.match_type, expected.match_format))
+            if create_missing is True:
+                self._store.initialize(deadline)
+            self._store.save_metadata(binding, values, prior, deadline)
             return Response("saved", EnrichmentHealth("ready", writable=True), stamp=stamp)
         return self._call(work)
 

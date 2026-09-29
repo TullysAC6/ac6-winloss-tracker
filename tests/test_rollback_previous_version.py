@@ -29,8 +29,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-# Dormant #15-0 builds on the exact main after UI-1B bookkeeping (PR #49).
-PREVIOUS_VERSION = "8d91588bf8057a5756a40cc0d1a98521f7bd00c4"
+# Dormant #15-1 builds on accepted #15-0 plus its deterministic harness closure.
+PREVIOUS_VERSION = "17b42e8c35306024b613d6d8d0ba8968998a6095"
 KEY = "player_streak_status_enabled"
 BROADCAST = "broadcast_show_best_streak"
 # This generation adds no preference: both builds understand the same v2 keys.

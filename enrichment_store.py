@@ -1,4 +1,4 @@
-"""Private v1 sidecar mechanics. Importing this module performs no file access.
+"""Private v1/v2 sidecar mechanics. Importing performs no file access.
 
 Only optional_enrichment may use this module in product code. In particular,
 these unfiltered rows are NOT a history, statistics or export API.
@@ -18,7 +18,7 @@ from pathlib import Path
 
 __all__ = ()
 _APPLICATION_ID = 0x41433645
-_VERSION = 1
+_VERSION = 2
 _MAX_PAGES = 16384
 _PAGE_SIZE = 4096
 _BATCH = 64
@@ -47,6 +47,14 @@ _DDL = (
                AND length(after_event_id) BETWEEN 1 AND 128
                AND instr(after_event_id, char(0)) = 0))
 )""",
+    """CREATE TABLE match_metadata (
+    event_id TEXT COLLATE BINARY PRIMARY KEY NOT NULL
+        REFERENCES match_bindings(event_id) ON DELETE CASCADE,
+    match_type TEXT NOT NULL
+        CHECK(typeof(match_type) = 'text' AND match_type IN ('ranked', 'custom', 'unknown')),
+    match_format TEXT NOT NULL
+        CHECK(typeof(match_format) = 'text' AND match_format IN ('single', 'team', 'unknown'))
+)""",
 )
 
 
@@ -67,6 +75,14 @@ def _time_bits(value):
     if type(value) not in (float, int) or not math.isfinite(value) or value < 0:
         raise _Unavailable("invalid_witness")
     return struct.pack(">d", float(value))
+
+
+def _metadata(values):
+    match_type, match_format = values
+    if (type(match_type) is not str or match_type not in ("ranked", "custom", "unknown")
+            or type(match_format) is not str or match_format not in ("single", "team", "unknown")):
+        raise _Unavailable("invalid_metadata")
+    return match_type, match_format
 
 
 @dataclass(frozen=True)
@@ -135,6 +151,9 @@ def _connection(path: Path, deadline: _Deadline, *, write=False):
     try:
         deadline.configure(connection)
         connection.execute("PRAGMA trusted_schema=OFF")
+        connection.execute("PRAGMA foreign_keys=ON")
+        if connection.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+            raise _Unavailable("storage_format")
         # Extension loading is disabled by sqlite3 by default and is never enabled.
         if not write:
             connection.execute("PRAGMA query_only=ON")
@@ -171,14 +190,15 @@ class _Store:
         if len(header) != 100 or header[:16] != b"SQLite format 3\0":
             raise _Unavailable("corrupt")
         if (int.from_bytes(header[68:72], "big") != _APPLICATION_ID
-                or int.from_bytes(header[60:64], "big") != _VERSION):
+                or int.from_bytes(header[60:64], "big") not in (1, _VERSION)):
             raise _Unavailable("unsupported_format", "incompatible")
         if header[18:20] != b"\x01\x01":
             raise _Unavailable("unsupported_journal", "incompatible")
 
     def _validate(self, connection):
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
         if (connection.execute("PRAGMA application_id").fetchone()[0] != _APPLICATION_ID
-                or connection.execute("PRAGMA user_version").fetchone()[0] != _VERSION):
+                or version not in (1, _VERSION)):
             raise _Unavailable("unsupported_format", "incompatible")
         if (connection.execute("PRAGMA page_size").fetchone()[0] != _PAGE_SIZE
                 or connection.execute("PRAGMA page_count").fetchone()[0] > _MAX_PAGES
@@ -189,7 +209,10 @@ class _Store:
             ("table", "maintenance_state", "maintenance_state"): _DDL[1],
             ("index", "sqlite_autoindex_match_bindings_1", "match_bindings"): None,
         }
-        rows = connection.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema LIMIT 4").fetchall()
+        if version == 2:
+            expected[("table", "match_metadata", "match_metadata")] = _DDL[2]
+            expected[("index", "sqlite_autoindex_match_metadata_1", "match_metadata")] = None
+        rows = connection.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema LIMIT 6").fetchall()
         if len(rows) != len(expected):
             raise _Unavailable("schema")
         for kind, name, table, sql in rows:
@@ -198,18 +221,26 @@ class _Store:
                 raise _Unavailable("schema")
             if sql is not None and _canonical(sql) != _canonical(expected[key]):
                 raise _Unavailable("schema")
-        for table, columns in (
+        tables = [
                 ("match_bindings", (("event_id", "TEXT", 1, 1), ("witness_version", "INTEGER", 1, 0),
                                     ("parent_created_at_bits", "BLOB", 1, 0), ("parent_result", "TEXT", 1, 0))),
-                ("maintenance_state", (("singleton", "INTEGER", 1, 1), ("after_event_id", "TEXT", 0, 0)))):
+                ("maintenance_state", (("singleton", "INTEGER", 1, 1), ("after_event_id", "TEXT", 0, 0)))]
+        if version == 2:
+            tables.append(("match_metadata", (("event_id", "TEXT", 1, 1), ("match_type", "TEXT", 1, 0),
+                                               ("match_format", "TEXT", 1, 0))))
+        for table, columns in tables:
             actual = connection.execute(f"PRAGMA table_xinfo({table})").fetchmany(5)
             if tuple((r[1], r[2], r[3], r[5]) for r in actual) != columns or any(r[4] is not None or r[6] for r in actual):
                 raise _Unavailable("schema")
-            if connection.execute(f"PRAGMA foreign_key_list({table})").fetchone():
+            foreign_keys = connection.execute(f"PRAGMA foreign_key_list({table})").fetchmany(2)
+            expected_keys = ([(0, 0, "match_bindings", "event_id", "event_id", "NO ACTION", "CASCADE", "NONE")]
+                             if table == "match_metadata" else [])
+            if foreign_keys != expected_keys:
                 raise _Unavailable("schema")
-        index = connection.execute("PRAGMA index_xinfo(sqlite_autoindex_match_bindings_1)").fetchmany(3)
-        if len(index) != 2 or index[0][2:] != ("event_id", 0, "BINARY", 1):
-            raise _Unavailable("schema")
+        for table in (("match_bindings", "match_metadata") if version == 2 else ("match_bindings",)):
+            index = connection.execute(f"PRAGMA index_xinfo(sqlite_autoindex_{table}_1)").fetchmany(3)
+            if len(index) != 2 or index[0][2:] != ("event_id", 0, "BINARY", 1):
+                raise _Unavailable("schema")
         cursor = connection.execute("SELECT singleton,after_event_id FROM maintenance_state LIMIT 2").fetchall()
         if len(cursor) != 1 or type(cursor[0][0]) is not int or cursor[0][0] != 1:
             raise _Unavailable("cursor")
@@ -286,14 +317,60 @@ class _Store:
                 f"FROM match_bindings WHERE event_id IN ({','.join('?' for _ in ids)})", ids).fetchmany(_BATCH + 1)
             return tuple(_Binding.from_row(row) for row in rows)
 
+    @staticmethod
+    def _save_binding(connection, binding):
+        row = connection.execute("SELECT * FROM match_bindings WHERE event_id=?", (binding.event_id,)).fetchone()
+        if row is not None:
+            if _Binding.from_row(row) != binding:
+                raise _Unavailable("identity_mismatch")
+            return
+        connection.execute("INSERT INTO match_bindings VALUES (?,?,?,?)", binding.values())
+
     def save(self, binding, deadline):
         with self.open(deadline, write=True) as connection:
-            row = connection.execute("SELECT * FROM match_bindings WHERE event_id=?", (binding.event_id,)).fetchone()
-            if row is not None:
-                if _Binding.from_row(row) != binding:
-                    raise _Unavailable("identity_mismatch")
-                return
-            connection.execute("INSERT INTO match_bindings VALUES (?,?,?,?)", binding.values())
+            self._save_binding(connection, binding)
+
+    def upgrade(self, deadline):
+        """Explicit, atomic v1 -> v2 migration; never repair an invalid store."""
+        with self.open(deadline, write=True) as connection:
+            if connection.execute("PRAGMA user_version").fetchone()[0] == 1:
+                connection.execute(_DDL[2])
+                connection.execute("PRAGMA user_version=2")
+                self._validate(connection)
+
+    def read_metadata(self, ids, deadline):
+        with self.open(deadline) as connection:
+            connection.execute("BEGIN")
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            fields = ("m.event_id,m.match_type,m.match_format" if version == 2 else "NULL,NULL,NULL")
+            join = (" LEFT JOIN match_metadata m ON m.event_id=b.event_id" if version == 2 else "")
+            rows = connection.execute(
+                "SELECT b.event_id,b.witness_version,b.parent_created_at_bits,b.parent_result," + fields
+                + " FROM match_bindings b" + join
+                + f" WHERE b.event_id IN ({','.join('?' for _ in ids)})", ids).fetchmany(_BATCH + 1)
+            result = []
+            for row in rows:
+                # A missing metadata row (or v1 binding) has no category evidence.
+                values = ("unknown", "unknown") if row[4] is None else _metadata(row[5:])
+                result.append((_Binding.from_row(row[:4]), values))
+            return tuple(result)
+
+    def save_metadata(self, binding, values, expected, deadline):
+        values, expected = _metadata(values), _metadata(expected)
+        with self.open(deadline, write=True) as connection:
+            if connection.execute("PRAGMA user_version").fetchone()[0] != 2:
+                raise _Unavailable("migration_required", "incompatible")
+            self._save_binding(connection, binding)
+            row = connection.execute("SELECT match_type,match_format FROM match_metadata WHERE event_id=?",
+                                     (binding.event_id,)).fetchone()
+            current = ("unknown", "unknown") if row is None else _metadata(row)
+            if current == values:
+                return  # Idempotent retry, including an already unknown binding.
+            if current != expected:
+                raise _Unavailable("metadata_conflict")
+            connection.execute("INSERT INTO match_metadata VALUES (?,?,?) ON CONFLICT(event_id) DO UPDATE SET "
+                               "match_type=excluded.match_type,match_format=excluded.match_format",
+                               (binding.event_id, *values))
 
     def scan(self, deadline):
         with self.open(deadline) as connection:

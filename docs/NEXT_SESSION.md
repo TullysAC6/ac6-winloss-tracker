@@ -20,7 +20,7 @@ Issue #6
 ## Current handoff
 
 - Public stable is **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`. PR #33 merged, [main CI passed](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/34792826474), public digests and both README one-liner smokes passed. Release bookkeeping advances `main` again; resolve `origin/main` for the current SHA.
-- The current **product/runtime baseline** is `17b42e8c35306024b613d6d8d0ba8968998a6095` from PR #54, the deterministic #15-0 test-harness closure. [Exact-main CI 36354725793](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36354725793) is **SUCCESS**. PR #54 changed tests/coordination only; production runtime is unchanged. Docs-only bookkeeping can advance the repository `main` SHA without changing that baseline (PR #56 already did), so always resolve current `main` from GitHub instead of treating the baseline SHA as the repository head.
+- The **pre-#15-1 product/runtime baseline** is `17b42e8c35306024b613d6d8d0ba8968998a6095` from PR #54, the deterministic #15-0 test-harness closure. [Exact-main CI 36354725793](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36354725793) is **SUCCESS**. PR #54 changed tests/coordination only; production runtime is unchanged. Docs-only bookkeeping can advance the repository `main` SHA without changing that baseline (PR #56 already did), so always resolve current `main` from GitHub instead of treating the baseline SHA as the repository head. The dormant #15-1 extension in this checkout is described below; its live gate/merge state belongs to PR #55 / Issue #6.
 - **v1.1.0 is superseded.** Its runtime was accepted and it was published, but its formal release acceptance was never completed: the README one-liner inside the tag carried a bootstrap `SHA-256` computed from Windows CRLF working-tree bytes instead of the published Git blob bytes, so the command failed closed. The tag was not moved and the Release was not edited.
 - v1.1.1 (now superseded by v1.2.0) ships the **same accepted runtime** (`93d5a57`) with corrected immutable distribution metadata. Real-AC6 T3 was not re-requested; the v1.1.0 T3 evidence carries forward because the runtime is byte-unchanged.
 - Issues #7 and #4 are closed against v1.1.1. Issue #6 stays open as the roadmap entry point.
@@ -92,7 +92,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 3. **UI-1A: ACCEPTED + MERGED — UNRELEASED.** PR #46 merged as `c2b00dc65a3511c120dc3a6595a55cdd014b8c28` after real-machine T3 PASS on exact head `6bb7ecbc156b995187ea8ad39976e18a0a85b198`; exact-main CI 36132227642 passed.
 4. **UI-1B: ACCEPTED + MERGED — UNRELEASED.** PR #48 merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b` after real-machine T3 PASS on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33`; exact-main CI 36230655908 passed.
 5. **#15-0 dormant enrichment storage foundation: ACCEPTED + MERGED — UNRELEASED.** PR #50 exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7` merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Its deadline-sensitive test-harness follow-up is fully closed by PR #54 (`17b42e8`), with exact-head CI 36353522053 and exact-main CI 36354725793 both SUCCESS. Production runtime unchanged; T3 N/A for the dormant #15-0 slice.
-6. **#15-1 is START AUTHORIZED / IN PROGRESS; remaining #15 is not authorized.** [PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55) is open as Draft on exact head `ae6a1e3a36e6d7e2ede257afa6f697865af4f085`, based on `main` `17b42e8`. It implements only dormant `match_type` / `match_format` persistence and sidecar v1→v2 upgrade. [Windows CI 36401134171](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36401134171) is SUCCESS on Python 3.12 / 3.13 / 3.14 plus aggregate. Independent review has not yet occurred; T3 is provisional N/A; Accepted NO · Merged NO · Released NO. The owner authorization permits the gated flow through #15-1 only and explicitly requires **STOP after #15-1**. #15-2 / remaining recognition, #28-A, UI-2 and release work are not authorized. The same remains true for shared visibility settings and Player personalization. Until separately authorized:
+6. **#15-1: owner-authorized dormant match-category persistence.** This checkout implements `match_type` / `match_format`, explicit atomic sidecar v1-to-v2 upgrade and checked storage/service APIs. [Contract](ISSUE15_1_METADATA_CONTRACT.md). No recognition, Rank/Rating, Season, runtime caller, UI or statistics is activated. Exact head, review, CI, acceptance and merge evidence are maintained in [PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55) and [Issue #6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6); resolve them before acting. The owner permits autonomous completion through required gates, independent review, pinned merge, exact-main CI and bookkeeping. **STOP after #15-1.** Remaining #15 / #15-2, #28-A, UI-2, shared settings, personalization and release work require separate owner authorization. Until separately authorized:
    - do not create its branch or worktree;
    - do not bump `preferences_version`, add a setting, or migrate `player_streak_status_enabled` / `broadcast_show_best_streak`;
    - do not change milestone behaviour.
@@ -101,7 +101,7 @@ Release publication and post-release verification are complete. See `PROJECT_STA
 
 The test-only TEMP-leak cleanup is **done**: PR #38, merged as `3bd89a3`.
 
-At most two unmerged generations exist at a time (§4). PRs through #54 that precede the current slice are merged. **One product generation is active: #15-1 / PR #55.** No later product generation is authorized.
+Resolve Issue #6 and open PRs for the live unmerged-generation count; #15-1 / PR #55 is the only authorized product generation. The maximum remains two. No later generation is authorized.
 
 ## Order after that — dependency, not preference
 
@@ -111,7 +111,7 @@ v1.2.0, PR #13, PR #5, PR #35, PR #40, PR #46, PR #48 and PR #50 are complete at
 
 ```text
 ✓ UI-0 → ✓ UI-1A (merged, unreleased) → ✓ UI-1B (merged, unreleased) → ✓ #15-0 (merged, unreleased)
-→ #15-1 [IN PROGRESS] → STOP / remaining #15 [NOT AUTHORIZED] → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12
+→ #15-1 [gate/merge state: PR #55 / Issue #6] → STOP / remaining #15 [NOT AUTHORIZED] → #28-A → UI-2 → #16-A / #28-B → UI-3A → #17 → #10/#11/#12
 → UI-3B → #16-B → #18 → #27 → UI-4
 ```
 
@@ -122,7 +122,7 @@ Four placements in it are load-bearing and will look wrong to anyone reading onl
 - **UI-3 is split.** UI-3A is Growth / Rank / Rating (#16-A, #28-B) and can ship as soon as its data exists; UI-3B is Opponent build statistics (#17, #10/#11/#12) and follows the recognition programme. They are not one milestone.
 - **#16-B before #18.** Advanced analytics run on data the user has actually accumulated. Historical backfill is retroactive data entry and does not gate them.
 
-At most two unmerged generations exist at a time (§4). PRs #40 through #54 are merged. **#15-1 / PR #55 is the one active product generation.** No remaining #15 slice or later phase starts without separate owner authorization.
+Resolve Issue #6 and open PRs for the live unmerged-generation count; #15-1 / PR #55 is the only authorized product generation. The maximum remains two. No later generation is authorized.
 
 ## What is newly recorded and must not be lost
 
