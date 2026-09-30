@@ -160,20 +160,25 @@ now = time.time() - 3600
 for index, result in enumerate(("win", "win", "loss", "win")):
     store.record_result(f"rollback-seed-{index}", result, "test",
                         {"streak": 0, "wins": 0, "losses": 0}, created_at=now + index)
-from optional_enrichment import MatchMetadata, OptionalEnrichmentService
+from optional_enrichment import MatchSnapshot, OptionalEnrichmentService
 from pathlib import Path
 sys.path.insert(0, str(Path(sys.argv[1]) / "tests"))
 from enrichment_test_clock import fixture_clock
+# Structured storage inputs (#15-2 v3 snapshots), not recognition truth.
+SNAPSHOTS = (("ranked","single","A4","S","recognized","rank-interpretation-1"),
+             ("custom","team","B2",None,None,None),
+             ("unknown","unknown",None,None,"failed","rank-interpretation-1"),
+             ("ranked","unknown","A",None,"recognized","rank-interpretation-1"))
 with fixture_clock():
     service = OptionalEnrichmentService(data_dir(), active=True)
     for index in range(4):
         ticket = service.prepare_binding(f"rollback-seed-{index}").ticket
         result = service.save_binding(ticket, create_missing=True)
         assert result.status == "saved", result
-        kind, form = (("ranked","single"), ("custom","team"), ("unknown","team"), ("ranked","unknown"))[index]
-        result = service.save_metadata(ticket, MatchMetadata(f"rollback-seed-{index}", kind, form),
-                                       expected=MatchMetadata(f"rollback-seed-{index}"))
-        assert result.status == "saved", result
+        values = SNAPSHOTS[index]
+        result = service.save_snapshot(ticket, MatchSnapshot(f"rollback-seed-{index}", *values),
+                                       expected_revision=0)
+        assert result.status == "saved" and result.snapshots[0].revision == 1, result
     assert len(service.lookup_many([f"rollback-seed-{index}" for index in range(4)]).bindings) == 4
 '''
 
@@ -501,13 +506,19 @@ class Run:
             "sys.path.insert(0, str(Path.cwd() / 'tests'))\n"
             "from enrichment_test_clock import fixture_clock\n"
             "with fixture_clock():\n"
-            "    response=OptionalEnrichmentService(data_dir(), active=True).lookup_metadata_many("
+            "    response=OptionalEnrichmentService(data_dir(), active=True).lookup_snapshot_many("
             "[f'rollback-seed-{i}' for i in range(4)])\n"
-            "    print(json.dumps([asdict(row) for row in sorted(response.metadata, key=lambda row: row.event_id)]))"))
-        expected = [dict(event_id=f"rollback-seed-{i}", match_type=kind, match_format=form)
-                    for i, (kind, form) in enumerate((("ranked","single"), ("custom","team"),
-                                                      ("unknown","team"), ("ranked","unknown")))]
-        check(visible == expected, f"{label}: metadata not preserved/visible: {visible}")
+            "    print(json.dumps([asdict(row) for row in sorted(response.snapshots, key=lambda row: row.event_id)]))"))
+        fields = ("match_type", "match_format", "self_rank", "opponent_rank",
+                  "recognition_status", "recognition_version")
+        seeded = (("ranked","single","A4","S","recognized","rank-interpretation-1"),
+                  ("custom","team","B2",None,None,None),
+                  ("unknown","unknown",None,None,"failed","rank-interpretation-1"),
+                  ("ranked","unknown","A",None,"recognized","rank-interpretation-1"))
+        # Whole snapshots, revision included: A stays A and A4 stays A4 across both rollbacks.
+        expected = [dict(event_id=f"rollback-seed-{i}", **dict(zip(fields, values)), revision=1)
+                    for i, values in enumerate(seeded)]
+        check(visible == expected, f"{label}: snapshots not preserved/visible: {visible}")
         self.evidence[label + "_visible_bindings"] = [row["event_id"] for row in visible]
         self.evidence[label + "_visible_metadata"] = visible
 

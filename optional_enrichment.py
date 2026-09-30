@@ -14,9 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from enrichment_store import (_BATCH, _Binding, _Deadline, _Store, _Unavailable,
-                              _connection, _key, _metadata, _time_bits)
+                              _connection, _key, _metadata, _revision, _snapshot, _time_bits)
 
-__all__ = ("OptionalEnrichmentService", "EnrichmentHealth", "Response", "BindingTicket", "MatchMetadata")
+__all__ = ("OptionalEnrichmentService", "EnrichmentHealth", "Response", "BindingTicket", "MatchMetadata",
+           "MatchSnapshot")
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,26 @@ class MatchMetadata:
 
 
 @dataclass(frozen=True)
+class MatchSnapshot:
+    """One coherent per-match metadata snapshot (docs/ISSUE15_2_RANK_EVIDENCE_CONTRACT.md).
+
+    Category, ranks and recognition evidence are written and read together.
+    recognition_status is None (no recorded recognition evidence), "recognized"
+    (every value here came from that recognizer) or "failed" (no values claimed);
+    recognition_version names interpretation semantics, never an app release.
+    revision is the stored revision this snapshot was read at (0: none stored).
+    """
+    event_id: str
+    match_type: str = "unknown"
+    match_format: str = "unknown"
+    self_rank: str | None = None
+    opponent_rank: str | None = None
+    recognition_status: str | None = None
+    recognition_version: str | None = None
+    revision: int = 0
+
+
+@dataclass(frozen=True)
 class Response:
     status: str
     health: EnrichmentHealth
@@ -53,6 +74,7 @@ class Response:
     deleted: int = 0
     pass_complete: bool = False
     metadata: tuple[MatchMetadata, ...] = ()
+    snapshots: tuple[MatchSnapshot, ...] = ()
 
 
 def _ids(values):
@@ -230,7 +252,7 @@ class OptionalEnrichmentService:
         return self._call(work)
 
     def upgrade_storage(self):
-        """Opt in to atomic v1 -> v2 migration; reads never migrate a store."""
+        """Opt in to atomic v1/v2 -> v3 migration; reads never migrate a store."""
         def work(deadline, stamp):
             self._store.upgrade(deadline)
             return Response("ready", EnrichmentHealth("ready", writable=True), stamp=stamp)
@@ -265,7 +287,11 @@ class OptionalEnrichmentService:
         expected is the caller's prior MatchMetadata (unknown/unknown if absent).
         A different current value rejects with metadata_conflict; equal target
         values are idempotent retries. This does not decide recognition precedence.
-        Existing v1 files require a separate explicit upgrade_storage() call.
+
+        This is the v2 category write. A v3 store (and therefore a fresh one,
+        which is always v3) rejects it as snapshot_required: use save_snapshot().
+        A v1 store does too, because its only upgrade leads to v3.
+        create_missing never creates a file this method would then refuse.
         """
         def work(deadline, stamp):
             binding = self._binding_for_write(ticket, deadline, stamp)
@@ -276,10 +302,61 @@ class OptionalEnrichmentService:
                 raise _Unavailable("invalid_metadata")
             values = _metadata((metadata.match_type, metadata.match_format))
             prior = _metadata((expected.match_type, expected.match_format))
-            if create_missing is True:
-                self._store.initialize(deadline)
+            if create_missing is True and not self._store.path.exists():
+                raise _Unavailable("snapshot_required", "incompatible")
             self._store.save_metadata(binding, values, prior, deadline)
             return Response("saved", EnrichmentHealth("ready", writable=True), stamp=stamp)
+        return self._call(work)
+
+    def lookup_snapshot(self, event_id):
+        return self.lookup_snapshot_many([event_id])
+
+    def lookup_snapshot_many(self, event_ids):
+        """Parent-checked v3 snapshots; a bound event without one is revision 0, all unknown.
+
+        Absence is no recorded evidence, not evidence of any category or rank, and
+        not an explicit "not attempted". v1/v2 stores reject as migration_required;
+        lookup_metadata_many() still reads their categories.
+        """
+        def work(deadline, stamp):
+            ids = _ids(event_ids)
+            rows = self._store.read_snapshots(ids, deadline)
+            parents = self._parents(ids, deadline)
+            visible = tuple(MatchSnapshot(binding.event_id, *values, revision=revision)
+                            for binding, revision, values in rows if parents.get(binding.event_id) == binding)
+            mismatch = any(binding.event_id in parents and parents[binding.event_id] != binding
+                           for binding, _, _ in rows)
+            health = EnrichmentHealth("degraded" if mismatch else "ready",
+                                      "identity_mismatch" if mismatch else "",
+                                      "pending" if len(visible) != len(rows) else "unknown")
+            return Response("visible" if visible else "unknown", health, stamp=stamp, snapshots=visible)
+        return self._call(work)
+
+    def save_snapshot(self, ticket, snapshot, *, expected_revision, create_missing=False):
+        """Atomically replace one event's whole snapshot at an expected revision.
+
+        expected_revision (and snapshot.revision, which must equal it) is the
+        revision the caller read; 0 when no snapshot exists. A different stored
+        revision rejects with snapshot_conflict, even for an identical target, so
+        an A -> B -> A cycle cannot be mistaken for no change. The response's one
+        snapshot carries the stored revision: unchanged for a no-op, else +1.
+        Invalid input is rejected before create_missing may create a fresh v3 file.
+        """
+        def work(deadline, stamp):
+            binding = self._binding_for_write(ticket, deadline, stamp)
+            if binding is None:
+                return Response("unknown", EnrichmentHealth("ready", cleanup="pending"), stamp=stamp)
+            if (not isinstance(snapshot, MatchSnapshot) or snapshot.event_id != binding.event_id
+                    or type(snapshot.revision) is not int or snapshot.revision != expected_revision):
+                raise _Unavailable("invalid_metadata")
+            values = _snapshot((snapshot.match_type, snapshot.match_format, snapshot.self_rank,
+                                snapshot.opponent_rank, snapshot.recognition_status, snapshot.recognition_version))
+            revision = _revision(expected_revision)
+            if create_missing is True:
+                self._store.initialize(deadline)
+            stored_revision, stored = self._store.save_snapshot(binding, values, revision, deadline)
+            return Response("saved", EnrichmentHealth("ready", writable=True), stamp=stamp,
+                            snapshots=(MatchSnapshot(binding.event_id, *stored, revision=stored_revision),))
         return self._call(work)
 
     def _cleanup(self, ids):

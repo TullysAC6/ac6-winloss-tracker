@@ -375,7 +375,7 @@ Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any 
 
 ## Phase 7 — Match metadata and growth analytics
 
-Phase 7A is **partially implemented**: #15-0 ([PR #50](https://github.com/TullysAC6/ac6-winloss-tracker/pull/50)) is accepted and merged but unreleased, and #15-1 ([PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55)) is merged but unreleased with owner acceptance pending; both are dormant storage only. User-visible recognition, Rank/Rating and category-aware analytics remain later work. Phase 7B depends on completion of 7A.
+Phase 7A is **partially implemented**: #15-0 ([PR #50](https://github.com/TullysAC6/ac6-winloss-tracker/pull/50)) is accepted and merged but unreleased, and #15-1 ([PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55)) is merged but unreleased with owner acceptance pending; both are dormant storage only. #15-2 (per-match rank and recognition evidence, sidecar v3) is the owner-authorized next dormant slice; its PR and Issue #6 hold the live state. User-visible recognition, Rank/Rating and category-aware analytics remain later work. Phase 7B depends on completion of 7A.
 
 ### Phase 7A — Match metadata foundation
 
@@ -386,9 +386,9 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | #15-0 optional enrichment storage foundation (`enrichment.db`) | **ACCEPTED — UNRELEASED** | PR #50 exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Dormant: ordinary startup does not open/create/migrate/clean the sidecar. `history.db` remains authoritative; match-bound bindings are parent-checked and missing parents are logically invisible. T3 N/A |
 | `match_type` — ranked / custom / unknown | **IMPLEMENTED + MERGED — ACCEPTANCE PENDING — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). No recognizer or runtime caller is added in this slice |
 | `match_format` — single / team / unknown | **IMPLEMENTED + MERGED — ACCEPTANCE PENDING — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). Mixed known/unknown values are valid; absence remains unknown |
-| `self_rank` | PLANNED | Single and Team, where reliable |
-| `opponent_rank` | PLANNED | Single only. Team opponent ranks deferred |
-| `metadata_recognition_status` / `metadata_recognition_version` | PLANNED | |
+| `self_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Canonical rank token or unknown, any format; see [ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md). The #15-2 PR and Issue #6 own the live review/merge/acceptance evidence. No recognizer or runtime caller |
+| `opponent_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Explicit Single only; TEAM/unknown carries none, and it is never resurrected. Team opponent ranks remain deferred |
+| `metadata_recognition_status` / `metadata_recognition_version` | **IMPLEMENTED (dormant #15-2 persistence only)** | `NULL` (no recorded evidence) / `recognized` / `failed`; the version names interpretation semantics, not the app release. The whole snapshot is revisioned (compare-and-set) |
 | Match / Rating observation timestamps usable for retrospective Season assignment | PLANNED | Saving the authoritative result or Rating observation does not wait for Season resolution |
 | Unresolved Season metadata | PLANNED | `season_id = unresolved` is valid; later reconciliation changes only derived Season metadata |
 | TEAM recorded through the normal result path | PLANNED | WIN/LOSE/DRAW, match history and win-rate stats. **Supersedes the previous "SINGLE only" scope decision** — see [DECISIONS.md](DECISIONS.md) |

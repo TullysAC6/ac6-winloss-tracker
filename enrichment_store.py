@@ -1,4 +1,4 @@
-"""Private v1/v2 sidecar mechanics. Importing performs no file access.
+"""Private v1/v2/v3 sidecar mechanics. Importing performs no file access.
 
 Only optional_enrichment may use this module in product code. In particular,
 these unfiltered rows are NOT a history, statistics or export API.
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import sqlite3
 import stat
 import struct
@@ -18,12 +19,14 @@ from pathlib import Path
 
 __all__ = ()
 _APPLICATION_ID = 0x41433645
-_VERSION = 2
+_VERSION = 3
+_SUPPORTED_VERSIONS = (1, 2, 3)
 _MAX_PAGES = 16384
 _PAGE_SIZE = 4096
 _BATCH = 64
 _BUDGET = 0.100
-_DDL = (
+_MAX_REVISION = 9007199254740991
+_BINDINGS_DDL, _MAINTENANCE_DDL, _METADATA_DDL = (
     """CREATE TABLE match_bindings (
     event_id TEXT COLLATE BINARY PRIMARY KEY NOT NULL
         CHECK(typeof(event_id) = 'text'
@@ -56,6 +59,69 @@ _DDL = (
         CHECK(typeof(match_format) = 'text' AND match_format IN ('single', 'team', 'unknown'))
 )""",
 )
+# #15-2: one coherent per-match snapshot (docs/ISSUE15_2_RANK_EVIDENCE_CONTRACT.md).
+# Rank tokens: the established UNRANKED, S and A/A1-A4, or an as yet unestablished
+# pre-S band letter with an optional 1-9 subdivision. No ordinal, no normalization.
+# instr(..., char(0)) guards the text rules: SQLite length() and GLOB stop at NUL.
+_SNAPSHOTS_DDL = """CREATE TABLE match_snapshots (
+    event_id TEXT COLLATE BINARY PRIMARY KEY NOT NULL
+        REFERENCES match_bindings(event_id) ON DELETE CASCADE,
+    revision INTEGER NOT NULL
+        CHECK(typeof(revision) = 'integer' AND revision BETWEEN 1 AND 9007199254740991),
+    match_type TEXT NOT NULL
+        CHECK(typeof(match_type) = 'text' AND match_type IN ('ranked', 'custom', 'unknown')),
+    match_format TEXT NOT NULL
+        CHECK(typeof(match_format) = 'text' AND match_format IN ('single', 'team', 'unknown')),
+    self_rank TEXT
+        CHECK(self_rank IS NULL OR (typeof(self_rank) = 'text' AND instr(self_rank, char(0)) = 0 AND (
+              self_rank IN ('UNRANKED', 'S', 'A', 'A1', 'A2', 'A3', 'A4')
+              OR (length(self_rank) = 1 AND self_rank GLOB '[B-RT-Z]')
+              OR (length(self_rank) = 2 AND self_rank GLOB '[B-RT-Z][1-9]')))),
+    opponent_rank TEXT
+        CHECK(opponent_rank IS NULL OR (typeof(opponent_rank) = 'text' AND instr(opponent_rank, char(0)) = 0 AND (
+              opponent_rank IN ('UNRANKED', 'S', 'A', 'A1', 'A2', 'A3', 'A4')
+              OR (length(opponent_rank) = 1 AND opponent_rank GLOB '[B-RT-Z]')
+              OR (length(opponent_rank) = 2 AND opponent_rank GLOB '[B-RT-Z][1-9]')))),
+    recognition_status TEXT
+        CHECK(recognition_status IS NULL OR (typeof(recognition_status) = 'text'
+              AND recognition_status IN ('recognized', 'failed'))),
+    recognition_version TEXT
+        CHECK(recognition_version IS NULL OR (typeof(recognition_version) = 'text'
+              AND instr(recognition_version, char(0)) = 0 AND length(recognition_version) BETWEEN 1 AND 64
+              AND recognition_version GLOB '[A-Za-z0-9]*'
+              AND NOT recognition_version GLOB '*[^A-Za-z0-9._:-]*')),
+    CHECK(opponent_rank IS NULL OR match_format = 'single'),
+    CHECK((recognition_status IS NULL) = (recognition_version IS NULL)),
+    CHECK(recognition_status IS NOT 'failed' OR (match_type = 'unknown' AND match_format = 'unknown'
+          AND self_rank IS NULL AND opponent_rank IS NULL)),
+    CHECK(recognition_status IS NOT 'recognized' OR match_type <> 'unknown' OR match_format <> 'unknown'
+          OR self_rank IS NOT NULL OR opponent_rank IS NOT NULL)
+)"""
+# The schema a fresh store is created with: always the current version.
+_DDL = (_BINDINGS_DDL, _MAINTENANCE_DDL, _SNAPSHOTS_DDL)
+_TABLES = {
+    "match_bindings": (_BINDINGS_DDL, (("event_id", "TEXT", 1, 1), ("witness_version", "INTEGER", 1, 0),
+                                       ("parent_created_at_bits", "BLOB", 1, 0), ("parent_result", "TEXT", 1, 0))),
+    "maintenance_state": (_MAINTENANCE_DDL, (("singleton", "INTEGER", 1, 1), ("after_event_id", "TEXT", 0, 0))),
+    "match_metadata": (_METADATA_DDL, (("event_id", "TEXT", 1, 1), ("match_type", "TEXT", 1, 0),
+                                       ("match_format", "TEXT", 1, 0))),
+    "match_snapshots": (_SNAPSHOTS_DDL, (("event_id", "TEXT", 1, 1), ("revision", "INTEGER", 1, 0),
+                                         ("match_type", "TEXT", 1, 0), ("match_format", "TEXT", 1, 0),
+                                         ("self_rank", "TEXT", 0, 0), ("opponent_rank", "TEXT", 0, 0),
+                                         ("recognition_status", "TEXT", 0, 0),
+                                         ("recognition_version", "TEXT", 0, 0))),
+}
+# Exactly these tables per supported version; v3 replaces match_metadata.
+_SCHEMAS = {1: ("match_bindings", "maintenance_state"),
+            2: ("match_bindings", "maintenance_state", "match_metadata"),
+            3: ("match_bindings", "maintenance_state", "match_snapshots")}
+_CHILD_TABLES = ("match_metadata", "match_snapshots")
+_TEXT_KEY_TABLES = ("match_bindings", "match_metadata", "match_snapshots")
+_SNAPSHOT_COLUMNS = "match_type,match_format,self_rank,opponent_rank,recognition_status,recognition_version"
+_RANK_EXACT = frozenset(("UNRANKED", "S", "A", "A1", "A2", "A3", "A4"))
+_RANK_BANDS = frozenset("BCDEFGHIJKLMNOPQRTUVWXYZ")
+_RECOGNITION_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}")
+_DEFAULT_SNAPSHOT = ("unknown", "unknown", None, None, None, None)
 
 
 class _Unavailable(Exception):
@@ -83,6 +149,45 @@ def _metadata(values):
             or type(match_format) is not str or match_format not in ("single", "team", "unknown")):
         raise _Unavailable("invalid_metadata")
     return match_type, match_format
+
+
+def _rank(value):
+    """None, or a canonical rank token exactly as observed; never normalized or ordered."""
+    if value is None:
+        return None
+    if type(value) is str and (value in _RANK_EXACT or (
+            value[:1] in _RANK_BANDS and (len(value) == 1 or (len(value) == 2 and value[1] in "123456789")))):
+        return value
+    raise _Unavailable("invalid_metadata")
+
+
+def _snapshot(values):
+    """Validate one coherent snapshot; the same rules as the match_snapshots CHECKs."""
+    match_type, match_format, self_rank, opponent_rank, status, version = values
+    match_type, match_format = _metadata((match_type, match_format))
+    self_rank, opponent_rank = _rank(self_rank), _rank(opponent_rank)
+    if opponent_rank is not None and match_format != "single":
+        raise _Unavailable("invalid_metadata")  # TEAM / unknown format carries no opponent rank
+    if status is None:
+        if version is not None:
+            raise _Unavailable("invalid_metadata")
+    else:
+        if (type(status) is not str or status not in ("recognized", "failed") or type(version) is not str
+                or _RECOGNITION_VERSION.fullmatch(version) is None):
+            raise _Unavailable("invalid_metadata")
+        facts = (match_type != "unknown" or match_format != "unknown"
+                 or self_rank is not None or opponent_rank is not None)
+        # A failed read claims no facts; a recognized snapshot claims at least one.
+        if facts != (status == "recognized"):
+            raise _Unavailable("invalid_metadata")
+    return match_type, match_format, self_rank, opponent_rank, status, version
+
+
+def _revision(value, *, stored=False):
+    low = 1 if stored else 0
+    if type(value) is not int or not low <= value <= _MAX_REVISION:
+        raise _Unavailable("invalid_metadata")
+    return value
 
 
 @dataclass(frozen=True)
@@ -190,7 +295,7 @@ class _Store:
         if len(header) != 100 or header[:16] != b"SQLite format 3\0":
             raise _Unavailable("corrupt")
         if (int.from_bytes(header[68:72], "big") != _APPLICATION_ID
-                or int.from_bytes(header[60:64], "big") not in (1, _VERSION)):
+                or int.from_bytes(header[60:64], "big") not in _SUPPORTED_VERSIONS):
             raise _Unavailable("unsupported_format", "incompatible")
         if header[18:20] != b"\x01\x01":
             raise _Unavailable("unsupported_journal", "incompatible")
@@ -198,21 +303,20 @@ class _Store:
     def _validate(self, connection):
         version = connection.execute("PRAGMA user_version").fetchone()[0]
         if (connection.execute("PRAGMA application_id").fetchone()[0] != _APPLICATION_ID
-                or version not in (1, _VERSION)):
+                or version not in _SUPPORTED_VERSIONS):
             raise _Unavailable("unsupported_format", "incompatible")
         if (connection.execute("PRAGMA page_size").fetchone()[0] != _PAGE_SIZE
                 or connection.execute("PRAGMA page_count").fetchone()[0] > _MAX_PAGES
                 or connection.execute("PRAGMA journal_mode").fetchone()[0] != "delete"):
             raise _Unavailable("storage_format")
-        expected = {
-            ("table", "match_bindings", "match_bindings"): _DDL[0],
-            ("table", "maintenance_state", "maintenance_state"): _DDL[1],
-            ("index", "sqlite_autoindex_match_bindings_1", "match_bindings"): None,
-        }
-        if version == 2:
-            expected[("table", "match_metadata", "match_metadata")] = _DDL[2]
-            expected[("index", "sqlite_autoindex_match_metadata_1", "match_metadata")] = None
-        rows = connection.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema LIMIT 6").fetchall()
+        tables = _SCHEMAS[version]
+        expected = {}
+        for table in tables:
+            expected[("table", table, table)] = _TABLES[table][0]
+            if table in _TEXT_KEY_TABLES:
+                expected[("index", f"sqlite_autoindex_{table}_1", table)] = None
+        rows = connection.execute("SELECT type,name,tbl_name,sql FROM sqlite_schema LIMIT ?",
+                                  (len(expected) + 1,)).fetchall()
         if len(rows) != len(expected):
             raise _Unavailable("schema")
         for kind, name, table, sql in rows:
@@ -221,26 +325,21 @@ class _Store:
                 raise _Unavailable("schema")
             if sql is not None and _canonical(sql) != _canonical(expected[key]):
                 raise _Unavailable("schema")
-        tables = [
-                ("match_bindings", (("event_id", "TEXT", 1, 1), ("witness_version", "INTEGER", 1, 0),
-                                    ("parent_created_at_bits", "BLOB", 1, 0), ("parent_result", "TEXT", 1, 0))),
-                ("maintenance_state", (("singleton", "INTEGER", 1, 1), ("after_event_id", "TEXT", 0, 0)))]
-        if version == 2:
-            tables.append(("match_metadata", (("event_id", "TEXT", 1, 1), ("match_type", "TEXT", 1, 0),
-                                               ("match_format", "TEXT", 1, 0))))
-        for table, columns in tables:
-            actual = connection.execute(f"PRAGMA table_xinfo({table})").fetchmany(5)
+        for table in tables:
+            columns = _TABLES[table][1]
+            actual = connection.execute(f"PRAGMA table_xinfo({table})").fetchmany(len(columns) + 1)
             if tuple((r[1], r[2], r[3], r[5]) for r in actual) != columns or any(r[4] is not None or r[6] for r in actual):
                 raise _Unavailable("schema")
             foreign_keys = connection.execute(f"PRAGMA foreign_key_list({table})").fetchmany(2)
             expected_keys = ([(0, 0, "match_bindings", "event_id", "event_id", "NO ACTION", "CASCADE", "NONE")]
-                             if table == "match_metadata" else [])
+                             if table in _CHILD_TABLES else [])
             if foreign_keys != expected_keys:
                 raise _Unavailable("schema")
-        for table in (("match_bindings", "match_metadata") if version == 2 else ("match_bindings",)):
-            index = connection.execute(f"PRAGMA index_xinfo(sqlite_autoindex_{table}_1)").fetchmany(3)
-            if len(index) != 2 or index[0][2:] != ("event_id", 0, "BINARY", 1):
-                raise _Unavailable("schema")
+        for table in tables:
+            if table in _TEXT_KEY_TABLES:
+                index = connection.execute(f"PRAGMA index_xinfo(sqlite_autoindex_{table}_1)").fetchmany(3)
+                if len(index) != 2 or index[0][2:] != ("event_id", 0, "BINARY", 1):
+                    raise _Unavailable("schema")
         cursor = connection.execute("SELECT singleton,after_event_id FROM maintenance_state LIMIT 2").fetchall()
         if len(cursor) != 1 or type(cursor[0][0]) is not int or cursor[0][0] != 1:
             raise _Unavailable("cursor")
@@ -331,17 +430,37 @@ class _Store:
             self._save_binding(connection, binding)
 
     def upgrade(self, deadline):
-        """Explicit, atomic v1 -> v2 migration; never repair an invalid store."""
+        """Explicit, atomic v1/v2 -> v3 migration; never repair an invalid store.
+
+        One writer transaction: the source was validated by open() under BEGIN
+        IMMEDIATE; v2 category rows are copied as revision 1 with no rank or
+        recognition evidence (nothing is inferred); the destination is validated
+        before the single commit. Any failure rolls schema, rows and version back.
+        """
         with self.open(deadline, write=True) as connection:
-            if connection.execute("PRAGMA user_version").fetchone()[0] == 1:
-                connection.execute(_DDL[2])
-                connection.execute("PRAGMA user_version=2")
-                self._validate(connection)
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == _VERSION:
+                return
+            carried = 0
+            connection.execute(_SNAPSHOTS_DDL)
+            if version == 2:
+                carried = connection.execute("SELECT count(*) FROM match_metadata").fetchone()[0]
+                connection.execute("INSERT INTO match_snapshots (event_id,revision,match_type,match_format) "
+                                   "SELECT event_id,1,match_type,match_format FROM match_metadata")
+                connection.execute("DROP TABLE match_metadata")
+            connection.execute(f"PRAGMA user_version={_VERSION}")
+            self._validate(connection)
+            if (connection.execute("SELECT count(*) FROM match_snapshots").fetchone()[0] != carried
+                    or connection.execute("PRAGMA foreign_key_check").fetchmany(1)):
+                raise _Unavailable("migration_verification")
 
     def read_metadata(self, ids, deadline):
         with self.open(deadline) as connection:
             connection.execute("BEGIN")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
+            if version == _VERSION:
+                # The category view of whole v3 snapshots: a corrupt row fails closed here too.
+                return tuple((binding, values[:2]) for binding, _, values in self._snapshot_rows(connection, ids))
             fields = ("m.event_id,m.match_type,m.match_format" if version == 2 else "NULL,NULL,NULL")
             join = (" LEFT JOIN match_metadata m ON m.event_id=b.event_id" if version == 2 else "")
             rows = connection.execute(
@@ -356,10 +475,17 @@ class _Store:
             return tuple(result)
 
     def save_metadata(self, binding, values, expected, deadline):
+        """The #15-1 category write, unchanged on v2 only.
+
+        v3 keeps category, ranks and recognition evidence as one revisioned
+        snapshot; a category-only write could neither carry a revision nor keep
+        that evidence true, so it is refused there, never silently merged. A v1
+        store gets the same answer: its only upgrade leads to v3.
+        """
         values, expected = _metadata(values), _metadata(expected)
         with self.open(deadline, write=True) as connection:
             if connection.execute("PRAGMA user_version").fetchone()[0] != 2:
-                raise _Unavailable("migration_required", "incompatible")
+                raise _Unavailable("snapshot_required", "incompatible")
             self._save_binding(connection, binding)
             row = connection.execute("SELECT match_type,match_format FROM match_metadata WHERE event_id=?",
                                      (binding.event_id,)).fetchone()
@@ -371,6 +497,63 @@ class _Store:
             connection.execute("INSERT INTO match_metadata VALUES (?,?,?) ON CONFLICT(event_id) DO UPDATE SET "
                                "match_type=excluded.match_type,match_format=excluded.match_format",
                                (binding.event_id, *values))
+
+    @staticmethod
+    def _snapshot_rows(connection, ids):
+        rows = connection.execute(
+            "SELECT b.event_id,b.witness_version,b.parent_created_at_bits,b.parent_result,s.revision,"
+            + ",".join("s." + column for column in _SNAPSHOT_COLUMNS.split(","))
+            + " FROM match_bindings b LEFT JOIN match_snapshots s ON s.event_id=b.event_id"
+            + f" WHERE b.event_id IN ({','.join('?' for _ in ids)})", ids).fetchmany(_BATCH + 1)
+        result = []
+        for row in rows:
+            if row[4] is None:
+                result.append((_Binding.from_row(row[:4]), 0, _DEFAULT_SNAPSHOT))
+            else:
+                result.append((_Binding.from_row(row[:4]), _revision(row[4], stored=True), _snapshot(row[5:])))
+        return tuple(result)
+
+    def read_snapshots(self, ids, deadline):
+        """(binding, revision, values) per binding; revision 0 means no snapshot row."""
+        with self.open(deadline) as connection:
+            connection.execute("BEGIN")
+            if connection.execute("PRAGMA user_version").fetchone()[0] != _VERSION:
+                raise _Unavailable("migration_required", "incompatible")
+            return self._snapshot_rows(connection, ids)
+
+    def save_snapshot(self, binding, values, expected_revision, deadline):
+        """Full-snapshot compare-and-set on the stored revision.
+
+        A stale expected revision always rejects, even when its target equals the
+        current values (an A -> B -> A cycle is a different revision). Only a write
+        at the current revision whose target equals the current snapshot is a
+        no-op; every other accepted write advances the revision by one.
+        """
+        values, expected_revision = _snapshot(values), _revision(expected_revision)
+        with self.open(deadline, write=True) as connection:
+            if connection.execute("PRAGMA user_version").fetchone()[0] != _VERSION:
+                raise _Unavailable("migration_required", "incompatible")
+            self._save_binding(connection, binding)
+            row = connection.execute(f"SELECT revision,{_SNAPSHOT_COLUMNS} FROM match_snapshots WHERE event_id=?",
+                                     (binding.event_id,)).fetchone()
+            revision, current = (0, _DEFAULT_SNAPSHOT) if row is None else (
+                _revision(row[0], stored=True), _snapshot(row[1:]))
+            if revision != expected_revision:
+                raise _Unavailable("snapshot_conflict")
+            if current == values:
+                return revision, current
+            if revision >= _MAX_REVISION:
+                raise _Unavailable("revision_exhausted")
+            if row is None:
+                connection.execute("INSERT INTO match_snapshots VALUES (?,?,?,?,?,?,?,?)",
+                                   (binding.event_id, 1, *values))
+            else:
+                changed = connection.execute(
+                    "UPDATE match_snapshots SET revision=?," + ",".join(f"{c}=?" for c in _SNAPSHOT_COLUMNS.split(","))
+                    + " WHERE event_id=? AND revision=?", (revision + 1, *values, binding.event_id, revision)).rowcount
+                if changed != 1:
+                    raise _Unavailable("snapshot_conflict")
+            return revision + 1, values
 
     def scan(self, deadline):
         with self.open(deadline) as connection:
