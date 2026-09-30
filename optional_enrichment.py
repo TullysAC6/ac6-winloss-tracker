@@ -14,10 +14,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from enrichment_store import (_BATCH, _Binding, _Deadline, _Store, _Unavailable,
-                              _connection, _key, _metadata, _revision, _snapshot, _time_bits)
+                              _connection, _key, _metadata, _observation, _revision, _snapshot, _time_bits)
 
 __all__ = ("OptionalEnrichmentService", "EnrichmentHealth", "Response", "BindingTicket", "MatchMetadata",
-           "MatchSnapshot")
+           "MatchSnapshot", "RankRatingObservation", "ObservationTicket", "ObservationView")
 
 
 @dataclass(frozen=True)
@@ -64,6 +64,42 @@ class MatchSnapshot:
 
 
 @dataclass(frozen=True)
+class RankRatingObservation:
+    """Immutable event evidence. Rating is observed text, never an implicit number.
+
+    observed_at is caller-supplied event time in UTC epoch seconds, not ingestion
+    time. No match/session owns this record. Season storage belongs to #28-A.
+    """
+    observation_id: str
+    observed_at: float
+    self_rank: str | None = None
+    rating_mode: str | None = None
+    rating_value: str | None = None
+    recognition_status: str | None = None
+    recognition_version: str | None = None
+    source: str = ""
+
+    def values(self):
+        return (self.observation_id, self.observed_at, self.self_rank, self.rating_mode, self.rating_value,
+                self.recognition_status, self.recognition_version, self.source)
+
+
+@dataclass(frozen=True)
+class ObservationTicket:
+    observation_id: str
+    generation: int
+    activation: object
+    association: _Binding | None = None
+
+
+@dataclass(frozen=True)
+class ObservationView:
+    observation: RankRatingObservation
+    association: _Binding | None = None
+    association_status: str = "none"  # none | valid | invalid | unavailable
+
+
+@dataclass(frozen=True)
 class Response:
     status: str
     health: EnrichmentHealth
@@ -75,6 +111,9 @@ class Response:
     pass_complete: bool = False
     metadata: tuple[MatchMetadata, ...] = ()
     snapshots: tuple[MatchSnapshot, ...] = ()
+    observations: tuple[ObservationView, ...] = ()
+    observation_ticket: ObservationTicket | None = None
+    observation_generation: int | None = None
 
 
 def _ids(values):
@@ -385,3 +424,140 @@ class OptionalEnrichmentService:
 
     def cleanup_deleted(self, event_ids):
         return self._cleanup(event_ids)
+
+    def prepare_observation(self, observation_id, *, match_event_id=None, create_missing=False):
+        """Explicitly prepare independent work; optional context never becomes ownership."""
+        def work(deadline, stamp):
+            identity = _key(observation_id)
+            event_id = None if match_event_id is None else _key(match_event_id)
+            if create_missing is True:
+                self._store.initialize(deadline)
+            generation = self._store.observation_generation(deadline)
+            association = None
+            if event_id is not None:
+                try:
+                    association = self._parents((event_id,), deadline).get(event_id)
+                    if association is not None and association.parent_result not in ('win', 'loss'):
+                        association = None
+                except _Unavailable as error:
+                    if error.reason != 'authority_unavailable':
+                        raise
+            return Response('prepared', EnrichmentHealth('ready'), stamp=stamp,
+                observation_ticket=ObservationTicket(identity, generation, self._activation, association),
+                observation_generation=generation)
+        return self._call(work)
+
+    def _observation_views(self, rows, deadline):
+        keys = tuple(dict.fromkeys(binding.event_id for _, binding in rows if binding is not None))
+        parents, unavailable = {}, False
+        if keys:
+            try:
+                parents = self._parents(keys, deadline)
+            except _Unavailable as error:
+                if error.reason != 'authority_unavailable':
+                    raise
+                unavailable = True
+        return tuple(ObservationView(RankRatingObservation(*values),
+            binding if binding is not None and parents.get(binding.event_id) == binding else None,
+            'none' if binding is None else 'unavailable' if unavailable
+            else 'valid' if parents.get(binding.event_id) == binding else 'invalid') for values, binding in rows)
+
+    def lookup_observation(self, observation_id):
+        return self.lookup_observations_many([observation_id])
+
+    def lookup_observations_many(self, observation_ids):
+        """Return independent evidence even with missing/unreadable match context.
+
+        Deferred consumers must install through publish_observations(), not cache
+        an unchecked old Response: generation is durable across service instances.
+        """
+        def work(deadline, stamp):
+            ids = _ids(observation_ids)
+            generation, rows = self._store.read_observations(ids, deadline)
+            views = self._observation_views(rows, deadline)
+            degraded = any(view.association_status in ('invalid', 'unavailable') for view in views)
+            return Response('visible' if views else 'unknown',
+                EnrichmentHealth('degraded' if degraded else 'ready', cleanup='pending' if degraded else 'unknown'),
+                stamp=stamp, observations=views, observation_generation=generation)
+        return self._call(work)
+
+    def save_observation(self, ticket, observation):
+        """Insert immutable evidence, or retry an identical identity/content without relinking."""
+        def work(deadline, stamp):
+            if (type(ticket) is not ObservationTicket or ticket.activation is not self._activation
+                    or type(observation) is not RankRatingObservation or ticket.observation_id != observation.observation_id):
+                raise _Unavailable('invalid_arguments')
+            values = _observation(observation.values())
+            generation = _revision(ticket.generation)
+            association = ticket.association
+            if association is not None:
+                if type(association) is not _Binding:
+                    raise _Unavailable('invalid_arguments')
+                _Binding.from_row(association.values())
+                try:
+                    if self._parents((association.event_id,), deadline).get(association.event_id) != association:
+                        association = None
+                except _Unavailable as error:
+                    if error.reason != 'authority_unavailable':
+                        raise
+                    association = None
+            self._store.save_observation(values, generation, association, deadline)
+            return Response('saved', EnrichmentHealth('ready', writable=True), stamp=stamp,
+                            observation_generation=generation)
+        return self._call(work)
+
+    def delete_observation_history(self):
+        """Explicit internal operation. Future UI must obtain informed confirmation.
+
+        Atomic deletion + durable generation increment. No match/snapshot deletion,
+        no secure erasure, no successful-empty response for missing/invalid stores.
+        """
+        def work(deadline, stamp):
+            generation, removed = self._store.purge_observations(deadline)
+            return Response('deleted', EnrichmentHealth('ready', writable=True), stamp=stamp,
+                            deleted=removed, observation_generation=generation)
+        return self._call(work, maintenance=True)
+
+    def publish_observations(self, response, consumer):
+        """Install a read through a generation barrier, serialized with observation purge.
+
+        consumer receives freshly validated views while the SQLite writer transaction
+        and service state lock are held. It must be bounded, in-memory and non-reentrant;
+        no I/O, callbacks into this service, or deferred installation. An exception is
+        isolated but cannot undo arbitrary external consumer effects. No product caller
+        is activated here. A purge failure never falsely reports successful deletion.
+        """
+        def work(deadline, stamp):
+            if (type(response) is not Response or response.stamp != stamp
+                    or response.status not in ('visible', 'unknown') or not callable(consumer)
+                    or type(response.observation_generation) is not int):
+                raise _Unavailable('stale')
+            ids = _ids([view.observation.observation_id for view in response.observations])
+            with self._store.observation_connection(deadline, write=True) as connection:
+                generation = self._store._observation_state(connection)[0]
+                if generation != response.observation_generation:
+                    raise _Unavailable('stale_observation_generation')
+                views = self._observation_views(self._store._observation_rows(connection, ids), deadline)
+                deadline.remaining()
+                with self._state_lock:
+                    if not self._active or stamp != (self._activation, self._revision):
+                        raise _Unavailable('stale')
+                    consumer(views)
+            return Response('published', EnrichmentHealth('ready'), stamp=stamp, observation_generation=generation)
+        return self._call(work)
+
+    def cleanup_observation_associations(self):
+        def work(deadline, stamp):
+            generation, rows = self._store.scan_observation_links(deadline)
+            parents = self._parents(tuple(dict.fromkeys(binding.event_id for _, binding in rows)), deadline) if rows else {}
+            candidates = tuple((identity, binding) for identity, binding in rows if parents.get(binding.event_id) != binding)
+            fresh = self._parents(tuple(dict.fromkeys(binding.event_id for _, binding in candidates)), deadline) if candidates else {}
+            candidates = tuple((identity, binding) for identity, binding in candidates if fresh.get(binding.event_id) != binding)
+            if not self._current(stamp):
+                raise _Unavailable('stale')
+            complete = len(rows) < _BATCH
+            cursor = None if complete or not rows else rows[-1][0]
+            removed = self._store.remove_observation_links(candidates, generation, cursor, deadline)
+            return Response('cleaned', EnrichmentHealth('ready', cleanup='complete-for-observed-pass' if complete else 'pending'),
+                stamp=stamp, examined=len(rows), deleted=removed, pass_complete=complete, observation_generation=generation)
+        return self._call(work, maintenance=True)

@@ -141,7 +141,7 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), before)
         history = (self.root / "history.db").read_bytes()
         self.assertEqual(self.service.upgrade_storage().status, "ready")
-        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(4,)])
         self.assertEqual(self.sql("SELECT * FROM maintenance_state"), [(1, "A")])
         self.assertEqual(self.service.lookup_metadata("A").metadata, (self.unknown,))
         upgraded = self.path.read_bytes()
@@ -161,7 +161,7 @@ class MetadataTests(unittest.TestCase):
         self.v1()
         before = self.path.read_bytes()
         connect = sqlite3.connect
-        for target in (storage._SNAPSHOTS_DDL, "PRAGMA user_version=3"):
+        for target in (storage._SNAPSHOTS_DDL, "PRAGMA user_version=4"):
             with self.subTest(target=target):
                 reached = []
                 class Fault(sqlite3.Connection):
@@ -188,7 +188,7 @@ class MetadataTests(unittest.TestCase):
         with ExitStack() as clocks:
             def after_upgrade(connection):
                 result = original(connection)
-                if connection.execute("PRAGMA user_version").fetchone()[0] == 3:
+                if connection.execute("PRAGMA user_version").fetchone()[0] == 4:
                     reached.append(True)
                     self.assertEqual(connection.execute("SELECT count(*) FROM match_snapshots").fetchone(), (0,))
                     deadline.end = 0
@@ -214,7 +214,7 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(self.service.upgrade_storage().health.reason, "schema")
         self.assertEqual(self.path.read_bytes(), before)
         self.sql("DROP INDEX unexpected")
-        self.sql("PRAGMA user_version=4")  # 3 is now a supported version with its own schema
+        self.sql("PRAGMA user_version=5")  # 4 is now a supported version with its own schema
         before = self.path.read_bytes()
         self.assertEqual(self.service.lookup_metadata("A").health.state, "incompatible")
         self.assertEqual(self.service.upgrade_storage().health.state, "incompatible")

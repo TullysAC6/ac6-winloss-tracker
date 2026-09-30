@@ -160,7 +160,7 @@ now = time.time() - 3600
 for index, result in enumerate(("win", "win", "loss", "win")):
     store.record_result(f"rollback-seed-{index}", result, "test",
                         {"streak": 0, "wins": 0, "losses": 0}, created_at=now + index)
-from optional_enrichment import MatchSnapshot, OptionalEnrichmentService
+from optional_enrichment import MatchSnapshot, RankRatingObservation, OptionalEnrichmentService
 from pathlib import Path
 sys.path.insert(0, str(Path(sys.argv[1]) / "tests"))
 from enrichment_test_clock import fixture_clock
@@ -180,6 +180,11 @@ with fixture_clock():
                                        expected_revision=0)
         assert result.status == "saved" and result.snapshots[0].revision == 1, result
     assert len(service.lookup_many([f"rollback-seed-{index}" for index in range(4)]).bindings) == 4
+    for index in range(2):
+        identity = f"rollback-observation-{index}"
+        ticket = service.prepare_observation(identity, match_event_id="rollback-seed-0" if index == 0 else None).observation_ticket
+        value = RankRatingObservation(identity, 123.125, "A4", "pre_s", "001,250", "recognized", "fixture.v1", "fixture")
+        assert service.save_observation(ticket, value).status == "saved"
 '''
 
 
@@ -521,6 +526,23 @@ class Run:
         check(visible == expected, f"{label}: snapshots not preserved/visible: {visible}")
         self.evidence[label + "_visible_bindings"] = [row["event_id"] for row in visible]
         self.evidence[label + "_visible_metadata"] = visible
+        observations = json.loads(self.in_app(
+            "import json, sys; from pathlib import Path; from dataclasses import asdict\n"
+            "from app_paths import data_dir\n"
+            "from optional_enrichment import OptionalEnrichmentService\n"
+            "sys.path.insert(0, str(Path.cwd() / 'tests'))\n"
+            "from enrichment_test_clock import fixture_clock\n"
+            "with fixture_clock():\n"
+            "    response=OptionalEnrichmentService(data_dir(), active=True).lookup_observations_many(['rollback-observation-0','rollback-observation-1'])\n"
+            "    assert response.status == 'visible' and response.observation_generation == 0\n"
+            "    print(json.dumps([{'value':asdict(v.observation),'context':v.association_status} for v in response.observations]))"))
+        expected_observations = [dict(value=dict(observation_id=f"rollback-observation-{i}",
+            observed_at=123.125, self_rank="A4", rating_mode="pre_s", rating_value="001,250",
+            recognition_status="recognized", recognition_version="fixture.v1", source="fixture"),
+            context="valid" if i == 0 else "none") for i in range(2)]
+        check(observations == expected_observations, f"{label}: independent observations changed: {observations}")
+        self.evidence[label + "_observations"] = observations
+
 
     def main(self):
         # Both layouts live under Programs\AC6WinLossTracker* (app-local and legacy);
