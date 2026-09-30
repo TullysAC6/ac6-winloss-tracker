@@ -4,6 +4,12 @@
 Live acceptance/merge evidence belongs in the candidate PR and [Issue #6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6).
 Public v1.2.0 does not contain this slice. No following slice is authorized.
 
+> **Superseded in part by #15-2** ([contract](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md)). A fresh sidecar is now v3, and
+> `upgrade_storage()` migrates v1/v2 to v3. On v3, and for a fresh file, `save_metadata` is refused as
+> `snapshot_required`, because a category-only write cannot keep rank or recognition evidence true. It is unchanged
+> on v2, and `lookup_metadata` still reads categories on v1/v2/v3. The rest of this document records the #15-1
+> contract as merged.
+
 ## Boundary
 
 This slice implements only the complete category enums in MASTER_REQUIREMENTS §§10–15:

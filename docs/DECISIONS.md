@@ -163,6 +163,35 @@ exact-head/main CI and merge evidence live on Issue #6 and the slice PR. No late
 
 ---
 
+## #15-2 keeps ranks and recognition evidence in one revisioned snapshot
+
+**Decision (2026-09-30, [boundary A](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5901186697)):
+per-match `self_rank`, Single-only `opponent_rank` and recognition status/version are stored with the category as
+one sidecar-v3 snapshot. Every write is a whole snapshot with an explicit revision compare-and-set.**
+[ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md) has the details.
+
+- **Ranks are canonical tokens, exactly as observed.** The repository establishes UNRANKED, A/A1–A4 (A4 directly
+  below S) and S. It does not establish the bands below A. They get a bounded syntax, not an invented enum. There is
+  no normalization, no filled-in subdivision (`A` never becomes `A4`) and no ordinal scale.
+- **A snapshot claims only what one source produced.**
+  - `recognized` means every value came from the named recognizer.
+  - `failed` claims no values.
+  - `NULL` means no recorded evidence, never "not attempted".
+  - TEAM and unknown formats carry no opponent rank, and nothing is resurrected on a return to Single.
+- **A revision, not a value compare, detects stale writers.** A value compare cannot see an A → B → A cycle. A stale
+  revision is rejected even for an identical target.
+- **The #15-1 category-only write stays v2-only.** It has no product caller. On v3 it would have to erase evidence or
+  keep evidence that is no longer true, so it is refused.
+- **Deferred:** Rating observations (identity, timestamps, source, `rating_value` / `rating_mode`) and their
+  full-history deletion policy stay open for a later slice
+  ([owner decision 5845998621](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5845998621)).
+
+Why: a stored rank or status is indistinguishable from an observation once it is in the database. A coarse rank
+silently completed, a failed read that keeps older facts, or a stale write that lands after a cycle would each
+corrupt every later statistic.
+
+---
+
 ## Optional match enrichment uses a dormant sidecar
 
 **Decision (2026-09-27, accepted and merged in PR #50): match-bound optional enrichment lives in

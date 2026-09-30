@@ -1,4 +1,4 @@
-"""T2: v2 -> exact v1 build -> v2, migration and real isolated server phases."""
+"""T2: v3 -> exact #15-1 (v2) build -> v3, migration and real isolated server phases."""
 import hashlib
 import json
 import os
@@ -21,6 +21,11 @@ import builtins, contextlib, hashlib, json, os, sqlite3, sys, threading, time, u
 from pathlib import Path
 from unittest.mock import patch
 source, root, phase, scenario = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], sys.argv[4]
+# Structured storage inputs, not recognition truth.
+SNAPSHOTS = {"A": ("ranked","single","A4","S","recognized","rank-interpretation-1"),
+             "B": ("custom","team","B2",None,None,None),
+             "C": ("unknown","unknown",None,None,"failed","rank-interpretation-1")}
+CATEGORIES = {key: values[:2] for key, values in SNAPSHOTS.items()}
 assert sys.stdin.readline().strip() == "GO", "parent did not install ownership"
 sys.path.insert(0, str(source))
 data = root / "AC6WinLossTracker"
@@ -51,7 +56,7 @@ def dormant():
     with patch.object(Path, "stat", guard(Path.stat)), patch.object(sqlite3, "connect", guard(sqlite3.connect)), \
             patch.object(builtins, "open", guard(builtins.open)):
         yield
-if phase in ("seed", "seed_v1"):
+if phase in ("seed", "seed_v2"):
     from history_store import HistoryStore
     store = HistoryStore(data)
     store.start_session(started_at=1)
@@ -87,12 +92,12 @@ state = {"pid":os.getpid(), "server_file":str(Path(server.__file__).resolve()),
          "server_sha256":hashlib.sha256(Path(server.__file__).read_bytes()).hexdigest(), "before":rows()}
 fixture = contextlib.ExitStack()
 try:
-    if phase in ("seed", "seed_v1", "upgrade", "again", "bad"):
+    if phase in ("seed", "seed_v2", "upgrade", "again", "bad"):
         # Only candidate phases, after the dormant-startup import assertion.
         sys.path.insert(0, str(source / "tests"))
         from enrichment_test_clock import fixture_clock
         fixture.enter_context(fixture_clock())
-    if phase in ("seed", "seed_v1"):
+    if phase in ("seed", "seed_v2"):
         assert not (data / "enrichment.db").exists()
         from optional_enrichment import OptionalEnrichmentService
         service = OptionalEnrichmentService(data, active=True)
@@ -101,27 +106,46 @@ try:
             assert result.status == "saved", result
         assert len(service.lookup_many(["A","B","C"]).bindings) == 3
         if phase == "seed":
+            # This build creates v3 and writes whole snapshots.
+            from optional_enrichment import MatchSnapshot
+            for key, values in SNAPSHOTS.items():
+                saved = service.save_snapshot(service.prepare_binding(key).ticket, MatchSnapshot(key, *values),
+                                              expected_revision=0)
+                assert saved.status == "saved" and saved.snapshots[0].revision == 1, saved
+        else:
+            # The exact #15-1 build creates v2 and writes categories with its own API.
+            import enrichment_store
+            assert enrichment_store._VERSION == 2
             from optional_enrichment import MatchMetadata
-            for key, kind, form in (("A","ranked","single"), ("B","custom","team"), ("C","unknown","team")):
+            for key, (kind, form) in CATEGORIES.items():
                 assert service.save_metadata(service.prepare_binding(key).ticket,
                     MatchMetadata(key, kind, form), expected=MatchMetadata(key)).status == "saved"
     elif phase == "upgrade":
-        from optional_enrichment import MatchMetadata, OptionalEnrichmentService
+        from optional_enrichment import MatchMetadata, MatchSnapshot, OptionalEnrichmentService
         service = OptionalEnrichmentService(data, active=True)
-        assert service.lookup_metadata("A").metadata == (MatchMetadata("A"),)
+        assert sorted(service.lookup_metadata_many(["A","B","C"]).metadata, key=lambda m: m.event_id) == [
+            MatchMetadata(key, *CATEGORIES[key]) for key in ("A","B","C")]
+        assert service.lookup_snapshot("A").health.reason == "migration_required"
         before = rows()
         assert service.upgrade_storage().status == "ready"
-        for key, kind, form in (("A","ranked","single"), ("B","custom","team"), ("C","unknown","team")):
-            assert service.save_metadata(service.prepare_binding(key).ticket,
-                MatchMetadata(key, kind, form), expected=MatchMetadata(key)).status == "saved"
+        # v2 categories carry over as revision 1; nothing about rank or recognition is inferred.
+        # C was unknown/unknown, which v2 never stores, so it has no snapshot at all.
+        migrated = {s.event_id: s for s in service.lookup_snapshot_many(["A","B","C"]).snapshots}
+        assert migrated == {"A": MatchSnapshot("A", "ranked", "single", revision=1),
+                            "B": MatchSnapshot("B", "custom", "team", revision=1), "C": MatchSnapshot("C")}, migrated
+        for key, values in SNAPSHOTS.items():
+            revision = migrated[key].revision
+            saved = service.save_snapshot(service.prepare_binding(key).ticket,
+                                          MatchSnapshot(key, *values, revision=revision), expected_revision=revision)
+            assert saved.status == "saved" and saved.snapshots[0].revision == revision + 1, saved
         assert rows() == before
     elif phase == "old":
-        # The accepted #15-0 build knows v1, but must preserve/reject v2.
+        # The exact #15-1 build knows v1/v2, but must preserve/reject v3.
         sys.path.insert(0, str(source / "tests"))
         from enrichment_test_clock import fixture_clock
         from optional_enrichment import OptionalEnrichmentService
         import enrichment_store
-        assert enrichment_store._VERSION == 1
+        assert enrichment_store._VERSION == 2
         sidecar = (data / "enrichment.db").read_bytes()
         with fixture_clock():
             old_service = OptionalEnrichmentService(data, active=True)
@@ -172,17 +196,20 @@ try:
                 assert server.settle_uncounted_results(server.history)
                 assert rows() == before and not server.uncounted_event_ids
     elif phase == "again":
-        from optional_enrichment import MatchMetadata, OptionalEnrichmentService
+        from dataclasses import replace
+        from optional_enrichment import MatchMetadata, MatchSnapshot, OptionalEnrichmentService
         import enrichment_store
         service = OptionalEnrichmentService(data, active=True)
         expected = sorted(set(r[0] for r in rows()) & {"A","B","C"})
         visible = service.lookup_many(["A","B","C"])
         state["visible_before_cleanup"] = sorted(b.event_id for b in visible.bindings)
         assert state["visible_before_cleanup"] == expected, visible
-        known = {"A": MatchMetadata("A","ranked","single"),
-                 "B": MatchMetadata("B","custom","team"), "C": MatchMetadata("C","unknown","team")}
+        snapshots = sorted(service.lookup_snapshot_many(["A","B","C"]).snapshots, key=lambda row: row.event_id)
+        assert [replace(row, revision=0) for row in snapshots] == [MatchSnapshot(key, *SNAPSHOTS[key])
+                                                                  for key in expected], snapshots
+        assert all(row.revision >= 1 for row in snapshots), snapshots
         assert sorted(service.lookup_metadata_many(["A","B","C"]).metadata,
-                      key=lambda row: row.event_id) == [known[key] for key in expected]
+                      key=lambda row: row.event_id) == [MatchMetadata(key, *CATEGORIES[key]) for key in expected]
         previous = json.loads((root / "old.json").read_text())
         if "D" in previous:
             assert not service.lookup(previous["D"]).bindings
@@ -205,7 +232,7 @@ try:
         assert sorted(b.event_id for b in service.lookup_many(["A","B","C"]).bindings) == expected
         connection = sqlite3.connect(data / "enrichment.db")
         try:
-            assert [r[0] for r in connection.execute("SELECT event_id FROM match_metadata ORDER BY event_id")] == expected
+            assert [r[0] for r in connection.execute("SELECT event_id FROM match_snapshots ORDER BY event_id")] == expected
         finally:
             connection.close()
     elif phase == "bad":
@@ -254,7 +281,7 @@ class EnrichmentRollbackTests(unittest.TestCase):
         if cls.previous is None:
             cls.directory.cleanup()
             raise AssertionError("exact previous source must be available")
-        assert PREVIOUS_VERSION == "17b42e8c35306024b613d6d8d0ba8968998a6095"
+        assert PREVIOUS_VERSION == "4441825d37ece7c257d94e014a78a791c0b57e9f"
 
     @classmethod
     def tearDownClass(cls):
@@ -393,7 +420,7 @@ class EnrichmentRollbackTests(unittest.TestCase):
                     optional.write_bytes(b"foreign invalid sqlite")
                 elif broken == "future":
                     with sqlite3.connect(optional) as connection:
-                        connection.execute("PRAGMA user_version=3")
+                        connection.execute("PRAGMA user_version=4")
                     connection.close()
                 elif broken == "locked":
                     lock = sqlite3.connect(optional)
@@ -428,9 +455,9 @@ class EnrichmentRollbackTests(unittest.TestCase):
         self.assertEqual({row.event_id for row in service.lookup_many(["A","B","C"]).bindings}, {"A","B","C"})
         self.assertFalse((data / "enrichment.db-journal").exists())
 
-    def test_real_v1_creation_migration_and_old_build_rejection(self):
-        root, data, port = self.profile("v1-upgrade")
-        self.phase(self.previous, root, "seed_v1", "record", port)
+    def test_real_v2_creation_migration_and_old_build_rejection(self):
+        root, data, port = self.profile("v2-upgrade")
+        self.phase(self.previous, root, "seed_v2", "record", port)
         self.phase(ROOT, root, "upgrade", "record", port)
         sidecar = (data / "enrichment.db").read_bytes()
         self.phase(self.previous, root, "old", "record", port)

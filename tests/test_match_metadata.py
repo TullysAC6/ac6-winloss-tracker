@@ -1,4 +1,9 @@
-"""T0: category persistence is optional, parent-checked and recognition-agnostic."""
+"""T0: #15-1 category persistence is optional, parent-checked and recognition-agnostic.
+
+Since #15-2 a fresh store is v3, so this v2 category API is exercised on an
+explicit exact v2 store; on v3 (and for a fresh file) it is refused as
+snapshot_required. tests/test_match_snapshots.py owns the v3 snapshot contract.
+"""
 import sqlite3
 import sys
 import tempfile
@@ -30,8 +35,17 @@ class MetadataTests(unittest.TestCase):
         self.ranked = MatchMetadata("A", "ranked", "single")
 
     def save(self, value=None, expected=None):
-        return self.service.save_metadata(self.ticket, value or self.ranked,
-                                          expected=expected or self.unknown, create_missing=True)
+        if not self.path.exists():
+            self.v2()
+        return self.service.save_metadata(self.ticket, value or self.ranked, expected=expected or self.unknown)
+
+    def v2(self):
+        # Canonical accepted v2 DDL; real #15-1 creation is covered by T2.
+        for table in storage._SCHEMAS[2]:
+            self.sql(storage._TABLES[table][0])
+        self.sql("INSERT INTO maintenance_state VALUES(1,NULL)")
+        self.sql(f"PRAGMA application_id={storage._APPLICATION_ID}")
+        self.sql("PRAGMA user_version=2")
 
     def sql(self, query, args=()):
         connection = sqlite3.connect(self.path)
@@ -126,20 +140,27 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), before)
         history = (self.root / "history.db").read_bytes()
         self.assertEqual(self.service.upgrade_storage().status, "ready")
-        self.assertEqual(self.sql("PRAGMA user_version"), [(2,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
         self.assertEqual(self.sql("SELECT * FROM maintenance_state"), [(1, "A")])
         self.assertEqual(self.service.lookup_metadata("A").metadata, (self.unknown,))
-        self.assertEqual(self.save().status, "saved")
         upgraded = self.path.read_bytes()
+        # The upgrade goes to v3, where category-only writes are refused, not merged.
+        self.assertEqual(self.save().health.reason, "snapshot_required")
         self.assertEqual(self.service.upgrade_storage().status, "ready")
         self.assertEqual(self.path.read_bytes(), upgraded)
         self.assertEqual((self.root / "history.db").read_bytes(), history)
+
+    def test_fresh_store_is_never_created_for_a_category_only_write(self):
+        result = self.service.save_metadata(self.ticket, self.ranked, expected=self.unknown, create_missing=True)
+        self.assertEqual((result.health.state, result.health.reason), ("incompatible", "snapshot_required"))
+        self.assertFalse(self.path.exists())
+        self.assertFalse(list(self.root.glob(".enrichment-*")))
 
     def test_migration_failure_at_each_step_restores_v1(self):
         self.v1()
         before = self.path.read_bytes()
         connect = sqlite3.connect
-        for target in (storage._DDL[2], "PRAGMA user_version=2"):
+        for target in (storage._SNAPSHOTS_DDL, "PRAGMA user_version=3"):
             with self.subTest(target=target):
                 reached = []
                 class Fault(sqlite3.Connection):
@@ -166,9 +187,9 @@ class MetadataTests(unittest.TestCase):
         with ExitStack() as clocks:
             def after_upgrade(connection):
                 result = original(connection)
-                if connection.execute("PRAGMA user_version").fetchone()[0] == 2:
+                if connection.execute("PRAGMA user_version").fetchone()[0] == 3:
                     reached.append(True)
-                    self.assertEqual(connection.execute("SELECT count(*) FROM match_metadata").fetchone(), (0,))
+                    self.assertEqual(connection.execute("SELECT count(*) FROM match_snapshots").fetchone(), (0,))
                     deadline.end = 0
                     clocks.enter_context(real_clock())
                 return result
@@ -192,7 +213,7 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(self.service.upgrade_storage().health.reason, "schema")
         self.assertEqual(self.path.read_bytes(), before)
         self.sql("DROP INDEX unexpected")
-        self.sql("PRAGMA user_version=3")
+        self.sql("PRAGMA user_version=4")  # 3 is now a supported version with its own schema
         before = self.path.read_bytes()
         self.assertEqual(self.service.lookup_metadata("A").health.state, "incompatible")
         self.assertEqual(self.service.upgrade_storage().health.state, "incompatible")
@@ -270,7 +291,8 @@ class MetadataTests(unittest.TestCase):
             connection.execute("UPDATE matches SET result='draw' WHERE event_id='A'")
         connection.close()
         self.assertEqual(self.service.prepare_binding("A").status, "unknown")
-        self.assertEqual(self.save().health.reason, "identity_mismatch")
+        self.assertEqual(self.service.save_metadata(self.ticket, self.ranked, expected=self.unknown,
+                                                    create_missing=True).health.reason, "identity_mismatch")
         self.assertFalse(self.path.exists())
 
 
