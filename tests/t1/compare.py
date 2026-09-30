@@ -49,6 +49,12 @@ _BOUNDS = (
 def compare_image(record, actual):
     checks = record["checks"]
     failures = []
+    if checks.get("adapter") == "match_header.v1":
+        for key in ("match_type", "match_format", "status", "version", "source"):
+            if not same_value(checks[key], actual.get(key)):
+                failures.append(failure("classify", key, checks[key], actual.get(key),
+                                        "header output differs from visually reviewed truth"))
+        return failures
     got = actual.get("frame_class")
     if not same_value(checks["frame_class"], got):
         failures.append(failure("classify", "frame_class", checks["frame_class"], got,

@@ -30,7 +30,7 @@ DEFAULT_CASE_TIMEOUT = 10.0
 DEFAULT_SUITE_TIMEOUT = 120.0
 JOB_EXIT_GRACE_SECONDS = 5.0
 REPLAYED_SOURCES = ("result_detector.py", "result_gate.py", "game_capture.py", "owned_worker.py",
-                    "detector_templates.json")
+                    "detector_templates.json", "match_header.py")
 EXPECTED_PROBES = frozenset(("socket", "dns", "process", "write_outside_root", "denied_import", "native_window_dll"))
 WORKER_SCRIPT = Path(__file__).resolve().with_name("worker.py")
 CREATE_NO_WINDOW = 0x08000000
@@ -131,7 +131,8 @@ def _spec(case, corpus, repo_root, fixtures_root, forbidden_roots):
                 referenced.add(step["wgc"]["sample"]["frame"])
         images = {image_id: corpus.images[image_id]["input"] for image_id in sorted(referenced)}
     return {"case_id": case.id, "kind": case.kind, "repo_root": str(repo_root), "fixtures_root": str(fixtures_root),
-            "forbidden_roots": list(forbidden_roots), "images": images, "input": data}
+            "forbidden_roots": list(forbidden_roots), "images": images, "input": data,
+            "adapter": case.record["checks"]["adapter"]}
 
 
 def _validate_worker_result(result, case, source_hashes):
@@ -232,7 +233,8 @@ def run_case(case, corpus, repo_root, fixtures_root, suite_root, index, timeout,
                 actual = result["actual"]
                 if case.kind == "image":
                     entry["failures"].extend(compare.compare_image(case.record, actual))
-                    entry["actual"] = {"frame_class": actual.get("frame_class")}
+                    entry["actual"] = (actual if case.record["family"] == "match_metadata"
+                                       else {"frame_class": actual.get("frame_class")})
                 else:
                     entry["failures"].extend(compare.compare_sequence(case.record, actual))
                     entry["actual"] = {"totals": compare.derive_totals(actual.get("observations") or [])}

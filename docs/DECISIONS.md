@@ -810,3 +810,21 @@ must:
 Owner adopted [Option B](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912336221) on 2026-09-30. Independent observations survive individual/date/Undo/full match deletion; optional event+witness context is hidden on proven parent loss and removed later without deleting observations. Unreadable authority is not deletion evidence. Explicit observation-history purge leaves matches and per-match snapshots alone and revokes stale writers/queued publication using an observation-only durable generation. Neither both-history deletion nor this foundation claims to remove every Tracker artifact or securely erase bytes.
 
 #15-3 freezes bounded lossless Rating text because §64/§65 establish no numeric domain. It preserves actual caller-supplied event time and exact #15-2 rank precision. Season storage remains with #28-A because catalog identity/assignment provenance/transition semantics are not settled. No confidence/speculative source enum, recognition, runtime, UI or analytics is added. See [contract](ISSUE15_3_OBSERVATION_CONTRACT.md) for API, migration and publication boundary. #15-1/#15-2 are explicitly accepted; #15-3 acceptance remains pending and STOP follows it.
+
+
+## #15-4 uses directly verified minimal header evidence before runtime integration
+
+On 2026-10-01 the owner accepted #15-3 and authorized #15-4 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5921021683)).
+Actual Autopilot/Video Analyzer artifacts were inspected, including raw video,
+reports, labels, correction provenance and the sequence-decoder implementation.
+The selected supported subset was [recorded before code](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5921185412):
+complete native English Ranked Single lobby header evidence only. Missing/partial
+or other-category evidence returns UNKNOWN on both fields. Custom/Team/Rank/Rating
+and runtime integration are deferred. No inferred AP monotonicity, sequence
+carry-forward, title/user metadata or analyzer-generated truth is adopted.
+The [contract](ISSUE15_4_RECOGNITION_CONTRACT.md) records genuine bounded canonical
+crops, original provenance, dev/validation limits (including initial false
+abstentions), correction discipline and exact missing-fixture plan.
+This is an engineering subset within the existing owner authorization; it does
+not change product scope, persistence ownership, A vs A4 precision, the pre-S/S
+boundary, Season ownership or owner Acceptance. STOP after #15-4.

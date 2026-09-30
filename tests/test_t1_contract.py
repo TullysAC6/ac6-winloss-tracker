@@ -328,7 +328,8 @@ class CorpusTests(unittest.TestCase):
 
     def test_the_committed_corpus_loads(self):
         corpus = load_corpus(self.root)
-        self.assertEqual(len(corpus.images), 25)
+        self.assertEqual(sum(r["family"] == "results" for r in corpus.images.values()), 25)
+        self.assertEqual(sum(r["family"] == "match_metadata" for r in corpus.images.values()), 11)
         self.assertGreaterEqual(len(corpus.sequences), 12)
         self.assertEqual([case.id for case in corpus.cases], sorted(case.id for case in corpus.cases))
         self.assertEqual(corpus.summary()["families"]["results"], "implemented")
@@ -382,6 +383,7 @@ class CorpusTests(unittest.TestCase):
         (self.root / "results" / "win" / "deeper" / "x.json").write_text("{}", encoding="utf-8")
         self.assertCorpusError("<family>/<category>")
         shutil.rmtree(self.root / "results")
+        shutil.rmtree(self.root / "match_metadata")
         for image in self.root.glob("*.ppm"):
             image.unlink()
         self.assertCorpusError("empty")

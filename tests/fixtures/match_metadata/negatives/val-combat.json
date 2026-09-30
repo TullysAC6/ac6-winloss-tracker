@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "metadata.val-combat",
+  "family": "match_metadata",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "match_metadata/negatives/val-combat.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 15947,
+    "sha256": "aaab1fbf5770f40bfb5b2deb0ad8a5f34e665ea01ff98efd4d37ae9992a8ae4f"
+  },
+  "truth": {
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "screen": "combat",
+    "visible_text": "no complete RANK MATCH: SINGLE header"
+  },
+  "checks": {
+    "adapter": "match_header.v1",
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "status": "failed",
+    "version": "rank-single-header.v1",
+    "source": "direct_header"
+  },
+  "coverage": [
+    "metadata.header.unknown"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "y86wDex-EQI",
+    "reference": "https://www.youtube.com/watch?v=y86wDex-EQI",
+    "timestamp_ms": 292000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "d0cf66d720edfa8fd9140ba0fab3a9ed652ec06e76fa5729be5c52e018e57c75",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Codex visual inspection; owner Acceptance pending",
+    "date": "2026-10-01",
+    "basis": "Original full frame and unmodified crop show combat; labels transcribed from visible UI, never Analyzer prediction.",
+    "privacy": "minimal top-left game UI crop; player/opponent names, handles, chat and desktop excluded",
+    "corrections": []
+  }
+}

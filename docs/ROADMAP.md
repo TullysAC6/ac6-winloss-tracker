@@ -23,13 +23,34 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
-## Current checkpoint — 2026-09-30
+## Current checkpoint — 2026-10-01
 
-#15-0, #15-1 (PR #55) and #15-2 (PR #61) are **Accepted + Merged + Unreleased**, following [explicit owner acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912055608). This supersedes historical pending/STOP wording below. #15-2 merged as `148a25c955ae3b6fd0a7624005f1465e31a13256`; [exact-main CI 36716529892](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36716529892) passed on attempt 1.
+#15-0/-1/-2/-3 are **Accepted + Merged + Unreleased**. The owner's explicit
+[#15-3 acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5920995379)
+supersedes every older pending/STOP statement for that slice. PR #62 merged as
+`d20741fd2903cd75daf9e05b3b8e5f4bdae77c33`; exact-main CI 36784597221 SUCCESS,
+attempt 1. Public stable remains **v1.2.0**, Issue #15 OPEN.
 
-**#15-3 independent Rank/Rating observation persistence + deletion lifecycle foundation** is the single [owner-authorized slice](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912336221), based on that exact main. Dormant sidecar v4, explicit atomic v1/v2/v3 migration, independent observation lifetime (Option B), optional context cleanup and observation-only purge/generation barrier; [contract](ISSUE15_3_OBSERVATION_CONTRACT.md). Its own **acceptance remains PENDING**, Released NO. Resolve its PR and Issues #15/#6 for live gates/review/merge and exact SHA evidence; these docs do not predict CI/merge outcomes.
+**#15-4 is the single owner-authorized slice** ([authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5921021683),
+[pre-code target/evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5921185412)).
+Actual local Autopilot/Analyzer artifacts and original frames were inspected.
+The supported subset is pure positive-only complete English `RANK MATCH: SINGLE`
+header recognition at the observed native 1920x1080 layout; all insufficient
+inputs abstain. Eleven tiny original-frame fixtures extend formal T1 while
+retaining the existing 42 result cases. **Custom/Team/Rank/Rating recognition,
+production acquisition/capture/hooks/workers/writes, Season, UI, analytics,
+opponent builds, DRAW/ResultGate/detector/CLEAR and release remain outside scope.**
+[Contract, inventory, validation limitations and missing-fixture plan](ISSUE15_4_RECOGNITION_CONTRACT.md).
 
-**STOP after #15-3.** No following #15 slice, recognition/runtime activation, #28-A, UI-2 or release is authorized. Issue #15 remains OPEN; public stable remains v1.2.0. #59 remains OPEN / low-priority deferred: if only the cumulative 20-minute CI limit blocks a required head/main check, STOP without workflow changes or repeated reruns. Unmerged-generation count must be resolved from GitHub (maximum two); only #15-3 may be active under this authorization.
+Resolve Issue #15 / its implementation PR for live gate/review/exact-head/main
+CI/merge evidence. #15-4 owner **Acceptance PENDING**, Released NO; authorization
+does not imply Acceptance. The existing recorded checkpoints below are historical
+where they conflict with this explicit owner decision.
+
+**STOP after #15-4.** No following slice is authorized. #59 remains OPEN / deferred;
+if its cumulative 20-minute CI limit alone blocks verification, STOP without
+workflow changes, weakened checks or repeated reruns. Resolve GitHub for the
+current main/open-PR count; the maximum unmerged generations remains two.
 
 ## Release status note — 2026-09-14
 

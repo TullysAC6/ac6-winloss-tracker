@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "metadata.dev-assembly",
+  "family": "match_metadata",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "match_metadata/negatives/dev-assembly.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 22213,
+    "sha256": "2019c00551f13b1481962eaa98849fbaf087876b9919640b108c3cfeaea2e585"
+  },
+  "truth": {
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "screen": "assembly",
+    "visible_text": "no complete RANK MATCH: SINGLE header"
+  },
+  "checks": {
+    "adapter": "match_header.v1",
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "status": "failed",
+    "version": "rank-single-header.v1",
+    "source": "direct_header"
+  },
+  "coverage": [
+    "metadata.header.unknown"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "WabYwwGakEQ",
+    "reference": "https://www.youtube.com/watch?v=WabYwwGakEQ",
+    "timestamp_ms": 498750,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "2994571a99f8e2364d514f70f31fa42f8e8b4308c53152003a9f5e97ced0cc5d",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Codex visual inspection; owner Acceptance pending",
+    "date": "2026-10-01",
+    "basis": "Original full frame and unmodified crop show assembly; labels transcribed from visible UI, never Analyzer prediction.",
+    "privacy": "minimal top-left game UI crop; player/opponent names, handles, chat and desktop excluded",
+    "corrections": []
+  }
+}
