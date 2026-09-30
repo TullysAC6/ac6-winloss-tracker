@@ -136,7 +136,8 @@ class MetadataTests(unittest.TestCase):
         before = self.path.read_bytes()
         self.assertEqual(self.service.inspect().status, "ready")
         self.assertEqual(self.service.lookup_metadata("A").metadata, (self.unknown,))
-        self.assertEqual(self.save().health.reason, "migration_required")
+        # v1 upgrades only to v3, so the category-only write is refused here too.
+        self.assertEqual(self.save().health.reason, "snapshot_required")
         self.assertEqual(self.path.read_bytes(), before)
         history = (self.root / "history.db").read_bytes()
         self.assertEqual(self.service.upgrade_storage().status, "ready")

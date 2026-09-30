@@ -287,10 +287,10 @@ class OptionalEnrichmentService:
         expected is the caller's prior MatchMetadata (unknown/unknown if absent).
         A different current value rejects with metadata_conflict; equal target
         values are idempotent retries. This does not decide recognition precedence.
-        Existing v1 files require a separate explicit upgrade_storage() call.
 
         This is the v2 category write. A v3 store (and therefore a fresh one,
         which is always v3) rejects it as snapshot_required: use save_snapshot().
+        A v1 store does too, because its only upgrade leads to v3.
         create_missing never creates a file this method would then refuse.
         """
         def work(deadline, stamp):

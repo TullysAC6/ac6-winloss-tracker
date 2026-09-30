@@ -62,6 +62,7 @@ _BINDINGS_DDL, _MAINTENANCE_DDL, _METADATA_DDL = (
 # #15-2: one coherent per-match snapshot (docs/ISSUE15_2_RANK_EVIDENCE_CONTRACT.md).
 # Rank tokens: the established UNRANKED, S and A/A1-A4, or an as yet unestablished
 # pre-S band letter with an optional 1-9 subdivision. No ordinal, no normalization.
+# instr(..., char(0)) guards the text rules: SQLite length() and GLOB stop at NUL.
 _SNAPSHOTS_DDL = """CREATE TABLE match_snapshots (
     event_id TEXT COLLATE BINARY PRIMARY KEY NOT NULL
         REFERENCES match_bindings(event_id) ON DELETE CASCADE,
@@ -72,12 +73,12 @@ _SNAPSHOTS_DDL = """CREATE TABLE match_snapshots (
     match_format TEXT NOT NULL
         CHECK(typeof(match_format) = 'text' AND match_format IN ('single', 'team', 'unknown')),
     self_rank TEXT
-        CHECK(self_rank IS NULL OR (typeof(self_rank) = 'text' AND (
+        CHECK(self_rank IS NULL OR (typeof(self_rank) = 'text' AND instr(self_rank, char(0)) = 0 AND (
               self_rank IN ('UNRANKED', 'S', 'A', 'A1', 'A2', 'A3', 'A4')
               OR (length(self_rank) = 1 AND self_rank GLOB '[B-RT-Z]')
               OR (length(self_rank) = 2 AND self_rank GLOB '[B-RT-Z][1-9]')))),
     opponent_rank TEXT
-        CHECK(opponent_rank IS NULL OR (typeof(opponent_rank) = 'text' AND (
+        CHECK(opponent_rank IS NULL OR (typeof(opponent_rank) = 'text' AND instr(opponent_rank, char(0)) = 0 AND (
               opponent_rank IN ('UNRANKED', 'S', 'A', 'A1', 'A2', 'A3', 'A4')
               OR (length(opponent_rank) = 1 AND opponent_rank GLOB '[B-RT-Z]')
               OR (length(opponent_rank) = 2 AND opponent_rank GLOB '[B-RT-Z][1-9]')))),
@@ -86,7 +87,7 @@ _SNAPSHOTS_DDL = """CREATE TABLE match_snapshots (
               AND recognition_status IN ('recognized', 'failed'))),
     recognition_version TEXT
         CHECK(recognition_version IS NULL OR (typeof(recognition_version) = 'text'
-              AND length(recognition_version) BETWEEN 1 AND 64
+              AND instr(recognition_version, char(0)) = 0 AND length(recognition_version) BETWEEN 1 AND 64
               AND recognition_version GLOB '[A-Za-z0-9]*'
               AND NOT recognition_version GLOB '*[^A-Za-z0-9._:-]*')),
     CHECK(opponent_rank IS NULL OR match_format = 'single'),
@@ -457,9 +458,11 @@ class _Store:
         with self.open(deadline) as connection:
             connection.execute("BEGIN")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            table = {2: "match_metadata", 3: "match_snapshots"}.get(version)
-            fields = ("m.event_id,m.match_type,m.match_format" if table else "NULL,NULL,NULL")
-            join = (f" LEFT JOIN {table} m ON m.event_id=b.event_id" if table else "")
+            if version == _VERSION:
+                # The category view of whole v3 snapshots: a corrupt row fails closed here too.
+                return tuple((binding, values[:2]) for binding, _, values in self._snapshot_rows(connection, ids))
+            fields = ("m.event_id,m.match_type,m.match_format" if version == 2 else "NULL,NULL,NULL")
+            join = (" LEFT JOIN match_metadata m ON m.event_id=b.event_id" if version == 2 else "")
             rows = connection.execute(
                 "SELECT b.event_id,b.witness_version,b.parent_created_at_bits,b.parent_result," + fields
                 + " FROM match_bindings b" + join
@@ -476,15 +479,13 @@ class _Store:
 
         v3 keeps category, ranks and recognition evidence as one revisioned
         snapshot; a category-only write could neither carry a revision nor keep
-        that evidence true, so it is refused there, never silently merged.
+        that evidence true, so it is refused there, never silently merged. A v1
+        store gets the same answer: its only upgrade leads to v3.
         """
         values, expected = _metadata(values), _metadata(expected)
         with self.open(deadline, write=True) as connection:
-            version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version == _VERSION:
+            if connection.execute("PRAGMA user_version").fetchone()[0] != 2:
                 raise _Unavailable("snapshot_required", "incompatible")
-            if version != 2:
-                raise _Unavailable("migration_required", "incompatible")
             self._save_binding(connection, binding)
             row = connection.execute("SELECT match_type,match_format FROM match_metadata WHERE event_id=?",
                                      (binding.event_id,)).fetchone()
@@ -497,24 +498,28 @@ class _Store:
                                "match_type=excluded.match_type,match_format=excluded.match_format",
                                (binding.event_id, *values))
 
+    @staticmethod
+    def _snapshot_rows(connection, ids):
+        rows = connection.execute(
+            "SELECT b.event_id,b.witness_version,b.parent_created_at_bits,b.parent_result,s.revision,"
+            + ",".join("s." + column for column in _SNAPSHOT_COLUMNS.split(","))
+            + " FROM match_bindings b LEFT JOIN match_snapshots s ON s.event_id=b.event_id"
+            + f" WHERE b.event_id IN ({','.join('?' for _ in ids)})", ids).fetchmany(_BATCH + 1)
+        result = []
+        for row in rows:
+            if row[4] is None:
+                result.append((_Binding.from_row(row[:4]), 0, _DEFAULT_SNAPSHOT))
+            else:
+                result.append((_Binding.from_row(row[:4]), _revision(row[4], stored=True), _snapshot(row[5:])))
+        return tuple(result)
+
     def read_snapshots(self, ids, deadline):
         """(binding, revision, values) per binding; revision 0 means no snapshot row."""
         with self.open(deadline) as connection:
             connection.execute("BEGIN")
             if connection.execute("PRAGMA user_version").fetchone()[0] != _VERSION:
                 raise _Unavailable("migration_required", "incompatible")
-            rows = connection.execute(
-                "SELECT b.event_id,b.witness_version,b.parent_created_at_bits,b.parent_result,s.revision,"
-                + ",".join("s." + column for column in _SNAPSHOT_COLUMNS.split(","))
-                + " FROM match_bindings b LEFT JOIN match_snapshots s ON s.event_id=b.event_id"
-                + f" WHERE b.event_id IN ({','.join('?' for _ in ids)})", ids).fetchmany(_BATCH + 1)
-            result = []
-            for row in rows:
-                if row[4] is None:
-                    result.append((_Binding.from_row(row[:4]), 0, _DEFAULT_SNAPSHOT))
-                else:
-                    result.append((_Binding.from_row(row[:4]), _revision(row[4], stored=True), _snapshot(row[5:])))
-            return tuple(result)
+            return self._snapshot_rows(connection, ids)
 
     def save_snapshot(self, binding, values, expected_revision, deadline):
         """Full-snapshot compare-and-set on the stored revision.

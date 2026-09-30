@@ -68,11 +68,16 @@ Two applicability rules hold in every snapshot:
   application release.
 - **Failed reads:** a failed read cannot relabel older facts as its own output. Recording it replaces the snapshot
   with an empty failed one; a caller that wants to keep the old facts simply does not write.
-- **One recognizer per snapshot:** callers must not carry values from one snapshot into a new snapshot with a different status or version.
+- **One recognizer per snapshot:** callers must not carry values from one snapshot into a new snapshot with a
+  different status or version. For example, a `dataclasses.replace()` of a read snapshot that changes only the
+  status/version would relabel old values. The store cannot detect this, so a future recognizer caller's review
+  must check it. Likewise, "not the app release" is a documented meaning: `1.2.0` is syntactically a valid version.
 - **Absence:** "no snapshot" and "no recorded evidence" never mean "not attempted". No "partial" or "not_attempted"
   state is stored. Partiality shows as unknown fields; which fields apply to Custom or TEAM is not established.
 
 The same rules are enforced twice: in code before any file is touched, and as `CHECK` constraints in the table.
+The text `CHECK`s also refuse embedded NUL (`instr(..., char(0)) = 0`), because SQLite's `length()` and `GLOB` stop at
+the first NUL, so the two layers agree.
 
 ## Revision and stale writers
 
@@ -90,6 +95,10 @@ and a binding without a row is revision 0.
 The existing activation/revision ticket, the authoritative parent witness, fresh parent checks at publication,
 publication invalidation and bounded cascade cleanup all apply unchanged.
 
+The revision is per stored row. It restarts only if cleanup removes a binding and the same `event_id` is bound again.
+That cannot happen for a live match: event ids are random and never reused, the witness includes `created_at`, and
+invalidation revokes older tickets.
+
 ## Service API
 
 These are internal only; no product caller exists.
@@ -99,9 +108,11 @@ These are internal only; no product caller exists.
 - `lookup_snapshot(event_id)` and `lookup_snapshot_many(ids)` (at most 64) are v3 only. They return parent-checked snapshots; a bound event
   without a row reads as revision 0, all unknown. v1/v2 reject as `migration_required`.
 - `save_snapshot(...)` is v3 only. Invalid input is rejected before `create_missing=True` may create a fresh v3 file.
-- `lookup_metadata(_many)` keeps reading categories on v1, v2 and v3.
+- `lookup_metadata(_many)` keeps reading categories on v1, v2 and v3. On v3 it validates the whole snapshot row, so a
+  corrupt row fails closed there exactly as in `lookup_snapshot`.
 - `save_metadata` (the #15-1 category write) stays unchanged on v2.
   - On v3 it is rejected as `snapshot_required`: it can carry no revision and cannot keep the evidence true.
+  - On v1 it is also rejected as `snapshot_required`, because v1's only upgrade leads to v3.
   - With `create_missing=True` and no file it is also rejected, without creating one.
   - The only callers are tests; product code has none.
 - `upgrade_storage()` migrates an exact v1 or v2 store to v3, and validates v3 as a no-op.
@@ -127,6 +138,9 @@ replaced.
 
 A failure or deadline after any mutation rolls schema, rows and version back together. An invalid source row
 aborts the whole migration.
+
+The copy is not batched. It runs under the same 100 ms cooperative budget, and a store too large to copy in time
+fails closed and stays v2. Real v2 data comes only from the unreleased #15-1, which has no product caller.
 
 ## Rollback
 

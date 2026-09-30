@@ -21,7 +21,7 @@ from optional_enrichment import MatchMetadata, MatchSnapshot, OptionalEnrichment
 
 VALID_RANKS = ("UNRANKED", "S", "A", "A1", "A2", "A3", "A4", "B", "B3", "C1", "E", "U", "Z9")
 INVALID_RANKS = ("A5", "A0", "S1", "S0", "a4", "a", "B10", "B0", "SS", "AA", "UNRANKED1", "", " A", "A4 ",
-                 "Ａ", "A+", "B-", "S rank", 4, 1.0, b"A", True)
+                 "Ａ", "A+", "B-", "S rank", "B\x00junk", "B1\x00x", "A\x00", 4, 1.0, b"A", True)
 
 
 class SnapshotTests(unittest.TestCase):
@@ -159,6 +159,10 @@ class SnapshotTests(unittest.TestCase):
             "UPDATE match_snapshots SET recognition_status='failed'",  # facts would remain
             "UPDATE match_snapshots SET recognition_version='1.2.0 release'",
             "UPDATE match_snapshots SET recognition_version=''",
+            # SQLite length() and GLOB stop at NUL; the instr() guard must still refuse these.
+            "UPDATE match_snapshots SET self_rank='B'||char(0)||'junk'",
+            "UPDATE match_snapshots SET opponent_rank='B1'||char(0)||'x'",
+            "UPDATE match_snapshots SET recognition_version='v1'||char(0)||' not a token!'",
             # '2' would be stored as the integer 2 by column affinity; these cannot be.
             "UPDATE match_snapshots SET revision=0", "UPDATE match_snapshots SET revision='two'",
             "UPDATE match_snapshots SET revision=2.5",
@@ -192,6 +196,7 @@ class SnapshotTests(unittest.TestCase):
                    MatchSnapshot("A", "ranked", recognition_status="recognized", recognition_version="x" * 65),
                    MatchSnapshot("A", "ranked", recognition_status="recognized", recognition_version="-v1"),
                    MatchSnapshot("A", "ranked", recognition_status="recognized", recognition_version="v 1"),
+                   MatchSnapshot("A", "ranked", recognition_status="recognized", recognition_version="v1\x00x"),
                    MatchSnapshot("A", "ranked", recognition_status="recognized", recognition_version=1),
                    MatchSnapshot("A", "RANKED"), MatchSnapshot("A", "ranked", "duel"))
         for snapshot in invalid:
@@ -281,7 +286,8 @@ class SnapshotTests(unittest.TestCase):
         connection.close()
         before = self.path.read_bytes()
         self.assertEqual(self.service.lookup_snapshot("A").health.reason, "invalid_metadata")
-        self.assertEqual(self.service.lookup_metadata("A").metadata, (MatchMetadata("A", "ranked", "single"),))
+        # The category view reads the same row, so it fails closed as well.
+        self.assertEqual(self.service.lookup_metadata("A").health.reason, "invalid_metadata")
         self.assertEqual(self.save(MatchSnapshot("A"), 1).health.reason, "invalid_metadata")
         self.assertEqual(self.path.read_bytes(), before)
 
@@ -343,7 +349,7 @@ class SnapshotTests(unittest.TestCase):
         self.build(1)
         self.assertEqual(self.service.lookup_metadata("A").metadata, (MatchMetadata("A"),))
         self.assertEqual(self.service.save_metadata(self.ticket, MatchMetadata("A", "ranked"),
-                                                    expected=MatchMetadata("A")).health.reason, "migration_required")
+                                                    expected=MatchMetadata("A")).health.reason, "snapshot_required")
         self.assertEqual(self.service.upgrade_storage().status, "ready")
         self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
         self.assertEqual(self.sql("SELECT * FROM match_snapshots"), [])
