@@ -29,8 +29,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-# Dormant #15-2 builds on main after #15-1 (sidecar v2) and the #59 diagnostics.
-PREVIOUS_VERSION = "4441825d37ece7c257d94e014a78a791c0b57e9f"
+# Dormant #15-3 builds on exact accepted #15-2 main (sidecar v3).
+PREVIOUS_VERSION = "148a25c955ae3b6fd0a7624005f1465e31a13256"
 KEY = "player_streak_status_enabled"
 BROADCAST = "broadcast_show_best_streak"
 # This generation adds no preference: both builds understand the same v2 keys.
@@ -99,18 +99,18 @@ finally:
 '''
 
 
-def extract_previous(destination):
+def extract_previous(destination, revision=PREVIOUS_VERSION):
     """The previous build's exact source, from git; fetched if the clone is shallow."""
     git = ["git", "-C", str(ROOT), "-c", f"safe.directory={ROOT}"]
-    present = subprocess.run(git + ["cat-file", "-e", PREVIOUS_VERSION + "^{commit}"],
+    present = subprocess.run(git + ["cat-file", "-e", revision + "^{commit}"],
                              capture_output=True, timeout=30).returncode == 0
     if not present:
         shallow = subprocess.run(git + ["rev-parse", "--is-shallow-repository"], capture_output=True,
                                  text=True, timeout=30).stdout.strip() == "true"
         depth = ["--depth=1"] if shallow else []  # never make a full clone shallow
-        subprocess.run(git + ["fetch", "--no-tags", *depth, "origin", PREVIOUS_VERSION],
+        subprocess.run(git + ["fetch", "--no-tags", *depth, "origin", revision],
                        capture_output=True, timeout=180)
-    archive = subprocess.run(git + ["archive", "--format=tar", PREVIOUS_VERSION],
+    archive = subprocess.run(git + ["archive", "--format=tar", revision],
                              capture_output=True, timeout=120)
     if archive.returncode != 0:
         return None

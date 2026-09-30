@@ -277,11 +277,10 @@ class EnrichmentRollbackTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.directory = tempfile.TemporaryDirectory(prefix="ac6-enrichment-t2-")
-        cls.previous = extract_previous(Path(cls.directory.name) / "previous")
+        cls.previous = extract_previous(Path(cls.directory.name) / "previous", revision="4441825d37ece7c257d94e014a78a791c0b57e9f")
         if cls.previous is None:
             cls.directory.cleanup()
             raise AssertionError("exact previous source must be available")
-        assert PREVIOUS_VERSION == "4441825d37ece7c257d94e014a78a791c0b57e9f"
 
     @classmethod
     def tearDownClass(cls):
@@ -420,7 +419,7 @@ class EnrichmentRollbackTests(unittest.TestCase):
                     optional.write_bytes(b"foreign invalid sqlite")
                 elif broken == "future":
                     with sqlite3.connect(optional) as connection:
-                        connection.execute("PRAGMA user_version=4")
+                        connection.execute("PRAGMA user_version=5")
                     connection.close()
                 elif broken == "locked":
                     lock = sqlite3.connect(optional)

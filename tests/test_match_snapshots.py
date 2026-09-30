@@ -71,13 +71,18 @@ class SnapshotTests(unittest.TestCase):
     def test_fresh_creation_is_exact_v3_and_history_is_untouched(self):
         history = (self.root / "history.db").read_bytes()
         self.assertEqual(self.save(self.recognized).status, "saved")
-        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(4,)])
         self.assertEqual(sorted(self.sql("SELECT type,name,tbl_name FROM sqlite_schema")), sorted([
             ("table", "match_bindings", "match_bindings"),
             ("index", "sqlite_autoindex_match_bindings_1", "match_bindings"),
             ("table", "maintenance_state", "maintenance_state"),
             ("table", "match_snapshots", "match_snapshots"),
-            ("index", "sqlite_autoindex_match_snapshots_1", "match_snapshots")]))
+            ("index", "sqlite_autoindex_match_snapshots_1", "match_snapshots"),
+            ("table", "observations", "observations"),
+            ("index", "sqlite_autoindex_observations_1", "observations"),
+            ("table", "observation_links", "observation_links"),
+            ("index", "sqlite_autoindex_observation_links_1", "observation_links"),
+            ("table", "observation_state", "observation_state")]))
         self.assertEqual(self.sql("SELECT sql FROM sqlite_schema WHERE name='match_snapshots'"),
                          [(storage._SNAPSHOTS_DDL,)])
         self.assertEqual(self.sql("SELECT * FROM match_snapshots"),
@@ -103,7 +108,7 @@ class SnapshotTests(unittest.TestCase):
                 self.assertEqual(self.service.upgrade_storage().health.reason, "schema")
                 self.assertEqual(self.path.read_bytes(), before)
                 self.path.unlink()
-        for future in (0, 4, 5, -1):
+        for future in (0, 5, 6, -1):
             with self.subTest(future=future):
                 self.assertEqual(self.save(self.recognized).status, "saved")
                 self.sql(f"PRAGMA user_version={future}")
@@ -328,7 +333,7 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(self.save(self.recognized, 0, False).health.reason, "migration_required")
         history = (self.root / "history.db").read_bytes()
         self.assertEqual(self.service.upgrade_storage().status, "ready")
-        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(4,)])
         self.assertEqual(self.sql("SELECT * FROM match_snapshots"),
                          [("A", 1, "ranked", "team", None, None, None, None)])
         self.assertEqual(self.sql("SELECT * FROM maintenance_state"), [(1, "A")])
@@ -351,16 +356,16 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(self.service.save_metadata(self.ticket, MatchMetadata("A", "ranked"),
                                                     expected=MatchMetadata("A")).health.reason, "snapshot_required")
         self.assertEqual(self.service.upgrade_storage().status, "ready")
-        self.assertEqual(self.sql("PRAGMA user_version"), [(3,)])
+        self.assertEqual(self.sql("PRAGMA user_version"), [(4,)])
         self.assertEqual(self.sql("SELECT * FROM match_snapshots"), [])
         self.assertEqual(self.current(), MatchSnapshot("A"))
 
     def test_migration_failure_after_each_real_mutation_restores_the_source(self):
-        steps = {1: (storage._SNAPSHOTS_DDL, "PRAGMA user_version=3"),
+        steps = {1: (storage._SNAPSHOTS_DDL, "PRAGMA user_version=4"),
                  2: (storage._SNAPSHOTS_DDL,
                      "INSERT INTO match_snapshots (event_id,revision,match_type,match_format) "
                      "SELECT event_id,1,match_type,match_format FROM match_metadata",
-                     "DROP TABLE match_metadata", "PRAGMA user_version=3")}
+                     "DROP TABLE match_metadata", "PRAGMA user_version=4")}
         connect = sqlite3.connect
         for version, targets in steps.items():
             for target in targets:
@@ -392,7 +397,7 @@ class SnapshotTests(unittest.TestCase):
         with ExitStack() as clocks:
             def after_upgrade(connection):
                 result = original(connection)
-                if connection.execute("PRAGMA user_version").fetchone()[0] == 3:
+                if connection.execute("PRAGMA user_version").fetchone()[0] == 4:
                     reached.append(connection.execute("SELECT count(*) FROM match_snapshots").fetchone())
                     deadline.end = 0
                     clocks.enter_context(real_clock())
@@ -464,7 +469,7 @@ class SnapshotTests(unittest.TestCase):
         history = self.root / "history.db"
         connection = sqlite3.connect(history)
         with connection:
-            connection.execute("PRAGMA user_version=4")
+            connection.execute("PRAGMA user_version=5")
         connection.close()
         self.assertEqual(self.service.lookup_snapshot("A").snapshots, ())
         self.assertEqual(self.sql("SELECT count(*) FROM match_snapshots"), [(1,)])

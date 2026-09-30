@@ -2436,6 +2436,12 @@ Sample-size and sparse-data honesty from §43 and §44 applies to every number t
 
 ---
 
+## Owner lifecycle clarification — 2026-09-30
+
+[Owner-adopted Option B](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912336221): independent Rank/Rating observations have a lifetime separate from matches even when sharing enrichment.db. Single/date/Undo/full match deletion preserves observations. Optional match context uses authoritative event identity and immutable witness, becomes unusable on proven parent loss, and is cleaned without deleting evidence; unreadable history never proves deletion. A separate explicit observation-history purge removes observation-owned data, preserves matches/per-match snapshots, and revokes stale work. Future all-user-data deletion must account for all Tracker artifacts; deleting both histories alone is insufficient and no secure-erasure guarantee is adopted.
+
+Dormant #15-3 implements this foundation only; [contract](ISSUE15_3_OBSERVATION_CONTRACT.md). Lossless bounded Rating text does not invent numeric semantics. Season assignment/catalog/storage contract remains #28-A; observations may be stored unresolved.
+
 # 65. Season catalog and retrospective assignment
 
 Status: **ADOPTED / PLANNED.** Tracked as **#28-A** in

@@ -804,3 +804,9 @@ must:
     the one-generation rollback keeps the user's choices;
   - nothing added to `config.json`;
   - no manual file edit.
+
+## Independent Rank/Rating observation lifetime — Option B
+
+Owner adopted [Option B](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912336221) on 2026-09-30. Independent observations survive individual/date/Undo/full match deletion; optional event+witness context is hidden on proven parent loss and removed later without deleting observations. Unreadable authority is not deletion evidence. Explicit observation-history purge leaves matches and per-match snapshots alone and revokes stale writers/queued publication using an observation-only durable generation. Neither both-history deletion nor this foundation claims to remove every Tracker artifact or securely erase bytes.
+
+#15-3 freezes bounded lossless Rating text because §64/§65 establish no numeric domain. It preserves actual caller-supplied event time and exact #15-2 rank precision. Season storage remains with #28-A because catalog identity/assignment provenance/transition semantics are not settled. No confidence/speculative source enum, recognition, runtime, UI or analytics is added. See [contract](ISSUE15_3_OBSERVATION_CONTRACT.md) for API, migration and publication boundary. #15-1/#15-2 are explicitly accepted; #15-3 acceptance remains pending and STOP follows it.

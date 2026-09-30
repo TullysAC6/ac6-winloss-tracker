@@ -1,4 +1,4 @@
-"""Private v1/v2/v3 sidecar mechanics. Importing performs no file access.
+"""Private v1/v2/v3/v4 sidecar mechanics. Importing performs no file access.
 
 Only optional_enrichment may use this module in product code. In particular,
 these unfiltered rows are NOT a history, statistics or export API.
@@ -19,8 +19,8 @@ from pathlib import Path
 
 __all__ = ()
 _APPLICATION_ID = 0x41433645
-_VERSION = 3
-_SUPPORTED_VERSIONS = (1, 2, 3)
+_VERSION = 4
+_SUPPORTED_VERSIONS = (1, 2, 3, 4)
 _MAX_PAGES = 16384
 _PAGE_SIZE = 4096
 _BATCH = 64
@@ -98,7 +98,57 @@ _SNAPSHOTS_DDL = """CREATE TABLE match_snapshots (
           OR self_rank IS NOT NULL OR opponent_rank IS NOT NULL)
 )"""
 # The schema a fresh store is created with: always the current version.
-_DDL = (_BINDINGS_DDL, _MAINTENANCE_DDL, _SNAPSHOTS_DDL)
+_OBSERVATIONS_DDL = """CREATE TABLE observations (
+    observation_id TEXT COLLATE BINARY PRIMARY KEY NOT NULL
+        CHECK(typeof(observation_id) = 'text' AND length(observation_id) BETWEEN 1 AND 128
+              AND instr(observation_id, char(0)) = 0),
+    observed_at REAL NOT NULL
+        CHECK(typeof(observed_at) = 'real' AND observed_at >= 0 AND observed_at <= 1.7976931348623157e308),
+    self_rank TEXT
+        CHECK(self_rank IS NULL OR (typeof(self_rank) = 'text' AND instr(self_rank, char(0)) = 0 AND (
+              self_rank IN ('UNRANKED', 'S', 'A', 'A1', 'A2', 'A3', 'A4')
+              OR (length(self_rank) = 1 AND self_rank GLOB '[B-RT-Z]')
+              OR (length(self_rank) = 2 AND self_rank GLOB '[B-RT-Z][1-9]')))),
+    rating_mode TEXT CHECK(rating_mode IS NULL OR rating_mode IN ('pre_s', 's_rank')),
+    rating_value TEXT
+        CHECK(rating_value IS NULL OR (typeof(rating_value) = 'text'
+              AND length(rating_value) BETWEEN 1 AND 128 AND instr(rating_value, char(0)) = 0)),
+    recognition_status TEXT CHECK(recognition_status IS NULL OR recognition_status IN ('recognized', 'failed')),
+    recognition_version TEXT
+        CHECK(recognition_version IS NULL OR (typeof(recognition_version) = 'text'
+              AND instr(recognition_version, char(0)) = 0 AND length(recognition_version) BETWEEN 1 AND 64
+              AND recognition_version GLOB '[A-Za-z0-9]*'
+              AND NOT recognition_version GLOB '*[^A-Za-z0-9._:-]*')),
+    source TEXT NOT NULL
+        CHECK(typeof(source) = 'text' AND instr(source, char(0)) = 0 AND length(source) BETWEEN 1 AND 64
+              AND source GLOB '[A-Za-z0-9]*' AND NOT source GLOB '*[^A-Za-z0-9._:-]*'),
+    CHECK(rating_value IS NULL OR rating_mode IS NOT NULL),
+    CHECK(rating_mode IS NOT 'pre_s' OR self_rank IS NOT 'S'),
+    CHECK(rating_mode IS NOT 's_rank' OR self_rank IS NULL OR self_rank = 'S'),
+    CHECK((recognition_status IS NULL) = (recognition_version IS NULL)),
+    CHECK(recognition_status IS NOT 'failed' OR (self_rank IS NULL AND rating_mode IS NULL AND rating_value IS NULL)),
+    CHECK(recognition_status IS NOT 'recognized' OR self_rank IS NOT NULL OR rating_value IS NOT NULL)
+)"""
+_OBSERVATION_LINKS_DDL = """CREATE TABLE observation_links (
+    observation_id TEXT COLLATE BINARY PRIMARY KEY NOT NULL
+        REFERENCES observations(observation_id) ON DELETE CASCADE,
+    event_id TEXT COLLATE BINARY NOT NULL
+        CHECK(typeof(event_id) = 'text' AND length(event_id) BETWEEN 1 AND 128 AND instr(event_id, char(0)) = 0),
+    witness_version INTEGER NOT NULL CHECK(typeof(witness_version) = 'integer' AND witness_version = 1),
+    parent_created_at_bits BLOB NOT NULL
+        CHECK(typeof(parent_created_at_bits) = 'blob' AND length(parent_created_at_bits) = 8),
+    parent_result TEXT NOT NULL CHECK(typeof(parent_result) = 'text' AND parent_result IN ('win', 'loss'))
+)"""
+_OBSERVATION_STATE_DDL = """CREATE TABLE observation_state (
+    singleton INTEGER PRIMARY KEY NOT NULL CHECK(typeof(singleton) = 'integer' AND singleton = 1),
+    generation INTEGER NOT NULL
+        CHECK(typeof(generation) = 'integer' AND generation BETWEEN 0 AND 9007199254740991),
+    after_observation_id TEXT COLLATE BINARY
+        CHECK(after_observation_id IS NULL OR (typeof(after_observation_id) = 'text'
+              AND length(after_observation_id) BETWEEN 1 AND 128 AND instr(after_observation_id, char(0)) = 0))
+)"""
+_OBSERVATION_DDL = (_OBSERVATIONS_DDL, _OBSERVATION_LINKS_DDL, _OBSERVATION_STATE_DDL)
+_DDL = (_BINDINGS_DDL, _MAINTENANCE_DDL, _SNAPSHOTS_DDL, *_OBSERVATION_DDL)
 _TABLES = {
     "match_bindings": (_BINDINGS_DDL, (("event_id", "TEXT", 1, 1), ("witness_version", "INTEGER", 1, 0),
                                        ("parent_created_at_bits", "BLOB", 1, 0), ("parent_result", "TEXT", 1, 0))),
@@ -111,12 +161,22 @@ _TABLES = {
                                          ("recognition_status", "TEXT", 0, 0),
                                          ("recognition_version", "TEXT", 0, 0))),
 }
+_TABLES.update({
+    'observations': (_OBSERVATIONS_DDL, (('observation_id', 'TEXT', 1, 1), ('observed_at', 'REAL', 1, 0),
+        ('self_rank', 'TEXT', 0, 0), ('rating_mode', 'TEXT', 0, 0), ('rating_value', 'TEXT', 0, 0),
+        ('recognition_status', 'TEXT', 0, 0), ('recognition_version', 'TEXT', 0, 0), ('source', 'TEXT', 1, 0))),
+    'observation_links': (_OBSERVATION_LINKS_DDL, (('observation_id', 'TEXT', 1, 1), ('event_id', 'TEXT', 1, 0),
+        ('witness_version', 'INTEGER', 1, 0), ('parent_created_at_bits', 'BLOB', 1, 0), ('parent_result', 'TEXT', 1, 0))),
+    'observation_state': (_OBSERVATION_STATE_DDL, (('singleton', 'INTEGER', 1, 1), ('generation', 'INTEGER', 1, 0),
+        ('after_observation_id', 'TEXT', 0, 0))),
+})
 # Exactly these tables per supported version; v3 replaces match_metadata.
 _SCHEMAS = {1: ("match_bindings", "maintenance_state"),
             2: ("match_bindings", "maintenance_state", "match_metadata"),
-            3: ("match_bindings", "maintenance_state", "match_snapshots")}
+            3: ("match_bindings", "maintenance_state", "match_snapshots"),
+            4: ("match_bindings", "maintenance_state", "match_snapshots", "observations", "observation_links", "observation_state")}
 _CHILD_TABLES = ("match_metadata", "match_snapshots")
-_TEXT_KEY_TABLES = ("match_bindings", "match_metadata", "match_snapshots")
+_TEXT_KEY_TABLES = ("match_bindings", "match_metadata", "match_snapshots", "observations", "observation_links")
 _SNAPSHOT_COLUMNS = "match_type,match_format,self_rank,opponent_rank,recognition_status,recognition_version"
 _RANK_EXACT = frozenset(("UNRANKED", "S", "A", "A1", "A2", "A3", "A4"))
 _RANK_BANDS = frozenset("BCDEFGHIJKLMNOPQRTUVWXYZ")
@@ -188,6 +248,31 @@ def _revision(value, *, stored=False):
     if type(value) is not int or not low <= value <= _MAX_REVISION:
         raise _Unavailable("invalid_metadata")
     return value
+
+
+def _observation(values):
+    """Lossless event evidence; no numeric Rating interpretation or Season inference."""
+    identity, observed_at, rank, mode, value, status, version, source = values
+    _key(identity)
+    _time_bits(observed_at)
+    rank = _rank(rank)
+    if mode is not None and (type(mode) is not str or mode not in ('pre_s', 's_rank')):
+        raise _Unavailable('invalid_observation')
+    if value is not None and (type(value) is not str or not 1 <= len(value) <= 128 or '\0' in value or mode is None):
+        raise _Unavailable('invalid_observation')
+    if (mode == 'pre_s' and rank == 'S') or (mode == 's_rank' and rank not in (None, 'S')):
+        raise _Unavailable('invalid_observation')
+    if type(source) is not str or _RECOGNITION_VERSION.fullmatch(source) is None:
+        raise _Unavailable('invalid_observation')
+    if status is None:
+        if version is not None:
+            raise _Unavailable('invalid_observation')
+    elif (type(status) is not str or status not in ('recognized', 'failed') or type(version) is not str
+          or _RECOGNITION_VERSION.fullmatch(version) is None
+          or (status == 'recognized' and rank is None and value is None)
+          or (status == 'failed' and any(x is not None for x in (rank, mode, value)))):
+        raise _Unavailable('invalid_observation')
+    return identity, float(observed_at), rank, mode, value, status, version, source
 
 
 @dataclass(frozen=True)
@@ -333,18 +418,23 @@ class _Store:
             foreign_keys = connection.execute(f"PRAGMA foreign_key_list({table})").fetchmany(2)
             expected_keys = ([(0, 0, "match_bindings", "event_id", "event_id", "NO ACTION", "CASCADE", "NONE")]
                              if table in _CHILD_TABLES else [])
+            if table == 'observation_links':
+                expected_keys = [(0, 0, 'observations', 'observation_id', 'observation_id', 'NO ACTION', 'CASCADE', 'NONE')]
             if foreign_keys != expected_keys:
                 raise _Unavailable("schema")
         for table in tables:
             if table in _TEXT_KEY_TABLES:
                 index = connection.execute(f"PRAGMA index_xinfo(sqlite_autoindex_{table}_1)").fetchmany(3)
-                if len(index) != 2 or index[0][2:] != ("event_id", 0, "BINARY", 1):
+                key = 'observation_id' if table in ('observations', 'observation_links') else 'event_id'
+                if len(index) != 2 or index[0][2:] != (key, 0, "BINARY", 1):
                     raise _Unavailable("schema")
         cursor = connection.execute("SELECT singleton,after_event_id FROM maintenance_state LIMIT 2").fetchall()
         if len(cursor) != 1 or type(cursor[0][0]) is not int or cursor[0][0] != 1:
             raise _Unavailable("cursor")
         if cursor[0][1] is not None:
             _key(cursor[0][1])
+        if version == 4:
+            self._observation_state(connection)
         return cursor[0][1]
 
     @contextmanager
@@ -387,6 +477,7 @@ class _Store:
                 for statement in _DDL:
                     connection.execute(statement)
                 connection.execute("INSERT INTO maintenance_state VALUES (1,NULL)")
+                connection.execute("INSERT INTO observation_state VALUES (1,0,NULL)")
                 connection.execute(f"PRAGMA application_id={_APPLICATION_ID}")
                 connection.execute(f"PRAGMA user_version={_VERSION}")
                 deadline.remaining()
@@ -430,7 +521,7 @@ class _Store:
             self._save_binding(connection, binding)
 
     def upgrade(self, deadline):
-        """Explicit, atomic v1/v2 -> v3 migration; never repair an invalid store.
+        """Explicit, atomic v1/v2/v3 -> v4 migration; never repair an invalid store.
 
         One writer transaction: the source was validated by open() under BEGIN
         IMMEDIATE; v2 category rows are copied as revision 1 with no rank or
@@ -441,13 +532,36 @@ class _Store:
             version = connection.execute("PRAGMA user_version").fetchone()[0]
             if version == _VERSION:
                 return
-            carried = 0
-            connection.execute(_SNAPSHOTS_DDL)
+            # Validate carried data before the first mutation, including corruption
+            # introduced by writers that bypassed CHECK/FK constraints. Stream in
+            # bounded batches under the same cooperative operation deadline.
+            tables = [('match_bindings', lambda row: _Binding.from_row(row))]
             if version == 2:
-                carried = connection.execute("SELECT count(*) FROM match_metadata").fetchone()[0]
-                connection.execute("INSERT INTO match_snapshots (event_id,revision,match_type,match_format) "
-                                   "SELECT event_id,1,match_type,match_format FROM match_metadata")
-                connection.execute("DROP TABLE match_metadata")
+                tables.append(('match_metadata', lambda row: (_key(row[0]), _metadata(row[1:]))))
+            if version == 3:
+                tables.append(('match_snapshots', lambda row: (_key(row[0]), _revision(row[1], stored=True), _snapshot(row[2:]))))
+            for table, validate in tables:
+                cursor = connection.execute('SELECT * FROM ' + table)
+                while True:
+                    deadline.remaining()
+                    batch = cursor.fetchmany(_BATCH)
+                    if not batch:
+                        break
+                    for row in batch:
+                        validate(row)
+            if connection.execute('PRAGMA foreign_key_check').fetchmany(1):
+                raise _Unavailable('migration_verification')
+            carried = connection.execute('SELECT count(*) FROM match_snapshots').fetchone()[0] if version == 3 else 0
+            if version < 3:
+                connection.execute(_SNAPSHOTS_DDL)
+                if version == 2:
+                    carried = connection.execute("SELECT count(*) FROM match_metadata").fetchone()[0]
+                    connection.execute("INSERT INTO match_snapshots (event_id,revision,match_type,match_format) "
+                                       "SELECT event_id,1,match_type,match_format FROM match_metadata")
+                    connection.execute("DROP TABLE match_metadata")
+            for ddl in _OBSERVATION_DDL:
+                connection.execute(ddl)
+            connection.execute('INSERT INTO observation_state VALUES (1,0,NULL)')
             connection.execute(f"PRAGMA user_version={_VERSION}")
             self._validate(connection)
             if (connection.execute("SELECT count(*) FROM match_snapshots").fetchone()[0] != carried
@@ -458,7 +572,7 @@ class _Store:
         with self.open(deadline) as connection:
             connection.execute("BEGIN")
             version = connection.execute("PRAGMA user_version").fetchone()[0]
-            if version == _VERSION:
+            if version >= 3:
                 # The category view of whole v3 snapshots: a corrupt row fails closed here too.
                 return tuple((binding, values[:2]) for binding, _, values in self._snapshot_rows(connection, ids))
             fields = ("m.event_id,m.match_type,m.match_format" if version == 2 else "NULL,NULL,NULL")
@@ -517,7 +631,7 @@ class _Store:
         """(binding, revision, values) per binding; revision 0 means no snapshot row."""
         with self.open(deadline) as connection:
             connection.execute("BEGIN")
-            if connection.execute("PRAGMA user_version").fetchone()[0] != _VERSION:
+            if connection.execute("PRAGMA user_version").fetchone()[0] < 3:
                 raise _Unavailable("migration_required", "incompatible")
             return self._snapshot_rows(connection, ids)
 
@@ -531,7 +645,7 @@ class _Store:
         """
         values, expected_revision = _snapshot(values), _revision(expected_revision)
         with self.open(deadline, write=True) as connection:
-            if connection.execute("PRAGMA user_version").fetchone()[0] != _VERSION:
+            if connection.execute("PRAGMA user_version").fetchone()[0] < 3:
                 raise _Unavailable("migration_required", "incompatible")
             self._save_binding(connection, binding)
             row = connection.execute(f"SELECT revision,{_SNAPSHOT_COLUMNS} FROM match_snapshots WHERE event_id=?",
@@ -577,3 +691,101 @@ class _Store:
             if cursor_update:
                 connection.execute("UPDATE maintenance_state SET after_event_id=? WHERE singleton=1", (cursor,))
             return deleted
+
+    @staticmethod
+    def _observation_state(connection):
+        rows = connection.execute('SELECT singleton,generation,after_observation_id FROM observation_state LIMIT 2').fetchall()
+        if len(rows) != 1 or type(rows[0][0]) is not int or rows[0][0] != 1:
+            raise _Unavailable('observation_state')
+        _revision(rows[0][1])
+        if rows[0][2] is not None:
+            _key(rows[0][2])
+        return rows[0][1], rows[0][2]
+
+    @contextmanager
+    def observation_connection(self, deadline, *, write=False):
+        with self.open(deadline, write=write) as connection:
+            if connection.execute('PRAGMA user_version').fetchone()[0] != 4:
+                raise _Unavailable('migration_required', 'incompatible')
+            if not write:
+                connection.execute('BEGIN')
+            yield connection
+
+    def observation_generation(self, deadline):
+        with self.observation_connection(deadline) as connection:
+            return self._observation_state(connection)[0]
+
+    @staticmethod
+    def _observation_rows(connection, ids):
+        rows = connection.execute('SELECT o.*,l.event_id,l.witness_version,l.parent_created_at_bits,l.parent_result '
+            'FROM observations o LEFT JOIN observation_links l ON l.observation_id=o.observation_id '
+            f"WHERE o.observation_id IN ({','.join('?' for _ in ids)}) ORDER BY o.observation_id COLLATE BINARY",
+            ids).fetchmany(_BATCH + 1)
+        return tuple((_observation(row[:8]), None if row[8] is None else _Binding.from_row(row[8:])) for row in rows)
+
+    def read_observations(self, ids, deadline):
+        with self.observation_connection(deadline) as connection:
+            return self._observation_state(connection)[0], self._observation_rows(connection, ids)
+
+    def save_observation(self, values, generation, association, deadline):
+        values = _observation(values)
+        with self.observation_connection(deadline, write=True) as connection:
+            if self._observation_state(connection)[0] != generation:
+                raise _Unavailable('stale_observation_generation')
+            row = connection.execute('SELECT * FROM observations WHERE observation_id=?', (values[0],)).fetchone()
+            if row is not None:
+                if _observation(row) != values:
+                    raise _Unavailable('observation_conflict')
+                # A retry never reattaches a cleared or changed association.
+                return
+            connection.execute('INSERT INTO observations VALUES (?,?,?,?,?,?,?,?)', values)
+            if association is not None:
+                connection.execute('INSERT INTO observation_links VALUES (?,?,?,?,?)', (values[0], *association.values()))
+
+    def purge_observations(self, deadline):
+        with self.observation_connection(deadline, write=True) as connection:
+            generation = self._observation_state(connection)[0]
+            if generation == _MAX_REVISION:
+                raise _Unavailable('generation_exhausted')
+            # Validate the observation dataset before mutation. A foreign writer
+            # may have bypassed CHECK/FK constraints; corruption is never a
+            # successfully empty/deleted history. Matches remain independent.
+            for table, validate in (
+                    ('observations', _observation),
+                    ('observation_links', lambda row: (_key(row[0]), _Binding.from_row(row[1:])))):
+                cursor = connection.execute('SELECT * FROM ' + table)
+                while True:
+                    deadline.remaining()
+                    batch = cursor.fetchmany(_BATCH)
+                    if not batch:
+                        break
+                    for row in batch:
+                        validate(row)
+            if connection.execute('PRAGMA foreign_key_check(observation_links)').fetchmany(1):
+                raise _Unavailable('invalid_observation')
+            removed = connection.execute('SELECT count(*) FROM observations').fetchone()[0]
+            connection.execute('DELETE FROM observations')
+            connection.execute('UPDATE observation_state SET generation=?,after_observation_id=NULL WHERE singleton=1',
+                               (generation + 1,))
+            return generation + 1, removed
+
+    def scan_observation_links(self, deadline):
+        with self.observation_connection(deadline) as connection:
+            generation, cursor = self._observation_state(connection)
+            rows = connection.execute('SELECT * FROM observation_links '
+                + ('WHERE observation_id > ? COLLATE BINARY ' if cursor is not None else '')
+                + 'ORDER BY observation_id COLLATE BINARY LIMIT 64', () if cursor is None else (cursor,)).fetchall()
+            return generation, tuple((_key(row[0]), _Binding.from_row(row[1:])) for row in rows)
+
+    def remove_observation_links(self, candidates, generation, cursor, deadline):
+        with self.observation_connection(deadline, write=True) as connection:
+            if self._observation_state(connection)[0] != generation:
+                raise _Unavailable('stale_observation_generation')
+            removed = 0
+            for identity, binding in candidates:
+                deadline.remaining()
+                removed += connection.execute('DELETE FROM observation_links WHERE observation_id=? AND event_id=? '
+                    'AND witness_version=? AND parent_created_at_bits=? AND parent_result=?',
+                    (identity, *binding.values())).rowcount
+            connection.execute('UPDATE observation_state SET after_observation_id=? WHERE singleton=1', (cursor,))
+            return removed

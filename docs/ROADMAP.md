@@ -23,6 +23,14 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
+## Current checkpoint — 2026-09-30
+
+#15-0, #15-1 (PR #55) and #15-2 (PR #61) are **Accepted + Merged + Unreleased**, following [explicit owner acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912055608). This supersedes historical pending/STOP wording below. #15-2 merged as `148a25c955ae3b6fd0a7624005f1465e31a13256`; [exact-main CI 36716529892](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36716529892) passed on attempt 1.
+
+**#15-3 independent Rank/Rating observation persistence + deletion lifecycle foundation** is the single [owner-authorized slice](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912336221), based on that exact main. Dormant sidecar v4, explicit atomic v1/v2/v3 migration, independent observation lifetime (Option B), optional context cleanup and observation-only purge/generation barrier; [contract](ISSUE15_3_OBSERVATION_CONTRACT.md). Its own **acceptance remains PENDING**, Released NO. Resolve its PR and Issues #15/#6 for live gates/review/merge and exact SHA evidence; these docs do not predict CI/merge outcomes.
+
+**STOP after #15-3.** No following #15 slice, recognition/runtime activation, #28-A, UI-2 or release is authorized. Issue #15 remains OPEN; public stable remains v1.2.0. #59 remains OPEN / low-priority deferred: if only the cumulative 20-minute CI limit blocks a required head/main check, STOP without workflow changes or repeated reruns. Unmerged-generation count must be resolved from GitHub (maximum two); only #15-3 may be active under this authorization.
+
 ## Release status note — 2026-09-14
 
 Public stable is **[v1.2.0 — RELEASED](https://github.com/TullysAC6/ac6-winloss-tracker/releases/tag/v1.2.0)**, annotated tag `v1.2.0` → `c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4`. PR #33, main CI, public hashes/digests and stubbed public install/uninstall smoke all passed. See [PROJECT_STATE.md](PROJECT_STATE.md) for evidence.
@@ -211,7 +219,7 @@ The **UI-0 design specification is approved and merged** (PR #42 as `be77844`); 
 **UI-1B was accepted on exact head `499939f2e3e5ccfcfd25972fe8be3037172afe33` and merged as `b64ce73c27b7b5c65fa5203ec90bdb85886b0d3b`** (PR #48), with exact-main CI 36230655908 green. It is not released.
 **#15-0 was accepted on exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7` and merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`** (PR #50). Exact-main CI 36315443975 passed on attempt 2 on the unchanged merge SHA after an attempt-1 Python 3.13 T0-only failure. It is not released and is dormant in ordinary production startup.
 That failure was a test-harness coupling, not a product defect. PRs #52/#53 first added finite test headroom, but later exact-main CI proved elapsed-time dependence remained. PR #54 replaced that coupling with `tests/enrichment_test_clock.py` for non-timing assertions while keeping real busy-lock and forced-expiry controls. Production `_BUDGET` remained 0.100 throughout; no product defect was found and product runtime did not change. Independent review **GO** on exact head `68d88d6884c1db1a91ba9a586a955b2e8eec48ab`; [exact-head CI 36353522053](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36353522053) **SUCCESS**; merge `17b42e8c35306024b613d6d8d0ba8968998a6095`; [exact-main CI 36354725793](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36354725793) **SUCCESS**. Public v1.2.0 rollback round trips PASS. #15-0 test-harness closure is complete; T3 N/A.
-**#15-1 was merged as `5d001a1862aef9c7544d503077c94de22453f7c1` on reviewed head `8c5bce4aad02751de5201c220d85e7d3c950797f`** (PR #55; implementation head `ae6a1e3a36e6d7e2ede257afa6f697865af4f085`); **owner acceptance is PENDING**. Exact-main CI 36545895081 passed on attempt 2 on the unchanged merge SHA after an attempt-1 Python 3.14 source-install readiness failure whose root cause is unresolved (unchanged-rerun success only). It is not released and is dormant in ordinary production startup.
+**#15-1 was merged as `5d001a1862aef9c7544d503077c94de22453f7c1` on reviewed head `8c5bce4aad02751de5201c220d85e7d3c950797f`** (PR #55; implementation head `ae6a1e3a36e6d7e2ede257afa6f697865af4f085`); **owner acceptance was explicitly granted on 2026-09-30** ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912055608)). Exact-main CI 36545895081 passed on attempt 2 on the unchanged merge SHA after an attempt-1 Python 3.14 source-install readiness failure whose root cause is unresolved (unchanged-rerun success only). It is not released and is dormant in ordinary production startup.
 From the current position:
 
 ```text
@@ -219,7 +227,8 @@ From the current position:
 ✓ UI-1A                       Player Overlay polish — ACCEPTED + MERGED (PR #46), unreleased
 ✓ UI-1B                       Broadcast Overlay polish — ACCEPTED + MERGED (PR #48), unreleased
 ✓ #15-0                       dormant enrichment storage foundation — ACCEPTED + MERGED (PR #50), unreleased
-→ #15-1                       dormant match-category persistence — MERGED (PR #55), owner acceptance PENDING, unreleased
+→ #15-1/#15-2                 dormant category/rank foundations — ACCEPTED + MERGED, unreleased
+→ #15-3                       independent observation foundation only → STOP
 ⏸ remaining #15                recognition / Rank / Rating / observation slices — NOT AUTHORIZED
 → #28-A                       Season Catalog / Assignment Foundation
 → UI-2                        Dashboard / History / Settings shell + manual Season refresh
@@ -375,7 +384,7 @@ Win rate is `WIN / (WIN + LOSE) * 100`, DRAW excluded from the denominator. Any 
 
 ## Phase 7 — Match metadata and growth analytics
 
-Phase 7A is **partially implemented**: #15-0 ([PR #50](https://github.com/TullysAC6/ac6-winloss-tracker/pull/50)) is accepted and merged but unreleased, and #15-1 ([PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55)) is merged but unreleased with owner acceptance pending; both are dormant storage only. #15-2 (per-match rank and recognition evidence, sidecar v3) is the owner-authorized next dormant slice; its PR and Issue #6 hold the live state. User-visible recognition, Rank/Rating and category-aware analytics remain later work. Phase 7B depends on completion of 7A.
+Phase 7A is **partially implemented**: #15-0 ([PR #50](https://github.com/TullysAC6/ac6-winloss-tracker/pull/50)) is accepted and merged but unreleased, and #15-1 ([PR #55](https://github.com/TullysAC6/ac6-winloss-tracker/pull/55)) is accepted and merged but unreleased; both are dormant storage only. #15-2 (PR #61, sidecar v3) is accepted and merged but unreleased. #15-3 is the single authorized dormant observation foundation; its PR and Issue #6 hold the live state. User-visible recognition, Rank/Rating and category-aware analytics remain later work. Phase 7B depends on completion of 7A.
 
 ### Phase 7A — Match metadata foundation
 
@@ -384,8 +393,8 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | Item | Status | Notes |
 |---|---|---|
 | #15-0 optional enrichment storage foundation (`enrichment.db`) | **ACCEPTED — UNRELEASED** | PR #50 exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Dormant: ordinary startup does not open/create/migrate/clean the sidecar. `history.db` remains authoritative; match-bound bindings are parent-checked and missing parents are logically invisible. T3 N/A |
-| `match_type` — ranked / custom / unknown | **IMPLEMENTED + MERGED — ACCEPTANCE PENDING — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). No recognizer or runtime caller is added in this slice |
-| `match_format` — single / team / unknown | **IMPLEMENTED + MERGED — ACCEPTANCE PENDING — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). Mixed known/unknown values are valid; absence remains unknown |
+| `match_type` — ranked / custom / unknown | **ACCEPTED + MERGED — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). No recognizer or runtime caller is added in this slice |
+| `match_format` — single / team / unknown | **ACCEPTED + MERGED — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). Mixed known/unknown values are valid; absence remains unknown |
 | `self_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Canonical rank token or unknown, any format; see [ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md). The #15-2 PR and Issue #6 own the live review/merge/acceptance evidence. No recognizer or runtime caller |
 | `opponent_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Explicit Single only; TEAM/unknown carries none, and it is never resurrected. Team opponent ranks remain deferred |
 | `metadata_recognition_status` / `metadata_recognition_version` | **IMPLEMENTED (dormant #15-2 persistence only)** | `NULL` (no recorded evidence) / `recognized` / `failed`; the version names interpretation semantics, not the app release. The whole snapshot is revisioned (compare-and-set) |
