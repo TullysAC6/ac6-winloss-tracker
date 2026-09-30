@@ -126,7 +126,8 @@ class OptionalEnrichmentService:
     """The only supported reader/writer. Construction is in-memory only.
 
     Storage operations serialize with a bounded I/O lock. The separate state
-    lock never covers I/O or callbacks, so invalidation can revoke blocked work.
+    lock never covers I/O. The explicit synchronous observation-publication
+    callback holds it only during installation, so invalidation serializes there.
     """
 
     def __init__(self, root: str | Path, *, active=False):

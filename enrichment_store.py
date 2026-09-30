@@ -747,6 +747,22 @@ class _Store:
             generation = self._observation_state(connection)[0]
             if generation == _MAX_REVISION:
                 raise _Unavailable('generation_exhausted')
+            # Validate the observation dataset before mutation. A foreign writer
+            # may have bypassed CHECK/FK constraints; corruption is never a
+            # successfully empty/deleted history. Matches remain independent.
+            for table, validate in (
+                    ('observations', _observation),
+                    ('observation_links', lambda row: (_key(row[0]), _Binding.from_row(row[1:])))):
+                cursor = connection.execute('SELECT * FROM ' + table)
+                while True:
+                    deadline.remaining()
+                    batch = cursor.fetchmany(_BATCH)
+                    if not batch:
+                        break
+                    for row in batch:
+                        validate(row)
+            if connection.execute('PRAGMA foreign_key_check(observation_links)').fetchmany(1):
+                raise _Unavailable('invalid_observation')
             removed = connection.execute('SELECT count(*) FROM observations').fetchone()[0]
             connection.execute('DELETE FROM observations')
             connection.execute('UPDATE observation_state SET generation=?,after_observation_id=NULL WHERE singleton=1',

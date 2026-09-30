@@ -5,6 +5,7 @@ Structured inputs are persistence evidence, never invented OCR ground truth.
 import math
 import sqlite3
 import sys
+import threading
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -380,6 +381,54 @@ class ObservationTests(unittest.TestCase):
             counts.append(response.deleted)
         self.assertEqual(counts, [64, 6, 0])
         self.assertEqual(self.sql('SELECT count(*) FROM observations'), [(70,)])
+
+    def test_corrupt_evidence_and_orphan_links_cannot_report_deleted(self):
+        for broken in ('evidence', 'orphan'):
+            with self.subTest(broken=broken):
+                self.save(link='A')
+                connection = sqlite3.connect(self.path)
+                with connection:
+                    if broken == 'evidence':
+                        connection.execute('PRAGMA ignore_check_constraints=ON')
+                        connection.execute("UPDATE observations SET self_rank='invented'")
+                    else:
+                        # Foreign writer with SQLite default FK OFF.
+                        connection.execute('DELETE FROM observations')
+                connection.close()
+                before = self.path.read_bytes()
+                self.assertEqual(self.service.delete_observation_history().status, 'unavailable')
+                self.assertEqual(self.path.read_bytes(), before)
+                self.assertEqual(self.sql('SELECT generation FROM observation_state'), [(0,)])
+                self.path.unlink()
+
+    def test_publication_writer_barrier_serializes_other_service_purge(self):
+        self.save()
+        response = self.service.lookup_observation('O')
+        other = OptionalEnrichmentService(self.root, active=True)
+        entered, release = threading.Event(), threading.Event()
+        results = []
+        def consumer(views):
+            entered.set()
+            if not release.wait(5):
+                raise AssertionError('test owner failed to release consumer')
+            results.extend(views)
+        publications = []
+        worker = threading.Thread(target=lambda: publications.append(
+            self.service.publish_observations(response, consumer)))
+        worker.start()
+        try:
+            self.assertTrue(entered.wait(5), 'owned worker did not reach barrier')
+            self.assertEqual(other.delete_observation_history().health.reason, 'busy')
+        finally:
+            release.set()
+            worker.join(5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(publications[0].status, 'published')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(other.delete_observation_history().status, 'deleted')
+        self.assertEqual(self.service.publish_observations(response, results.extend).health.reason,
+                         'stale_observation_generation')
+        self.assertEqual(len(results), 1)
 
     def test_dormant_methods_touch_nothing(self):
         disabled = OptionalEnrichmentService(self.root)
