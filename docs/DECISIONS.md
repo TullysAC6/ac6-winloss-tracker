@@ -410,6 +410,15 @@ the field most often omitted.
 
 ## An unexplained timeout is instrumented before it is changed
 
+**2026-10-01 #59 resume:** the owner authorized a CI-only cumulative-budget repair
+after #15-4 main run36834524203 reached the outer20min limit with T0/T1/T2 PASS.
+Move the unchanged source-install3.13/3.14 invocation to independent jobs and
+require both matrices in the existing aggregate check. [Contract and timings](ISSUE59_CI_JOB_BUDGET.md).
+The previous duration deferral is superseded for this maintenance only; inner15s
+deadlines, scenarios and failure assertions remain unchanged. No claim that this
+repairs either unexplained readiness/Node startup cause. #15-4 Accepted PENDING;
+after verified maintenance closure STOP before any next #15 slice.
+
 **Decision (2026-09-29, maintenance [#59](https://github.com/TullysAC6/ac6-winloss-tracker/issues/59)):
 when a timeout fails on unchanged code and an unchanged rerun passes, the next step is to retain
 evidence. Timeouts, sleeps, retries and assertions stay as they are until that evidence shows where

@@ -4,7 +4,27 @@ Last updated: 2026-10-01 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
-## Current checkpoint — 2026-10-01
+## Current checkpoint — #59 resumed, 2026-10-01
+
+#15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
+as `848674115f842f7fcb22ce8c3fccc598502e7c45`, identical to reviewed head
+`7904f96a1861d5d168e9dea37e4d65fa1b24a302` in product/tree content. Its original
+exact-main run36834524203 is NOT GREEN:3.14 T0/T1/T2 passed, source-install was
+cancelled by the existing cumulative20min job limit. That run is retained.
+
+The owner explicitly **resumed #59 CI-budget maintenance only** ([checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/59#issuecomment-5928158022)).
+[Job boundary, timings and preserved semantics](ISSUE59_CI_JOB_BUDGET.md).
+Separate source-install3.13/3.14 jobs preserve every original scenario and inner
+deadline; the existing required gate depends on both matrices. Resolve Issue #59
+and its PR for live local/review/exact-head/main/merge evidence. The older
+STOP/deferral text below is historical where it conflicts with this authorization.
+
+After successful new exact-main verification, complete #59 closure and #15-4
+technical bookkeeping; #15-4 **Acceptance PENDING**, Released NO. Public stable
+v1.2.0, Issue #15 OPEN. **STOP before the next #15 slice.** No product/installer
+behavior or #15-4 code/fixture changes; unresolved15s causes are not repaired here.
+
+## Historical checkpoint — #15-4 before #59 resume
 
 #15-0/-1/-2/-3 are **Accepted + Merged + Unreleased**. The owner's explicit
 [#15-3 acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5920995379)

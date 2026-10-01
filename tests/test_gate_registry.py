@@ -6,7 +6,10 @@ runs a gate out of order all fail here.
 """
 import ast
 import re
+import shutil
+import subprocess
 import sys
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -40,6 +43,13 @@ def unittest_tests(path):
         return own
 
     return {name: tests for name in classes if (tests := methods(name))}
+
+
+def workflow_job(workflow, name):
+    match = re.search(rf"(?ms)^  {re.escape(name)}:\n(.*?)(?=^  [\w-]+:\n|\Z)", workflow)
+    if match is None:
+        raise AssertionError(f"missing workflow job: {name}")
+    return match.group(1)
 
 
 class GateRegistryTests(unittest.TestCase):
@@ -135,6 +145,65 @@ class GateRegistryTests(unittest.TestCase):
             block = workflow[:workflow.index(f"python tests/{command}")]
             step = block[block.rindex("- name:"):]
             self.assertIn("matrix.python-version != '3.12'", step, f"{command} runs on 3.13 and 3.14 only")
+
+    def test_source_install_has_separate_budget_without_coverage_loss(self):
+        workflow = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        core = workflow_job(workflow, "windows-tests")
+        source = workflow_job(workflow, "windows-source-install")
+        self.assertIn("python-version: ['3.12', '3.13', '3.14']", core)
+        self.assertIn("python-version: ['3.13', '3.14']", source)
+        invocation = "./tests/test_source_install_flow.ps1 -PythonPath (Get-Command python.exe).Source"
+        self.assertNotIn("test_source_install_flow.ps1", core)
+        self.assertEqual(workflow.count(invocation), 1)
+        for job in (core, source):
+            self.assertIn("timeout-minutes: 20\n", job)
+            self.assertIn("fail-fast: false", job)
+            self.assertIn("runs-on: windows-latest", job)
+            self.assertIn("cache-dependency-path: requirements.lock", job)
+            self.assertIn("python -m pip install --only-binary=:all: --require-hashes -r requirements.lock", job)
+            self.assertIn("python -m pip check", job)
+            self.assertNotIn("continue-on-error", job)
+        self.assertNotRegex(source, r"(?m)^\s+(?:if|needs):", "every source-install matrix entry must run independently")
+        self.assertIn(f"        run: {invocation}\n", source)
+        for duplicate in ("run_all_tests.py", "run_t1.py", "run_t2.py", "pip_audit", "test_bootstrap.ps1"):
+            self.assertNotIn(duplicate, source, "the dedicated job must not repeat unrelated heavy gates")
+
+    def test_required_aggregate_rejects_every_non_success_result(self):
+        workflow = (ROOT / ".github/workflows/test.yml").read_text(encoding="utf-8")
+        aggregate = workflow_job(workflow, "required-windows-tests")
+        self.assertIn("name: Windows tests\n", aggregate, "preserve the required check name")
+        self.assertIn("if: always()\n", aggregate)
+        self.assertIn("needs: [windows-tests, windows-source-install]\n", aggregate)
+        self.assertIn("timeout-minutes: 5\n", aggregate)
+        self.assertNotIn("continue-on-error", aggregate)
+        command = re.search(r"(?ms)^        run: \|\n(.+)\Z", aggregate)
+        self.assertIsNotNone(command)
+        script = textwrap.dedent(command.group(1))
+        for token in ("needs.windows-tests.result", "needs.windows-source-install.result"):
+            self.assertIn("${{ " + token + " }}", script)
+        pwsh = shutil.which("pwsh")
+        if pwsh is None:
+            self.skipTest("PowerShell 7 required to execute the actual CI aggregate script")
+        script = script.replace("${{ needs.windows-tests.result }}", "__CORE__").replace(
+            "${{ needs.windows-source-install.result }}", "__SOURCE__")
+        probe = "$gate = @'\n" + script + "\n'@\n" + r"""
+$states = @('success', 'failure', 'cancelled', 'skipped')
+foreach ($core in $states) {
+    foreach ($source in $states) {
+        $passed = $true
+        try { & ([scriptblock]::Create($gate.Replace('__CORE__', $core).Replace('__SOURCE__', $source))) }
+        catch { $passed = $false }
+        if ($passed -ne ($core -eq 'success' -and $source -eq 'success')) {
+            throw "Aggregate accepted/rejected the wrong state: $core / $source"
+        }
+    }
+}
+Write-Output 'All 16 aggregate verdicts PASS'
+"""
+        result = subprocess.run([pwsh, "-NoProfile", "-NonInteractive", "-Command", probe],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("All 16 aggregate verdicts PASS", result.stdout)
 
 
 if __name__ == "__main__":
