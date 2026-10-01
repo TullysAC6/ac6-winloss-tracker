@@ -25,6 +25,9 @@
     "contract.gate_feedback": "An accepted result returns external_mutation to the detector, installing the post-result lock.",
     "contract.undo_feedback": "An undo moves the post-result lock to the undo, so the detector re-arms later than it would have without it.",
     "contract.gate_rejection": "A manual result inside the cooldown is refused by the shared ResultGate and never mutates the detector.",
-    "contract.processing_time": "The post-result cooldown is measured from processing time, not from capture time."
+    "contract.processing_time": "The post-result cooldown is measured from processing time, not from capture time.",
+    "metadata.header.positive": "Complete native English Ranked Single lobby header is recognized directly.",
+    "metadata.header.unknown": "Genuine unrelated assembly, garage, loading, sortie and combat crops abstain.",
+    "metadata.header.partial": "A genuinely truncated header crop abstains on both category fields."
   }
 }

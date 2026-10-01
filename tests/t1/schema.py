@@ -210,6 +210,9 @@ def _debug_checks(source, checks):
 
 
 def validate_image_record(source, record, category, known_tags):
+    if isinstance(record, dict) and record.get("family") == "match_metadata":
+        from .metadata_schema import validate
+        return validate(source, record, category, known_tags)
     _object(source, record, ("schema_version", "id", "family", "category", "input", "truth", "checks",
                              "coverage", "provenance", "review"))
     if record["schema_version"] != SCHEMA_VERSION:

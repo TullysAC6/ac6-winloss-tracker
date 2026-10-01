@@ -1,18 +1,39 @@
 # Project state
 
-Last updated: 2026-09-30 JST
+Last updated: 2026-10-01 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current checkpoint — 2026-09-30
+## Current checkpoint — 2026-10-01
 
-#15-0, #15-1 (PR #55) and #15-2 (PR #61) are **Accepted + Merged + Unreleased**, following [explicit owner acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912055608). This supersedes historical pending/STOP wording below. #15-2 merged as `148a25c955ae3b6fd0a7624005f1465e31a13256`; [exact-main CI 36716529892](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36716529892) passed on attempt 1.
+#15-0/-1/-2/-3 are **Accepted + Merged + Unreleased**. The owner's explicit
+[#15-3 acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5920995379)
+supersedes every older pending/STOP statement for that slice. PR #62 merged as
+`d20741fd2903cd75daf9e05b3b8e5f4bdae77c33`; exact-main CI 36784597221 SUCCESS,
+attempt 1. Public stable remains **v1.2.0**, Issue #15 OPEN.
 
-**#15-3 independent Rank/Rating observation persistence + deletion lifecycle foundation** is the single [owner-authorized slice](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912336221), based on that exact main. Dormant sidecar v4, explicit atomic v1/v2/v3 migration, independent observation lifetime (Option B), optional context cleanup and observation-only purge/generation barrier; [contract](ISSUE15_3_OBSERVATION_CONTRACT.md). Its own **acceptance remains PENDING**, Released NO. Resolve its PR and Issues #15/#6 for live gates/review/merge and exact SHA evidence; these docs do not predict CI/merge outcomes.
+**#15-4 is the single owner-authorized slice** ([authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5921021683),
+[pre-code target/evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5921185412)).
+Actual local Autopilot/Analyzer artifacts and original frames were inspected.
+The supported subset is pure positive-only complete English `RANK MATCH: SINGLE`
+header recognition at the observed native 1920x1080 layout; all insufficient
+inputs abstain. Eleven tiny original-frame fixtures extend formal T1 while
+retaining the existing 42 result cases. **Custom/Team/Rank/Rating recognition,
+production acquisition/capture/hooks/workers/writes, Season, UI, analytics,
+opponent builds, DRAW/ResultGate/detector/CLEAR and release remain outside scope.**
+[Contract, inventory, validation limitations and missing-fixture plan](ISSUE15_4_RECOGNITION_CONTRACT.md).
 
-**STOP after #15-3.** No following #15 slice, recognition/runtime activation, #28-A, UI-2 or release is authorized. Issue #15 remains OPEN; public stable remains v1.2.0. #59 remains OPEN / low-priority deferred: if only the cumulative 20-minute CI limit blocks a required head/main check, STOP without workflow changes or repeated reruns. Unmerged-generation count must be resolved from GitHub (maximum two); only #15-3 may be active under this authorization.
+Resolve Issue #15 / its implementation PR for live gate/review/exact-head/main
+CI/merge evidence. #15-4 owner **Acceptance PENDING**, Released NO; authorization
+does not imply Acceptance. The existing recorded checkpoints below are historical
+where they conflict with this explicit owner decision.
+
+**STOP after #15-4.** No following slice is authorized. #59 remains OPEN / deferred;
+if its cumulative 20-minute CI limit alone blocks verification, STOP without
+workflow changes, weakened checks or repeated reruns. Resolve GitHub for the
+current main/open-PR count; the maximum unmerged generations remains two.
 
 ## Position
 
@@ -24,7 +45,8 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | #15-0 enrichment storage foundation | **PR #50: Implemented + Accepted + merged to `main`** (`59ecb197`, 2026-09-27), exact accepted head `1827212f4eafe85de62f7219c6f2072f448f1ce7`. Implemented YES · Automated gates PASS · Reviewed GO · T3 N/A · Accepted YES · Merged YES · Released NO ([owner acceptance checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/pull/50#issuecomment-5855363291)). T3 **N/A**: no production activation, recognition, UI, process/thread, result/delete hook or ordinary-startup sidecar access. **Not released.** Issue #15 remains OPEN; #15-1 is a separately owner-authorized slice |
 | #15-1 match-category persistence | **Accepted + Merged + Unreleased** — PR #55, merge `5d001a1862aef9c7544d503077c94de22453f7c1`; [owner acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912055608); dormant v2 category contract. Historical CI readiness failures remain unresolved and recorded below. |
 | #15-2 rank / recognition evidence | **Accepted + Merged + Unreleased** — PR #61, reviewed head `311d926964bbb16704a80af5340790c374fa2fd5`, merge `148a25c955ae3b6fd0a7624005f1465e31a13256`; [owner acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5912055608); dormant revisioned v3 snapshots. |
-| #15-3 independent observations | Dormant v4 persistence + Option B deletion lifecycle; [contract](ISSUE15_3_OBSERVATION_CONTRACT.md). **Accepted PENDING**, Released NO; live implementation/review/gates/merge evidence on its PR and Issues #15/#6. STOP after this slice. |
+| #15-3 independent observations | **Accepted + Merged + Unreleased** — PR #62, merge `d20741fd`; [owner acceptance](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5920995379); dormant v4 / Option B [contract](ISSUE15_3_OBSERVATION_CONTRACT.md). |
+| #15-4 offline evidence | Single authorized slice; complete Ranked Single header only; 11 metadata fixtures, formal T1 53 cases. [Contract](ISSUE15_4_RECOGNITION_CONTRACT.md). Acceptance PENDING, Released NO; resolve PR / Issue #15 for live gates/review/merge. STOP after #15-4. |
 | Source-install readiness on Python 3.14 (unresolved observation) | Exact-main CI [36545895081](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36545895081) on the #15-1 merge `5d001a18`: **attempt 1 FAILED on Python 3.14 only** (job 109332068273). T0, T1, T2 and the fresh source install passed; the running-update scenario of `tests/test_source_install_flow.ps1` then timed out in `install.ps1`'s unchanged 15-second application-readiness check. The installer rolled back safely (previous source, shortcut and environment restored; the previous installation restarted and reported overall health ready) and the test failed with `Installer failed`. Python 3.12 and 3.13 passed. **One bounded rerun of only the failed job on the unchanged merge SHA** — no code, test, timeout, sleep or assertion change — **passed (attempt 2, job 109385256049; all 24 source-install scenarios PASS) and the aggregate gate is green.** This is **unchanged-rerun success only: it is not proof of a permanent fix, and it does not establish a runner flake.** The root cause is **unresolved**: the failed readiness condition (install nonce, live server or overall health) was not retained in the log. Independent read-only triage (recorded in PR #55) found no established #15-1 regression or serious rollback failure, but could not identify the cause. Any recurrence, failure on another runtime, unsafe rollback or unresolved process residue goes to the owner for investigation **outside #15-1**; no fix is authorized by this record. Attempt 1 stays viewable on the run. A second, independent 15 s timeout followed on Python 3.14 (the T0 Node watchdog for `tests/test_issue4_overlay.js`, PR #58 run [36567223925](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36567223925) attempt 1; the unchanged rerun passed). Owner-authorized **diagnostic instrumentation only** for both paths is maintenance [#59](https://github.com/TullysAC6/ac6-winloss-tracker/issues/59); resolve it for live state. See [DECISIONS.md](DECISIONS.md#an-unexplained-timeout-is-instrumented-before-it-is-changed) |
 | UI-1B Broadcast Overlay generation | **PR #48: Implemented + Accepted + merged to `main`** (`b64ce73`, 2026-09-26). Real-machine T3 PASS on the exact head. **Not released**. See the PR #48 section below |
 | UI-1A Player Overlay generation | **PR #46: Implemented + Accepted + merged to `main`** (`c2b00dc`, 2026-09-25). Real-machine T3 PASS on the exact head. **Not released**. See the PR #46 section below |
@@ -36,9 +58,9 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 | Source-install CI race | **Fixed and merged (test-only).** The first exact-main CI of `be77844` ([run 35798045591](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/35798045591), attempt 1) failed on Python 3.13 because `tests/test_source_install_flow.ps1` read `.dashboard-runtime.json` after a fixed 2 s sleep; an unchanged rerun of the same SHA passed. Classified as a test-fixture timing race, not a product defect. [PR #43](https://github.com/TullysAC6/ac6-winloss-tracker/pull/43) replaces the sleep with a bounded 7 s / 100 ms readiness poll that fails on early exit, requires parseable runtime JSON with a PID, and requires that PID to equal the launched process. Merged as `0333183b8abe512262910ad81a6a1aadf09e8dda`. Independent review GO is recorded in the PR #43 handoff checklist (no separate GitHub review object); T3 N/A (production runtime unchanged) |
 | Enrichment deadline test harness | **Closed deterministically in PR #54.** PRs #52/#53 first added finite test headroom, but later exact-main CI proved wall-clock dependence remained. PR #54 replaced elapsed-time coupling with `tests/enrichment_test_clock.py` for non-timing assertions while retaining real busy-lock / forced-expiry controls. Independent review **GO** on exact head `68d88d6884c1db1a91ba9a586a955b2e8eec48ab`; [exact-head CI 36353522053](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36353522053) **SUCCESS**; merged as `17b42e8c35306024b613d6d8d0ba8968998a6095`; [exact-main CI 36354725793](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36354725793) **SUCCESS**. Production `_BUDGET` stayed 0.100; product runtime unchanged; T3 N/A. Public v1.2.0 rollback round trips PASS |
 | Documentation generation | PR #13 merged Revision 3. PR #31 preserves those requirements and adds Revision 4 / §65; Revision 4 is canonical on main after merge `e214ae0`. UI-0 design spec PR #42 merged as `be77844` |
-| Unmerged generations | #15-0/-1/-2 Accepted + Merged + Unreleased. #15-3 only is authorized; its own acceptance PENDING. Resolve GitHub for live completion/count, then STOP; Issue #15 OPEN, stable v1.2.0. |
-| Formal T1 | **AVAILABLE, and PASSES on `main`.** `python tests/run_t1.py` — 42 of 42, 0 skipped, 25 images + 17 sequences, corpus SHA-256 `6cfc4873bd0aa2bd…`. **T1 is no longer N/A** |
-| Current position | #15-0/-1/-2 Accepted + Merged + Unreleased. #15-3 only is authorized; its own acceptance PENDING. Resolve GitHub for live completion/count, then STOP; Issue #15 OPEN, stable v1.2.0. |
+| Unmerged generations | #15-0/-1/-2 Accepted + Merged + Unreleased. #15-3 accepted; #15-4 only is authorized, with its own acceptance PENDING. Resolve GitHub for live completion/count, then STOP; Issue #15 OPEN, stable v1.2.0. |
+| Formal T1 | **AVAILABLE.** The #15-4 candidate extends the existing 42-case result corpus to 53 cases, 36 images + 17 sequences (11 metadata). Resolve its PR for candidate-local and exact-head/main CI evidence and final corpus SHA-256. **T1 is no longer N/A** |
+| Current position | #15-0/-1/-2 Accepted + Merged + Unreleased. #15-3 accepted; #15-4 only is authorized, with its own acceptance PENDING. Resolve GitHub for live completion/count, then STOP; Issue #15 OPEN, stable v1.2.0. |
 
 ## v1.2.0 published integrity — 2026-09-14
 

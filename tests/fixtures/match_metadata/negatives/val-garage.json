@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "metadata.val-garage",
+  "family": "match_metadata",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "match_metadata/negatives/val-garage.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 25863,
+    "sha256": "6d88fb6a730628cf3e677500322f1ccc6bf453c307c032acaa7a6a341bd64def"
+  },
+  "truth": {
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "screen": "garage",
+    "visible_text": "no complete RANK MATCH: SINGLE header"
+  },
+  "checks": {
+    "adapter": "match_header.v1",
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "status": "failed",
+    "version": "rank-single-header.v1",
+    "source": "direct_header"
+  },
+  "coverage": [
+    "metadata.header.unknown"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "xJ86EUS510w",
+    "reference": "https://www.youtube.com/watch?v=xJ86EUS510w",
+    "timestamp_ms": 314250,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "b17a9937da429a3019ba2b001102381e701d93aa031475674df91ac9da1f9deb",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Codex visual inspection; owner Acceptance pending",
+    "date": "2026-10-01",
+    "basis": "Original full frame and unmodified crop show garage; labels transcribed from visible UI, never Analyzer prediction.",
+    "privacy": "minimal top-left game UI crop; player/opponent names, handles, chat and desktop excluded",
+    "corrections": []
+  }
+}

@@ -128,8 +128,8 @@ def load_corpus(root):
             raise CorpusError(f"{relative}: file type is not allowed in the fixture corpus")
         parts = relative.split("/")
         if suffix in IMAGE_SUFFIXES:
-            if len(parts) not in (1, 3) or (len(parts) == 3 and parts[0] != "results"):
-                raise CorpusError(f"{relative}: images live at the legacy root or under results/<category>/")
+            if len(parts) not in (1, 3) or (len(parts) == 3 and parts[0] not in ("results", "match_metadata")):
+                raise CorpusError(f"{relative}: images live at the legacy root or under an implemented image family")
             image_files[relative] = path
             continue
         if suffix == ".md":
@@ -161,6 +161,8 @@ def load_corpus(root):
     referenced = {}
     for relative, path, category in image_sources:
         record, digest = _read_json(path, relative)
+        if not isinstance(record, dict) or record.get("family") != relative.split("/")[0]:
+            raise CorpusError(f"{relative}: record family differs from directory family")
         try:
             schema.validate_image_record(relative, record, category, known_tags)
         except MetadataError as error:
@@ -197,6 +199,13 @@ def load_corpus(root):
         corpus.files[image["path"]] = actual
         corpus.images[record["id"]] = record
         corpus.cases.append(Case(record["id"], "image", relative, record, digest))
+    metadata = [r for r in corpus.images.values() if r["family"] == "match_metadata"]
+    split_videos = {split: {r["provenance"]["video_id"] for r in metadata
+                           if r["provenance"]["split"] == split} for split in ("dev", "validation")}
+    if split_videos["dev"] & split_videos["validation"]:
+        raise CorpusError("metadata source videos must not cross dev/validation splits")
+    if metadata and [r["id"] for r in metadata if r["provenance"]["template_source"]] != ["metadata.dev-header"]:
+        raise CorpusError("metadata has exactly one pinned dev-header template source")
     if corpus.image_bytes > MAX_CORPUS_IMAGE_BYTES:
         raise CorpusError(f"corpus images total {corpus.image_bytes} bytes; the limit is {MAX_CORPUS_IMAGE_BYTES}")
     orphans = sorted(set(image_files) - set(referenced))

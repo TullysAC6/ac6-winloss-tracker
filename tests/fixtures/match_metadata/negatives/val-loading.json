@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "metadata.val-loading",
+  "family": "match_metadata",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "match_metadata/negatives/val-loading.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 6740,
+    "sha256": "73cb245f7c785aba9a7a2f272c92ae8349235e5412f4d1fb32511053fef60278"
+  },
+  "truth": {
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "screen": "loading",
+    "visible_text": "no complete RANK MATCH: SINGLE header"
+  },
+  "checks": {
+    "adapter": "match_header.v1",
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "status": "failed",
+    "version": "rank-single-header.v1",
+    "source": "direct_header"
+  },
+  "coverage": [
+    "metadata.header.unknown"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "y86wDex-EQI",
+    "reference": "https://www.youtube.com/watch?v=y86wDex-EQI",
+    "timestamp_ms": 148500,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "7e14bc234156437f73e5986af53bce1a2ee8f36b43e045342f1b305117088a54",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Codex visual inspection; owner Acceptance pending",
+    "date": "2026-10-01",
+    "basis": "Original full frame and unmodified crop show loading; labels transcribed from visible UI, never Analyzer prediction.",
+    "privacy": "minimal top-left game UI crop; player/opponent names, handles, chat and desktop excluded",
+    "corrections": []
+  }
+}

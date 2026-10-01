@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "id": "metadata.dev-sortie",
+  "family": "match_metadata",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "match_metadata/negatives/dev-sortie.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 7354,
+    "sha256": "fd5ff14986b8b4d07b68b957e6c2524330eb4997ccb40d5fa922ca2fb04a779e"
+  },
+  "truth": {
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "screen": "sortie",
+    "visible_text": "no complete RANK MATCH: SINGLE header"
+  },
+  "checks": {
+    "adapter": "match_header.v1",
+    "match_type": "unknown",
+    "match_format": "unknown",
+    "status": "failed",
+    "version": "rank-single-header.v1",
+    "source": "direct_header"
+  },
+  "coverage": [
+    "metadata.header.unknown"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 245250,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "9d396bb14da0321e1bf199970534be604d36ed7a8096e0b29f0d82cfd645cbec",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Codex visual inspection; owner Acceptance pending",
+    "date": "2026-10-01",
+    "basis": "Original full frame and unmodified crop show sortie; labels transcribed from visible UI, never Analyzer prediction.",
+    "privacy": "minimal top-left game UI crop; player/opponent names, handles, chat and desktop excluded",
+    "corrections": []
+  }
+}
