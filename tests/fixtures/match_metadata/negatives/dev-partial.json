@@ -16,7 +16,7 @@
     "match_type": "unknown",
     "match_format": "unknown",
     "screen": "partial_header",
-    "visible_text": "RANK MATCH"
+    "visible_text": "RANK MATCH:"
   },
   "checks": {
     "adapter": "match_header.v1",
@@ -55,6 +55,19 @@
     "date": "2026-10-01",
     "basis": "Original full frame and unmodified crop show partial_header; labels transcribed from visible UI, never Analyzer prediction.",
     "privacy": "minimal top-left game UI crop; player/opponent names, handles, chat and desktop excluded",
-    "corrections": []
+    "corrections": [
+      {
+        "previous_truth": {
+          "match_type": "unknown",
+          "match_format": "unknown",
+          "screen": "partial_header",
+          "visible_text": "RANK MATCH"
+        },
+        "reason": "Independent visual review identified the visibly present colon omitted from the original transcription. Category and failed/UNKNOWN expectation unchanged.",
+        "verifier": "Codex independent High review; correction applied by implementing Codex",
+        "date": "2026-10-01",
+        "evidence_sha256": "423bd3721eee6d375c3276ad7f5df30a47484b6f5cbcfc0aa7255211b90fcfbf"
+      }
+    ]
   }
 }

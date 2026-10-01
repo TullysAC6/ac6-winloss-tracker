@@ -161,6 +161,8 @@ def load_corpus(root):
     referenced = {}
     for relative, path, category in image_sources:
         record, digest = _read_json(path, relative)
+        if not isinstance(record, dict) or record.get("family") != relative.split("/")[0]:
+            raise CorpusError(f"{relative}: record family differs from directory family")
         try:
             schema.validate_image_record(relative, record, category, known_tags)
         except MetadataError as error:

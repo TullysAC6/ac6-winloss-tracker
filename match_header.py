@@ -17,6 +17,7 @@ SOURCE = "direct_header"
 SHAPE = (60, 480)
 MIN_GLOBAL = 0.95
 MIN_GLYPH = 0.90
+TEXT_TOP, TEXT_BOTTOM = 14, 42  # evidenced text rows; exclude UI border highlights
 
 # Packed white-ink mask, mechanically extracted from the visually reviewed
 # dev-header.png only. Its source/provenance and extraction are in the contract.
@@ -24,6 +25,8 @@ MIN_GLYPH = 0.90
 _PACKED = b"c-rmMJ&xNj5Cz~NSg_;`G#4SLYq20~1zT*HBkWbU*dk?)5C$pIa<N5N2%fx=thHk=k^@A9;U8I_Ma{f1(f_?z^tsc%_O-7+CS&^7<Y07W;z~K{$tNNq*Nn*Q<zx#*oOF~DxKMI(GL@XjwAo@##7*r;*A`!$tw;;_^@JmzZmp2-Y7d0B%O|x*k%vNoa722*ud98&w&beC*|XXir%m|8UH<@%<j=MeY^OAmQ@fRc$yWPy@&{Pk&UVOZGr5Ol&lcMaIF<t0TkBv)SXasXD()M_pf)WwY&KHL_trla<|#*C$h;NzL?N!$svXqgWmK#Czq1||Wu~|4pC}J%antt7@|4oOWjuVzBl=@rn`absvmz(fI!|Hn?^a~9uCS@>Y98msGE?_gc2L{G;7UR`o^SdaO=H{E>$V=*G(TPJlB*sDTQByK$v}-w&!ebKu+?q0YMt>qhXG%m?R3d=$-2ooN5t8*oN@cETxzwPmQk{f`?a_Bh}_cwJwiQONQ|A<#k!X@&nPo&zO&eu=AK4m1G#Fkvs-Q2tX>`V@IkJ=FOA?inhwiNZCf+>vSm{D96z#+;$ks?C~-qhOnaY&IGi(y2^q=X*dLY9QxAJoi=3?8J<s5vokEW=nIq;`<O@o4WsxNZJK}<f3R0C|*VzwSHpq2<XMYy*pV7id7zVYtMYN5)%&Wx?s$RZZ{O5=~Zn@gmzV@}Ref@3y1_%R{&;"
 _REFERENCE = np.unpackbits(np.frombuffer(zlib.decompress(base64.b85decode(_PACKED)),
                                          dtype=np.uint8)).reshape(SHAPE).astype(bool)
+_REFERENCE[:TEXT_TOP] = False
+_REFERENCE[TEXT_BOTTOM:] = False
 _REFERENCE.setflags(write=False)
 _COLUMNS = np.flatnonzero(_REFERENCE.any(axis=0))
 _BREAKS = np.flatnonzero(np.diff(_COLUMNS) > 1) + 1
@@ -44,7 +47,10 @@ class HeaderRecognition:
 def _ink(pixels):
     low = pixels.min(axis=2)
     high = pixels.max(axis=2)
-    return (low >= 180) & ((high.astype(np.int16) - low) <= 50)
+    ink = (low >= 180) & ((high.astype(np.int16) - low) <= 50)
+    ink[:TEXT_TOP] = False
+    ink[TEXT_BOTTOM:] = False
+    return ink
 
 
 def _f1(reference, candidate):

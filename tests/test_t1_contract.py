@@ -351,6 +351,11 @@ class CorpusTests(unittest.TestCase):
         target.write_text(IMAGE_RECORD.read_text(encoding="utf-8"), encoding="utf-8")
         self.assertCorpusError("reserved and has no replay adapter")
 
+    def test_metadata_cannot_dispatch_from_the_results_family_directory(self):
+        source = self.root / "match_metadata" / "negatives" / "dev-combat.json"
+        source.rename(self.root / "results" / "negatives" / "dev-combat.json")
+        self.assertCorpusError("record family differs from directory family")
+
     def test_orphaned_duplicate_and_tampered_pixels_fail(self):
         shutil.copy(self.root / "normal_01.ppm", self.root / "orphan.ppm")
         self.assertCorpusError("without a fixture record")

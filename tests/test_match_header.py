@@ -46,11 +46,18 @@ class HeaderTests(unittest.TestCase):
             np.testing.assert_array_equal(pixels, before)
 
     def test_every_glyph_is_required_even_if_global_score_would_pass(self):
+        self.assertEqual(len(m._GLYPHS), 16)  # RANK(4) MATCH(5) colon(1) SINGLE(6)
         # Constructed white-ink model inputs, not original-image fixture replay.
         for left, right in m._GLYPHS:
             pixels = np.repeat((m._REFERENCE.astype(np.uint8) * 255)[:, :, None], 3, axis=2)
             pixels[:, left:right] = 0
             self.assertEqual(m.recognize_header(pixels).status, "failed")
+
+    def test_border_noise_cannot_merge_letters_or_hide_a_partial_letter(self):
+        pixels = np.repeat((m._REFERENCE.astype(np.uint8) * 255)[:, :, None], 3, axis=2)
+        pixels[4, 131:149] = 255  # the bright UI border that previously joined M/A
+        pixels[:, 178:192] = 0  # independently reproduced partial-A false positive
+        self.assertEqual(m.recognize_header(pixels).status, "failed")
 
     def test_one_pixel_edge_variation_has_bounded_tolerance(self):
         # Constructed morphology probes fix the edge mechanism; no holdout tuning.

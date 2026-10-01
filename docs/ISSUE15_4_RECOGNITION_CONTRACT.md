@@ -84,14 +84,21 @@ holdout measurements after that correction**. A new third-source positive at
 expected label was changed; no accuracy, confidence calibration or broad
 generalization is claimed.
 
-Corrections start as an empty bounded list. Any future truth correction requires
+Corrections use a bounded list. Independent review corrected one partial-header
+visible-text transcription from `RANK MATCH` to `RANK MATCH:` with previous truth,
+reason, verifier/date and original evidence hash; category and UNKNOWN expectations
+were unchanged. Any future truth correction requires
 original visual evidence, previous truth, reason, verifier/date and evidence hash;
 preserve the Git diff and rerun affected gates. Never change truth to suit a
 prediction. New fixtures require direct visual review and privacy checks.
 
 ## Algorithm and sequence decision
 
-White ink: every channel >=180, channel spread <=50. The reviewed dev crop's
+White ink: every channel >=180, channel spread <=50; only evidenced text rows
+14..41 of the ROI are used. A bright top border initially merged the M/A groups;
+independent review found a partial-A false acceptance. Excluding border pixels
+separates all 16 glyphs; a partial-letter regression and family/directory mismatch
+rejection were added. The reviewed dev crop's
 binary mask is packed and embedded as a read-only constant, with an integrity
 test that reproduces the extraction from that exact dev asset. No validation
 image contributes to the model. Compare nine bounded displacement positions
