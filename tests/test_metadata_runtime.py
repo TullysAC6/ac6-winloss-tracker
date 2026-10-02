@@ -129,8 +129,7 @@ class RuntimeTests(unittest.TestCase):
 
     def test_result_or_cancel_while_acquiring_rejects_late_completion(self):
         for action in (lambda: self.result(), self.runtime.cancel,
-                       lambda: self.runtime.notify("result", result="draw"),
-                       lambda: self.runtime.notify("capture_gap")):
+                       lambda: self.runtime.notify("result", result="draw")):
             started, release = threading.Event(), threading.Event()
             def blocked(target, cancel):
                 started.set()
@@ -145,6 +144,102 @@ class RuntimeTests(unittest.TestCase):
             self.finish()
             self.assertIsNone(self.runtime.pending)
             self.assertIsNone(self.runtime.candidate)
+
+    def test_acquisition_gap_requires_capture_strictly_after_latest_gap(self):
+        # Barrier controls completion; native capture and gap use the fake
+        # monotonic clock. No sleep/headroom decides which evidence is valid.
+        for captured, gaps, expected in (
+                (101.0, (100.0,), "pending"),
+                (99.5, (100.0,), "unknown"),
+                (100.0, (100.0,), "unknown"),
+                (100.5, (100.0, 101.0), "unknown"),
+                (101.5, (100.0, 101.0), "pending")):
+            with self.subTest(captured=captured, gaps=gaps):
+                self.now = 100.0
+                started, release = threading.Event(), threading.Event()
+                def blocked(target, cancel):
+                    started.set()
+                    self.assertTrue(release.wait(3))
+                    return {**self.positive(target, cancel), "captured_at": captured}
+                self.worker.side_effect = blocked
+                self.runtime.acquire()
+                try:
+                    self.assertTrue(started.wait(3))
+                    for gap in gaps:
+                        self.now = gap
+                        self.runtime.notify("capture_gap")
+                        self.assertEqual(self.runtime.state, "acquiring")
+                        self.assertFalse(self.runtime.cancelled.is_set())
+                    self.now = max(captured, gaps[-1]) + .1
+                finally:
+                    release.set()
+                    self.finish()
+                self.assertEqual(self.runtime.status()["state"], expected)
+                if expected == "pending":
+                    self.assertEqual(self.runtime.pending["expires"], captured + 600)
+                else:
+                    self.assertEqual(self.runtime.reason, "capture_gap")
+                    self.assertIsNone(self.runtime.pending)
+                self.assertFalse((self.root / "enrichment.db").exists())
+
+    def test_gap_after_pending_or_confirmation_discards_and_never_leaks(self):
+        for confirmation in (False, True):
+            self.acquire()
+            if confirmation:
+                self.result()
+            self.runtime.notify("capture_gap")
+            self.assertEqual(self.runtime.reason, "capture_gap")
+            self.assertIsNone(self.runtime.pending)
+            self.assertIsNone(self.runtime.candidate)
+            self.result("later")
+            self.assertIsNone(self.runtime.candidate)
+            self.assertFalse((self.root / "enrichment.db").exists())
+
+    def test_gap_does_not_clear_result_cancel_off_identity_or_loss_revocation(self):
+        for kind in ("win", "draw", "decision", "cancel", "off", "target", "lost", "shutdown"):
+            with self.subTest(kind=kind):
+                self.now, self.on, self.target = 100.0, True, dict(TARGET)
+                runtime = MetadataRuntime(self.root, enabled=lambda: self.on,
+                    target=lambda: self.target, worker=lambda t,c: blocked(t,c), clock=lambda: self.now)
+                started, release = threading.Event(), threading.Event()
+                def blocked(target, cancel):
+                    started.set()
+                    self.assertTrue(release.wait(3))
+                    return self.positive(target, cancel)
+                runtime.acquire()
+                try:
+                    self.assertTrue(started.wait(3))
+                    runtime.notify("capture_gap")
+                    self.now = 101.0
+                    if kind in ("win", "draw"):
+                        runtime.notify("result", result=kind, event_id="one", witness=("one", 2, kind))
+                    elif kind == "decision": runtime.notify("decision")
+                    elif kind == "cancel": runtime.cancel()
+                    elif kind == "off": self.on = False; runtime.cancel("disabled")
+                    elif kind == "target": self.target = {**TARGET, "birth": 31}
+                    elif kind == "lost":
+                        with runtime.lock: runtime.notify("capture_gap")
+                    else:
+                        revoked = threading.Event()
+                        original_cancel = runtime.cancel
+                        def cancel(reason="cancelled"):
+                            reply = original_cancel(reason)
+                            revoked.set()
+                            return reply
+                        runtime.cancel = cancel
+                        stopping = threading.Thread(target=runtime.shutdown)
+                        stopping.start()
+                        self.assertTrue(revoked.wait(3))
+                        release.set()
+                        stopping.join(3)
+                        self.assertFalse(stopping.is_alive())
+                finally:
+                    release.set()
+                    task = runtime.task
+                    if task: task.join(3); self.assertFalse(task.is_alive())
+                self.assertIsNone(runtime.pending)
+                self.assertIsNone(runtime.candidate)
+                runtime.shutdown()
 
     def test_receipt_before_cleanup_cannot_attach_a_late_capture(self):
         self.acquire()

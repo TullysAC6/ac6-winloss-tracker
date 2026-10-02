@@ -49,6 +49,17 @@ new request returns busy. Restart, cancellation, OFF, expiry, target/window/proc
 change, detector capture uncertainty, Undo/reset/purge and lost notifications revoke
 evidence. Native work never holds authoritative result locks.
 
+Owner T3 on `1bf2ed53` failed with `capture_gap`; its first target-unavailable
+attempt is excluded per the owner. A detector gap **during acquisition** now records
+the latest monotonic watermark without cancelling the bounded child. Adoption
+requires actual native `captured_at` strictly later than that watermark; an older
+or equal-time frame is UNKNOWN even if IPC/cleanup finishes later. Each additional
+gap advances the fence. A gap after pending/confirmation still discards immediately.
+No gap can reset OFF/cancel/result/decision/lost/identity/shutdown revocation, extend
+a timeout or revive previously published evidence. Child-local native discontinuity
+checks are unchanged. This is a new pre-match observation boundary, not match identity.
+Re-review/new exact-head CI and owner T3 are required before merge.
+
 The first accepted game result consumes pending. **Accepted DRAW consumes it even
 though the existing product creates no DRAW match row.** A result during acquisition
 invalidates its late completion. WIN/LOSS publishes a fixed confirmation only after

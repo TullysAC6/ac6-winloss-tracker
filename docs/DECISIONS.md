@@ -22,6 +22,20 @@ continuous OCR, schema migration, result/CLEAR/DRAW semantic change or release.
 [Concrete implementation contract](ISSUE15_5_RUNTIME_CONTRACT.md). Fresh Astra High
 review and exact-head CI precede owner T3; STOP before merge until owner T3 PASS.
 
+### T3 capture-gap correction (2026-10-02)
+
+The owner reported acquisition `unknown/capture_gap` on PR #65 candidate
+`1bf2ed53`; T3 is FAIL/STOP, not accepted. The owner requested a correction.
+Previously any detector gap cancelled an active acquisition, even when a later
+native lobby frame could establish new evidence. During acquisition only, retain
+the latest monotonic gap watermark and require actual native `captured_at` strictly
+after it before publishing pending, following normal child exit and cleanup.
+Completion time alone is insufficient. A gap after pending/confirmation still
+revokes immediately. Result/DRAW/decision, cancellation/OFF, target change, lost
+notification and cleanup failure retain their existing fail-closed rules.
+No retries, detector/ResultGate change, watchdog/TTL increase or fixture change.
+Delta review and new exact-head CI precede a new owner T3 on the corrected head.
+
 ## Auto update
 
 **Decision: the Tracker does not update itself.**

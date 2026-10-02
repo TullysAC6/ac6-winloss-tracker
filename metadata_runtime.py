@@ -57,11 +57,13 @@ class MetadataRuntime:
         self.reason = ""
         self.request_id = None
         self.last = None
+        self.acquisition_gap_at = None
 
     def _discard(self, reason):
         self.epoch += 1
         self.cancelled.set()
         self.pending = self.candidate = None
+        self.acquisition_gap_at = None
         self.state, self.reason = "unknown", reason
 
     def notify(self, kind, *, result=None, event_id=None, decided_at=None, witness=None):
@@ -80,6 +82,13 @@ class MetadataRuntime:
                 self.lost.clear()
             if kind != "result":
                 if kind == "decision" and self.state != "acquiring":
+                    return
+                if kind == "capture_gap" and self.state == "acquiring" and self.task is not None:
+                    # No evidence has been published yet. A fresh native lobby
+                    # capture after this gap may start new evidence; completion
+                    # time alone cannot rehabilitate a pre-gap frame.
+                    self.acquisition_gap_at = self.clock()
+                    self.reason = "capture_gap_waiting_fresh_frame"
                     return
                 self._discard(kind)
                 return
@@ -186,7 +195,12 @@ class MetadataRuntime:
                     valid = self.enabled() and self.target() == target
                     with self.lock:
                         if self._valid(epoch) and valid:
-                            if (isinstance(result, dict) and result.get("status") == "recognized"
+                            if (isinstance(result, dict)
+                                    and type(result.get("captured_at")) in (int, float)
+                                    and self.acquisition_gap_at is not None
+                                    and result["captured_at"] <= self.acquisition_gap_at):
+                                self._discard("capture_gap")
+                            elif (isinstance(result, dict) and result.get("status") == "recognized"
                                     and result.get("version") == VERSION
                                     and result.get("source") == "direct_header"
                                     and result.get("match_type") == "ranked"

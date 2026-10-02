@@ -87,13 +87,15 @@ with fixture_clock():
         elif cmd == "native_install":
             from lobby_capture import acquire
             script = message["script"]
+            timing = {"clock": lambda: clock[0]} if message.get("fake_clock") else {}
             server.metadata_runtime = MetadataRuntime(server.DATA_ROOT, target=lambda: target,
-                worker=lambda t,c: acquire(t,c,script=script))
+                worker=lambda t,c: acquire(t,c,script=script), **timing)
         elif cmd == "finish": finish()
         elif cmd == "result":
             server.result_gate.clear_for_manual_correction()
             assert server.record_result(message["result"], "auto")
         elif cmd == "draw": server.metadata_notify("result", result="draw")
+        elif cmd == "gap": server.metadata_notify("capture_gap")
         elif cmd == "expire": clock[0] += message["seconds"]
         elif cmd == "sidecar_fault":
             def broken(root): raise OSError("injected optional fault")
@@ -194,6 +196,22 @@ class ServerTests(unittest.TestCase):
         self.post({"action":"enable","enabled":True})
         self.command("install")
 
+    def retain_child(self, pid):
+        # Creation time may remain queryable on an already-terminated process
+        # while Windows retains its object. Hold the exact live process handle
+        # and inspect its exit signal, rather than treating that time as alive.
+        kernel = ctypes.WinDLL("kernel32",use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE,wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel.OpenProcess(0x100000,False,pid)  # SYNCHRONIZE; never termination authority.
+        self.assertTrue(handle)
+        self.addCleanup(kernel.CloseHandle,handle)
+        self.assertEqual(kernel.WaitForSingleObject(handle,0),258,"child was not live before release")
+        return kernel,handle
+
     def cleanup(self):
         if self.p.poll() is None:
             try: self.post({},path="/api/system/shutdown")
@@ -261,13 +279,55 @@ class ServerTests(unittest.TestCase):
         while not marker.exists() and time.monotonic()<deadline: threading.Event().wait(.01)
         self.assertTrue(marker.exists())
         pid=int(marker.read_text())
-        birth=process_birth(pid); self.assertIsNotNone(birth)
+        kernel,handle=self.retain_child(pid)
         self.assertEqual(self.post({},path="/api/system/shutdown")[0],200)
         self.p.stdin.write('{"cmd":"stop"}\n'); self.p.stdin.flush()
         self.read("DONE")
         self.p.wait(timeout=8)
-        self.assertIsNone(process_birth(pid),"owned child survived normal server shutdown")
+        self.assertEqual(kernel.WaitForSingleObject(handle,0),0,"owned child survived normal server shutdown")
         self.assertFalse((self.root/"AC6WinLossTracker"/".runtime.json").exists())
+
+    def test_gap_ordering_with_authenticated_http_and_actual_owned_child(self):
+        # The child's structured frame timestamp is synthetic and the runtime
+        # clock deterministic. Actual PID/Job/IPC/HTTP/cleanup remain production.
+        self.post({"action":"enable","enabled":True})
+        for index, offset in enumerate((-.5, 0.0, 1.0)):
+            gap_at = 100.0 + index * 1.5
+            captured = gap_at + offset
+            marker, release = self.root/f"gap-child-{index}", self.root/f"gap-release-{index}"
+            script = self.root/f"gap-worker-{index}.py"
+            mode = (f"Path({str(marker)!r}).write_text(str(os.getpid()))\n"
+                    f"    while not Path({str(release)!r}).exists(): time.sleep(.01)")
+            code = FAKE_WORKER.replace("SOURCE",repr(str(ROOT))).replace("MODE",mode)
+            self.assertIn('"captured_at":time.monotonic()',code)
+            code = code.replace('"captured_at":time.monotonic()',f'"captured_at":{captured!r}')
+            script.write_text(code,encoding="utf-8")
+            self.command("native_install",script=str(script),fake_clock=True)
+            self.assertEqual(self.post({"action":"acquire"})[1]["state"],"acquiring")
+            deadline = time.monotonic()+10
+            while not marker.exists() and time.monotonic()<deadline: threading.Event().wait(.01)
+            self.assertTrue(marker.exists())
+            pid = int(marker.read_text())
+            kernel,handle = self.retain_child(pid)
+            self.command("gap")  # Cleanup time alone cannot prove capture after this gap.
+            self.assertEqual(self.post({"action":"status"})[1]["state"],"acquiring")
+            self.command("expire",seconds=1.5)
+            release.write_text("GO",encoding="utf-8")
+            self.command("finish")
+            self.assertEqual(kernel.WaitForSingleObject(handle,0),0,"gap acquisition left its owned child")
+            status = self.post({"action":"status"})[1]
+            if captured <= gap_at:
+                self.assertEqual((status["state"],status["reason"]),("unknown","capture_gap"))
+            else:
+                self.assertEqual(status["state"],"pending")
+                self.command("result",result="win")
+                self.assertEqual(self.post({"action":"status"})[1]["state"],"confirmation")
+                self.command("gap")
+                self.assertNotIn("event_id",self.post({"action":"status"})[1])
+                self.command("result",result="loss")
+                self.assertNotIn("event_id",self.post({"action":"status"})[1])
+            self.assertFalse((self.root/"AC6WinLossTracker"/"enrichment.db").exists())
+        self.assertEqual(len(self.command("rows")["rows"]),2)
 
 
 @unittest.skipUnless(os.name=="nt","Windows contained process")

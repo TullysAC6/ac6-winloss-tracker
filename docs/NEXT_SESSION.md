@@ -14,6 +14,11 @@ supersedes earlier STOP/pending statements below.
 Read [#15-5 runtime contract](ISSUE15_5_RUNTIME_CONTRACT.md), its live PR/gates/
 fresh Astra High review/exact-head CI, and [T3 procedure](ISSUE15_5_T3.md).
 STOP for owner-operated T3: do not merge without explicit owner T3 PASS.
+Owner T3 on `1bf2ed53` failed with `capture_gap`; its first target-unavailable
+attempt is excluded. Continue only the authorized gap/capture ordering correction
+in PR #65, then affected gates, fresh delta review, new exact-head CI and new T3.
+Acquisition may adopt only a native frame strictly after the latest detector gap;
+pending/confirmation still discard on any gap. Do not retry the old candidate for PASS.
 Acceptance remains PENDING; release and #15-6 are not authorized.
 
 ## Historical checkpoint — #59 resumed, 2026-10-01

@@ -9,9 +9,11 @@ Use an isolated data root; these steps do not copy or alter your usual history.
 Close the normal Tracker yourself first. Leave AC6 running. Open PowerShell and paste:
 
 ```powershell
-$candidate = 'C:\Users\makis\OneDrive\ドキュメント\ChatGPT\AC6 Tool Dev\ac6-wt-issue15-5-runtime'
+$candidate = 'C:\Users\makis\OneDrive\ドキュメント\ChatGPT\AC6 Tool Dev\ac6-wt-issue15-5-capture-gap'
 $python = 'C:\Users\makis\AppData\Local\Programs\Python\Python314\python.exe'
-$env:LOCALAPPDATA = Join-Path $env:TEMP 'AC6-Issue15-5-owner-T3'
+$t3Base = Join-Path $env:TEMP ('AC6-Issue15-5-gap-T3-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+if (Test-Path -LiteralPath $t3Base) { throw 'Existing T3 root: preserve it and use a new timestamp.' }
+$env:LOCALAPPDATA = $t3Base
 if (Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue) { throw 'Close your normal Tracker first; no process was stopped.' }
 Set-Location -LiteralPath $candidate
 $t3Data = Join-Path $env:LOCALAPPDATA 'AC6WinLossTracker'
@@ -47,6 +49,11 @@ No lobby_worker.py should appear in process command lines while OFF.
 ## Match 1: explicit acquisition and confirmation
 
 Set AC6 to the accepted **English RANK MATCH: SINGLE, native 1920x1080** lobby.
+Use a visible nonminimized native client (for example borderless/windowed 1920x1080)
+so switching to PowerShell does not minimize AC6. A gap after successful capture
+still discards pending/confirmation; it must not be ignored to obtain a pass.
+The previous candidate's T3 was FAIL/capture_gap; start again on the PR's new
+reviewed/CI-passing exact head, not the old `1bf2ed53` or its original data root.
 Do not use the future-rank reference images as a recognition test. Then:
 
 ```powershell

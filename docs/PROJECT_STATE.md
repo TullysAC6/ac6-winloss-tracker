@@ -17,6 +17,11 @@ implementation](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issue
 #15-5 remains Accepted PENDING, T3 PENDING, Merged NO, Released NO; gate/review
 and exact-head evidence belong to its PR. STOP for owner-operated T3 before merge;
 after later explicit T3 PASS, pinned merge/exact-main verification are required.
+First owner T3 on PR #65 head `1bf2ed53` is FAIL/STOP: acquisition became
+`unknown/capture_gap` (first target-unavailable attempt excluded). The owner has
+authorized the bounded acquisition gap/capture ordering correction; see DECISIONS.
+Corrected-head gates/delta review/CI and a fresh owner T3 are required. The old
+passing CI is historical evidence only, not corrected-head proof.
 No next slice or release is authorized. Historical checkpoints below are superseded
 only where they conflict with this latest owner decision.
 
