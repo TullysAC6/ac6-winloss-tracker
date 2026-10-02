@@ -108,10 +108,10 @@ class MetadataRuntime:
         finally:
             self.lock.release()
 
-    def _sync(self):
+    def _sync_state(self):
         if not self.enabled():
             self.cancel("disabled")
-            return False
+            return False, None
         with self.lock:
             if self.lost.is_set():
                 self._discard("notification_lost")
@@ -119,7 +119,10 @@ class MetadataRuntime:
             item = self.candidate or self.pending
             if item and self.clock() >= item["expires"]:
                 self._discard("expired")
-            return not self.closed
+            return not self.closed, self.epoch
+
+    def _sync(self):
+        return self._sync_state()[0]
 
     def cancel(self, reason="cancelled"):
         with self.lock:
@@ -147,16 +150,22 @@ class MetadataRuntime:
             raise
 
     def acquire(self):
-        if not self._sync():
+        active, admission_epoch = self._sync_state()
+        if not active:
             return {"state": "disabled"}
         # Target discovery outside the state lock and core critical section.
         target = self.target()
+        if not self.enabled():
+            self.cancel("disabled")
+            return {"state": "disabled"}
         if target is None:
             self.cancel("target_unavailable")
             return {"state": "unknown", "reason": "target_unavailable"}
         with self.lock:
             if self.task is not None or self.closed:
                 return {"state": "busy"}
+            if self.epoch != admission_epoch or self.lost.is_set():
+                return {"state": "rejected", "reason": "acquisition_revoked"}
             self._discard("replaced")
             self.cancelled = threading.Event()
             epoch, cancel = self.epoch, self.cancelled
@@ -167,6 +176,12 @@ class MetadataRuntime:
             def work():
                 result = None
                 try:
+                    with self.lock:
+                        if not self._valid(epoch):
+                            return
+                    if not self.enabled():
+                        self.cancel("disabled")
+                        return
                     result = self.worker(target, cancel)
                     valid = self.enabled() and self.target() == target
                     with self.lock:

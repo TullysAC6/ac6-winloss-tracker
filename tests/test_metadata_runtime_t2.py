@@ -297,6 +297,23 @@ class WorkerTests(unittest.TestCase):
         self.assertTrue(result["cleaned"])
         self.assertFalse(marker.exists())
 
+    def test_valid_response_followed_by_crash_or_hang_never_becomes_pending(self):
+        for after_response in ("os._exit(23)", "time.sleep(30)"):
+            script = self.script()
+            code = script.read_text(encoding="utf-8")
+            seam='try: owned_entry(ready, work, (), owner=owner)'
+            self.assertEqual(code.count(seam),1)
+            code=code.replace(seam,'    '+after_response+'\n'+seam)
+            script.write_text(code,encoding="utf-8")
+            runtime=MetadataRuntime(self.root,enabled=lambda:True,target=lambda:TARGET,
+                worker=lambda t,c:acquire(t,c,script=script))
+            runtime.acquire()
+            task=runtime.task
+            if task: task.join(8); self.assertFalse(task.is_alive())
+            self.assertIsNone(runtime.pending)
+            self.assertEqual(runtime.status()["state"],"unknown")
+            runtime.shutdown()
+
     def wait_file(self, path):
         deadline = time.monotonic() + 10
         while not path.exists() and time.monotonic() < deadline:

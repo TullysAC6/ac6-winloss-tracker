@@ -151,6 +151,36 @@ class RuntimeTests(unittest.TestCase):
         self.runtime.notify("result", result="win", event_id="one", decided_at=99)
         self.assertIsNone(self.runtime.candidate)
 
+    def test_off_cancel_result_and_shutdown_during_target_discovery_never_dispatch(self):
+        for kind in ("off", "cancel", "draw", "shutdown", "lost"):
+            entered, release = threading.Event(), threading.Event()
+            enabled = [True]
+            worker = Mock(side_effect=self.positive)
+            def target():
+                entered.set()
+                self.assertTrue(release.wait(3))
+                return TARGET
+            runtime = MetadataRuntime(self.root, enabled=lambda: enabled[0], target=target,
+                worker=worker, clock=lambda: self.now)
+            reply = []
+            request = threading.Thread(target=lambda: reply.append(runtime.acquire()))
+            request.start()
+            try:
+                self.assertTrue(entered.wait(3))
+                if kind == "off": enabled[0] = False; runtime.cancel("disabled")
+                elif kind == "draw": runtime.notify("result", result="draw")
+                elif kind == "shutdown": runtime.shutdown()
+                elif kind == "lost": runtime.lost.set()
+                else: runtime.cancel()
+            finally:
+                release.set(); request.join(3)
+            self.assertFalse(request.is_alive())
+            self.assertNotEqual(reply[0]["state"], "acquiring")
+            worker.assert_not_called()
+            self.assertIsNone(runtime.task)
+            self.assertIsNone(runtime.pending)
+            runtime.shutdown()
+
     def test_notification_never_waits_and_loss_revokes(self):
         self.acquire()
         with self.runtime.lock:
@@ -278,6 +308,35 @@ class RuntimeTests(unittest.TestCase):
 
 
 class BoundaryTests(unittest.TestCase):
+    def test_pre_cancel_never_spawns_and_response_requires_normal_exit(self):
+        import lobby_capture
+        cancel=threading.Event(); cancel.set()
+        with patch.object(lobby_capture,"spawn_python") as spawn:
+            self.assertTrue(lobby_capture.acquire(TARGET,cancel)["cleaned"])
+            spawn.assert_not_called()
+        cancel.clear()
+        for mode, exit_code in (("normal",0),("crash",23),("forced_zero",0)):
+            process=Mock(pid=900,ac6_launch_nonce="a"*64)
+            process.poll.side_effect=lambda: process.returncode
+            process.returncode=None
+            def wait(timeout):
+                if mode == "forced_zero" and process.returncode is None:
+                    raise lobby_capture.subprocess.TimeoutExpired("owned",timeout)
+                process.returncode=exit_code
+            process.wait.side_effect=wait
+            positive={"status":"recognized","match_type":"ranked","match_format":"single",
+                      "version":VERSION,"source":"direct_header","captured_at":100.0}
+            with patch.object(lobby_capture,"spawn_python",return_value=process), \
+                 patch.object(lobby_capture,"process_birth",return_value=1), \
+                 patch.object(lobby_capture,"KillOnCloseJob") as job, \
+                 patch.object(lobby_capture,"PipeReader") as reader:
+                if mode == "forced_zero":
+                    job.return_value.close.side_effect=lambda: setattr(process,"returncode",0)
+                reader.return_value.read.side_effect=[{"pid":900,"launch_nonce":"a"*64},positive]
+                response=lobby_capture.acquire(TARGET,cancel)
+            self.assertTrue(response["cleaned"])
+            self.assertEqual(response["status"],"recognized" if mode=="normal" else "failed")
+
     def test_native_adapter_fresh_geometry_repeat_stale_and_target_change(self):
         import types
         import numpy as np

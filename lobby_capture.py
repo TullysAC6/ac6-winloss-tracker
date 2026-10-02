@@ -129,12 +129,13 @@ _unreaped = []
 
 
 def acquire(target, cancel, *, script=None):
-    if os.name != "nt" or _unreaped:
+    if os.name != "nt" or _unreaped or cancel.is_set():
         return {"status": "failed", "cleaned": not _unreaped}
     deadline = time.monotonic() + ATTEMPT_SECONDS
     process = job = None
     response = {"status": "failed"}
     cleaned = False
+    completed_normally = False
     try:
         script = Path(script) if script else Path(__file__).with_name("lobby_worker.py")
         birth = process_birth(os.getpid())
@@ -176,12 +177,19 @@ def acquire(target, cancel, *, script=None):
             try:
                 process.stdin.close()
                 adapter.join(.3)
+                completed_normally = process.poll() == 0
             finally:
                 if job:
                     job.close()
                 try:
                     stop_process(adapter)
                     cleaned = not adapter.is_alive()
+                    # A structured response is evidence only when its owned
+                    # producer also completed normally. Dead after crash/kill
+                    # is cleanup success, not recognition success.
+                    if not cleaned or not completed_normally:
+                        response.clear()
+                        response["status"] = "failed"
                 except Exception:
                     _unreaped.append((process, job))
         response["cleaned"] = cleaned

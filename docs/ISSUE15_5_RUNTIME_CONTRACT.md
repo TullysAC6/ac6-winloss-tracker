@@ -35,6 +35,11 @@ Unsupported/stale/repeated/discontinuous/changed targets fail UNKNOWN.
 The child response contains only bounded structured JSON. Graceful join then Job
 closure and bounded terminate/kill verify death before publishing evidence.
 Unreapable work blocks replacement. No resident OCR thread/process exists.
+Acquisition carries its revocation epoch across target discovery and rechecks
+preference/admission before dispatch. Intervening OFF/cancel/result/shutdown/lost
+notifications reject it, and a pre-cancelled child request never spawns. Recognized
+IPC is adopted only after verified **normal exit0 before forced cleanup**; a response
+followed by crash/hang/kill is UNKNOWN even when all processes were reaped.
 
 ## Single pending and first result
 
@@ -90,12 +95,25 @@ measurements must be labelled separately, with no invented acceptance threshold.
 
 Local 3.14.7 synthetic actual-server measurement, five OFF control cycles vs five
 explicit owned-child acquisitions (structured fake header, **no WGC/game**): server
-CPU total 15.625 -> 31.250 ms (delta +15.625 ms/5); final working set 45.691 ->
-46.574 MiB (delta +0.883 MiB); mean request-through-cleanup/status latency
-6.274 -> 249.080 ms (delta +242.806 ms). ON includes worker bootstrap and an
+CPU total 0.000 -> 62.500 ms (delta +62.500 ms/5); CPU cycles 39,333,654 ->
+184,797,690 (delta +145,464,036); final working set 46.207 -> 47.043 MiB
+(delta +0.836 MiB); mean request-through-cleanup/status latency
+9.849 -> 249.210 ms (delta +239.361 ms). ON includes worker bootstrap and an
 extra completion IPC; OFF performs no worker work. These are mechanism observations,
 not a game-performance result or an acceptance threshold. Native WGC/game and child
 resource impact remain owner T3 measurements.
+The short CPU-time observations are quantized in 15.625 ms increments; the preceding
+five-cycle post-fix run reported 0 ms for both paths. CPU cycles are therefore also
+recorded; zero reported milliseconds does not mean no CPU cost. No regression/pass
+threshold is inferred from these small synthetic samples.
+
+Pre-review complete CI [run36948798782](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/36948798782)
+passed all six jobs/aggregate on `8888d9ede022015d5fc95a0c65d5a03a10497cb0`,
+attempt1. Fresh Astra High review required two local corrections: acquisition
+preflight revocation and response-then-abnormal-exit rejection. Both are corrected;
+full local Python T0 and affected real metadata T2 (9 cases) pass again. Re-review
+and final exact-head CI evidence are recorded in PR #65; neither authorizes merge
+before owner T3.
 
 After review GO and exact-head CI SUCCESS, follow [owner T3 procedure](ISSUE15_5_T3.md).
 Do not merge until explicit owner T3 PASS. Do not infer Acceptance or publish a release.
