@@ -106,7 +106,8 @@ class BroadcastStaticTests(unittest.TestCase):
 
     def test_server_adds_one_allow_listed_field_and_no_thread_or_route(self):
         self.assertEqual(SERVER.count("threading.Thread("), 2, "same resident thread topology")
-        self.assertEqual(SERVER.count('if path == "'), 11, "no new endpoint")
+        self.assertEqual(SERVER.replace('if path == "/api/metadata":', '').count('if path == "'),
+                         11, "Broadcast transport unchanged; #15-5 adds only its authenticated control")
         self.assertIn('BROADCAST_PREFERENCE_KEYS = ("broadcast_show_best_streak",)', SERVER)
         self.assertNotIn(PLAYER_KEY, SERVER)
         handler = SERVER[SERVER.index('if path == "/config":'):SERVER.index('if path == "/stats":')]
@@ -169,7 +170,7 @@ class BroadcastConfigTests(unittest.TestCase):
     def test_a_bad_file_keeps_the_last_value_and_is_never_rewritten(self):
         self.write('{"preferences_version": 2, "broadcast_show_best_streak": false}')
         self.assertEqual(self.server.broadcast_preferences(), {KEY: False})
-        for bad in ("{broken", '{"preferences_version": 4, "broadcast_show_best_streak": true}',
+        for bad in ("{broken", '{"preferences_version": 5, "broadcast_show_best_streak": true}',
                     '{"preferences_version": 2, "broadcast_show_best_streak": "true"}',
                     '{"preferences_version": 2, "broadcast_overlay": {"show_best_streak": true}}',
                     '{"preferences_version": 2, "surprise": true}'):

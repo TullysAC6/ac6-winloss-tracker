@@ -29,6 +29,7 @@ FROZEN_V18_CONFIG_KEYS = {
 KEYS_BY_VERSION = {
     1: {"player_streak_status_enabled"},   # UI-1A
     2: {"broadcast_show_best_streak"},     # UI-1B
+    3: {"match_metadata_detection"},      # #15-5, default OFF explicit local control
 }
 # Exactly what UI-1A (preferences version 1) writes, and what the owner's live
 # preferences.json held after the UI-1A real-machine T3.
@@ -100,7 +101,7 @@ class VersioningDisciplineTests(unittest.TestCase):
     def test_ui_1b_contract(self):
         # UI-1B: one Broadcast-only boolean, ON by default (every earlier build
         # always showed 最高連勝), and the UI-1A key untouched.
-        self.assertEqual(preferences.PREFERENCES_VERSION, 2)
+        self.assertEqual(KEYS_BY_VERSION[2], {BROADCAST})
         self.assertIs(preferences.DEFAULTS[BROADCAST], True)
         self.assertIs(preferences.DEFAULTS[KEY], True)
         self.assertNotIn(".", BROADCAST)
@@ -108,12 +109,12 @@ class VersioningDisciplineTests(unittest.TestCase):
 
 class ValidationTests(Isolated):
     def test_missing_file_is_every_default_and_is_never_created_by_reading(self):
-        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: True})
+        self.assertEqual(preferences.load(), defaults())
         self.assertFalse(self.path.exists())
 
     def test_current_version_is_strict(self):
         self.write({"preferences_version": V, KEY: False, BROADCAST: False})
-        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: False})
+        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: False, "match_metadata_detection": False})
         for bad in ({"preferences_version": V, KEY: "false"},
                     {"preferences_version": V, KEY: 0},
                     {"preferences_version": V, BROADCAST: "false"},
@@ -135,7 +136,7 @@ class ValidationTests(Isolated):
 
     def test_a_ui_1a_file_is_read_strictly_and_gains_the_broadcast_default(self):
         self.write(UI_1A_FILE)
-        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: True})
+        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: True, "match_metadata_detection": False})
         for bad in ({"preferences_version": 1, KEY: "no"}, {"preferences_version": 1, "surprise": 1}):
             with self.subTest(bad=bad):
                 self.write(bad)
@@ -146,7 +147,7 @@ class ValidationTests(Isolated):
         newer = {"preferences_version": V + 1, KEY: False, BROADCAST: False, "future_anchor": "top-right",
                  "future_scale": 1.25, "note": None}
         self.write(newer)
-        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: False},
+        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: False, "match_metadata_detection": False},
                          "unknown newer keys are never interpreted")
         for bad in ({"preferences_version": V + 1, KEY: "no"},
                     {"preferences_version": V + 1, BROADCAST: "no"},
@@ -240,17 +241,17 @@ class SaveTests(Isolated):
     def test_save_is_atomic_versioned_and_round_trips(self):
         self.assertTrue(preferences.save({KEY: False}))
         self.assertEqual(self.stored(), {"preferences_version": V, KEY: False})
-        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: True})
+        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: True, "match_metadata_detection": False})
         self.assertTrue(preferences.save({KEY: True}))
-        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: True})
+        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: True, "match_metadata_detection": False})
         self.assertEqual(list(self.path.parent.glob(".preferences-*.tmp")), [])
 
     def test_broadcast_off_persists_and_on_restores(self):
         self.assertTrue(preferences.save({BROADCAST: False}))
         self.assertEqual(self.stored(), {"preferences_version": V, BROADCAST: False})
-        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: False})
+        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: False, "match_metadata_detection": False})
         self.assertTrue(preferences.save({BROADCAST: True}))
-        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: True})
+        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: True, "match_metadata_detection": False})
         self.assertFalse(preferences.save({BROADCAST: True}), "nothing to change")
 
     def test_player_and_broadcast_values_are_independent(self):
@@ -259,13 +260,13 @@ class SaveTests(Isolated):
         self.assertTrue(preferences.save({BROADCAST: False}))
         self.assertIs(preferences.load()[KEY], False, "the Broadcast setting never moves the Player status")
         self.assertTrue(preferences.save({KEY: True}))
-        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: False})
+        self.assertEqual(preferences.load(), {KEY: True, BROADCAST: False, "match_metadata_detection": False})
 
     def test_a_ui_1a_file_upgrades_to_this_version_keeping_the_player_value(self):
         self.write(UI_1A_FILE)
         self.assertTrue(preferences.save({BROADCAST: False}))
         self.assertEqual(self.stored(), {"preferences_version": V, KEY: False, BROADCAST: False})
-        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: False})
+        self.assertEqual(preferences.load(), {KEY: False, BROADCAST: False, "match_metadata_detection": False})
 
     def test_save_preserves_what_a_newer_build_wrote(self):
         newer = {"preferences_version": V + 1, KEY: True, BROADCAST: True, "future_key": False}

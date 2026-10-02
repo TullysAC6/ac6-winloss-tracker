@@ -67,6 +67,61 @@ detector_fallback = {
     "last_result": None,
 }
 
+# Construct/import optional runtime only on an authenticated explicit opt-in.
+metadata_runtime = None
+metadata_control_lock = threading.Lock()
+
+
+def metadata_notify(kind, **payload):
+    """Best-effort in-memory observer. Core never waits for optional locks/I/O."""
+    runtime = metadata_runtime
+    if runtime is not None:
+        try:
+            runtime.notify(kind, **payload)
+        except Exception:
+            # Lost/invalid observation cannot affect accepted results.
+            runtime.lost.set()
+
+
+def metadata_control(body):
+    global metadata_runtime
+    if not isinstance(body, dict):
+        raise ValueError("metadata control requires an object")
+    action = body.get("action")
+    fields = {"enable": {"action", "enabled"}, "acquire": {"action"},
+              "status": {"action"}, "cancel": {"action"},
+              "confirm": {"action", "request_id", "event_id", "same_match"}}
+    if action not in fields or set(body) != fields[action]:
+        raise ValueError("invalid metadata action/fields")
+    if action == "enable":
+        if type(body["enabled"]) is not bool:
+            raise ValueError("enabled must be Boolean")
+        preferences.save({"match_metadata_detection": body["enabled"]})
+    try:
+        enabled = preferences.load()["match_metadata_detection"] is True
+    except (OSError, ValueError, KeyError, TypeError):
+        enabled = False
+    with metadata_control_lock:
+        if enabled and metadata_runtime is None:
+            from metadata_runtime import MetadataRuntime
+            metadata_runtime = MetadataRuntime(DATA_ROOT)
+        runtime = metadata_runtime
+    if not enabled:
+        if runtime is not None:
+            runtime.cancel("disabled")
+        return {"state": "disabled"}
+    if action == "enable" or action == "status":
+        return runtime.status()
+    if action == "cancel":
+        return runtime.cancel()
+    if action == "acquire":
+        return runtime.acquire()
+    if (not isinstance(body["request_id"], str) or len(body["request_id"]) != 32
+            or not isinstance(body["event_id"], str) or not 1 <= len(body["event_id"]) <= 128
+            or body["same_match"] is not True):
+        raise ValueError("confirm exact request_id/event_id and same_match=true")
+    return runtime.confirm(body["request_id"], body["event_id"], body["same_match"])
+
 
 
 event_bus = EventBus(history_size=300)
@@ -557,6 +612,11 @@ def record_result(result, source):
             result_gate.clear_for_manual_correction()
             discard_uncounted_result(store, event_id)
             raise
+        # Both authoritative writes succeeded. Consume pending here, never from
+        # SSE/latest-row inference. This observer has no I/O or blocking lock.
+        witness = getattr(store, "last_result_witness", None)
+        metadata_notify("result", result=result, event_id=event_id if source == "auto" else None,
+                        decided_at=now, witness=witness)
         invalidate_dashboard_summary()
         set_history_health("active")
 
@@ -630,6 +690,7 @@ def undo_result():
     the row is queued to be taken out of history, completing the undo.
     """
     with result_lock:
+        metadata_notify("undo")
         if uncounted_event_ids and not settle_uncounted_results(history):
             raise UndoIncomplete("previous history correction is still pending")
         before = stats.snapshot()
@@ -684,6 +745,7 @@ def undo_result():
 
 def reset_stats():
     with result_lock:
+        metadata_notify("reset")
         s = stats.reset()
         invalidate_dashboard_summary()
         result_gate.lock_now()
@@ -1076,6 +1138,7 @@ def purge_history(mode, cutoff=None):
     a purge cannot leave the Tracker unable to record the next result.
     """
     with result_lock:
+        metadata_notify("purge")
         with history_lock:
             store = history
         if store is None:
@@ -1147,6 +1210,7 @@ def detector_supervisor():
                     publish,
                     stop_event,
                     diagnostic_recorder=RECORDER,
+                    on_optional_event=metadata_notify,
                 )
             except Exception as e:
                 msg = f"{type(e).__name__}: {e}"
@@ -1306,6 +1370,17 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
+            if path == "/api/metadata":
+                # This optional authenticated route is bounded even if a client
+                # sends a partial body. No general HTTP behavior is changed.
+                self.connection.settimeout(2.0)
+                try:
+                    result = metadata_control(self.read_json_body())
+                except (ValueError, json.JSONDecodeError) as error:
+                    self.json_response({"error": str(error)}, 400)
+                else:
+                    self.json_response({"ok": True, **result})
+                return
             if path == "/api/system/shutdown":
                 prepare_history_shutdown()
                 self.json_response({"ok": True, "status": "shutting_down"})
@@ -1517,6 +1592,11 @@ def main(on_ready=None):
         pass
     finally:
         stop_event.set()
+        if metadata_runtime is not None:
+            try:
+                metadata_runtime.shutdown()
+            except Exception:
+                pass  # Optional teardown never suppresses core shutdown.
         if detector_thread is not None:
             detector_thread.join(timeout=4.0)
         with history_lock:

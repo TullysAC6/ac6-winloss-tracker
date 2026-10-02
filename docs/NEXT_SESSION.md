@@ -1,10 +1,22 @@
 # Next session
 
-Last updated: 2026-10-01 JST
+Last updated: 2026-10-02 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
-## Current checkpoint — #59 resumed, 2026-10-01
+## Current checkpoint — #15-5 owner-authorized implementation
+
+Base main `27e5f49aa7bb73b9a90f04a0465624e4e5d58008`; CI36842472785
+SUCCESS attempt1. #59 CLOSED; #15-0 through #15-4 Accepted + Merged +
+Unreleased. Stable v1.2.0, Issue #15 OPEN. [Owner adoption and implementation
+authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5943012970)
+supersedes earlier STOP/pending statements below.
+Read [#15-5 runtime contract](ISSUE15_5_RUNTIME_CONTRACT.md), its live PR/gates/
+fresh Astra High review/exact-head CI, and [T3 procedure](ISSUE15_5_T3.md).
+STOP for owner-operated T3: do not merge without explicit owner T3 PASS.
+Acceptance remains PENDING; release and #15-6 are not authorized.
+
+## Historical checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
 as `848674115f842f7fcb22ce8c3fccc598502e7c45`, identical to reviewed head

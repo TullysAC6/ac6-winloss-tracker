@@ -1,12 +1,26 @@
 # Project state
 
-Last updated: 2026-10-01 JST
+Last updated: 2026-10-02 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current checkpoint — #59 resumed, 2026-10-01
+## Current checkpoint — #15-5 owner-authorized implementation
+
+Live base main `27e5f49aa7bb73b9a90f04a0465624e4e5d58008`, exact-main
+CI36842472785 SUCCESS attempt1. #59 CLOSED; #15-0 through #15-4 Accepted +
+Merged + Unreleased. Stable v1.2.0; Issue #15 OPEN.
+The [owner adopted the assisted runtime architecture and authorized production
+implementation](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5943012970).
+[#15-5 contract](ISSUE15_5_RUNTIME_CONTRACT.md) and [T3 procedure](ISSUE15_5_T3.md).
+#15-5 remains Accepted PENDING, T3 PENDING, Merged NO, Released NO; gate/review
+and exact-head evidence belong to its PR. STOP for owner-operated T3 before merge;
+after later explicit T3 PASS, pinned merge/exact-main verification are required.
+No next slice or release is authorized. Historical checkpoints below are superseded
+only where they conflict with this latest owner decision.
+
+## Historical checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
 as `848674115f842f7fcb22ce8c3fccc598502e7c45`, identical to reviewed head
