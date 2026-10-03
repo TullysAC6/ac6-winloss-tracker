@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections import deque
 from pathlib import Path
 
 from .clock import ModuleTime, VirtualClock
@@ -83,6 +84,14 @@ class ReplayRecorder:
         self.frames = []
         self.rows = []
         self.flushes = []
+        self.candidate_bundles = deque(maxlen=8)
+
+    def submit_candidate_bundle(self, bundle):
+        self.candidate_bundles.append(bundle)
+
+    def close_candidate_bundles(self):
+        self.candidate_bundles.clear()
+        return True
 
     def buffer_frame(self, **payload):
         self.frames.append((self.cursor.index, payload))
