@@ -226,7 +226,7 @@ for stripe_fraction in (0.01, 0.05, 0.10, 0.20, 0.50, 1.0):
 # Crossing lighting stripes may suppress relative contrast on a few rows.
 # The existing normalized gap handling must retain independent text support.
 for band_gray in (74, 75, 79):
-    for band_height in (1, 2, 4):
+    for band_height in (1, 2, 4, 6, 8, 10):
         lit = bytearray(lit_background(prefix, width, height, peripheral=True))
         x0, x1 = width * 18 // 100, width * 34 // 100
         for y in range(height):

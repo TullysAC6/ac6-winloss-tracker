@@ -292,13 +292,18 @@ def _leading_text_contrast(raw, width, height, x0, x1):
         baseline.append(values / (height - lower_start))
     mask = bytearray(strip_width * height)
     row_mask = bytearray(strip_width * height)
+    neutral_gray = bytearray(strip_width * height)
+    neutral_remaining = bytearray(strip_width * height)
     for y in range(height):
         row_pixels = []
         for sx, x in enumerate(range(x0, x1)):
             i = (y * width + x) * 4
             b, g, r = raw[i], raw[i+1], raw[i+2]
             gray = (29*b + 150*g + 77*r) >> 8
-            row_pixels.append((gray, max(r, g, b)-min(r, g, b) < 42))
+            neutral = max(r, g, b)-min(r, g, b) < 42
+            row_pixels.append((gray, neutral))
+            neutral_gray[y * strip_width + sx] = gray
+            neutral_remaining[y * strip_width + sx] = neutral
             if max(r, g, b)-min(r, g, b) < 42 and abs(gray-baseline[sx]) >= 5:
                 mask[y * strip_width + sx] = 1
         # A uniform vertical change between this row and the lower margin
@@ -329,6 +334,35 @@ def _leading_text_contrast(raw, width, height, x0, x1):
                     and cluster['density'] >= 0.060):
                 text_columns += 1
         if text_columns / strip_width >= 0.060:
+            return True
+    # Relative lighting references are not proof that a prefix is absent:
+    # a crossing line can equal the letters and cancel its own contrast rows.
+    # Independently veto coherent neutral components directly from pixels,
+    # without subtracting either reference. Each pixel is visited once; the
+    # same text geometry/support bounds apply and this can only reject recovery.
+    for start in range(len(neutral_remaining)):
+        if not neutral_remaining[start]:
+            continue
+        level = neutral_gray[start]
+        stack = [start]
+        neutral_remaining[start] = 0
+        count, y_min, y_max = 0, height, -1
+        while stack:
+            i = stack.pop()
+            y, x = divmod(i, strip_width)
+            count += 1
+            y_min, y_max = min(y_min, y), max(y_max, y)
+            neighbors = (i-strip_width if y else -1,
+                         i+strip_width if y+1 < height else -1,
+                         i-1 if x else -1, i+1 if x+1 < strip_width else -1)
+            for j in neighbors:
+                if j >= 0 and neutral_remaining[j] and neutral_gray[j] == level:
+                    neutral_remaining[j] = 0
+                    stack.append(j)
+        span = (y_max-y_min+1) / height
+        center = (y_max+y_min+1) / (2*height)
+        density = count / (strip_width * (y_max-y_min+1))
+        if 0.40 <= span <= 0.70 and 0.36 <= center <= 0.64 and density >= 0.060:
             return True
     return False
 

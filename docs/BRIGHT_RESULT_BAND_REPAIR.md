@@ -70,14 +70,20 @@ the preserved dim prefix. Recovery now also examines each column's independent
 vertical profiles with the same normalized bins, text-height/center bounds,
 gap handling and >=6% column support. An additional independent NO-GO showed
 why raw uninterrupted runs were insufficient: crossing background lines split
-visible prefix strokes. Nine crossing-line controls now retain that evidence.
+visible prefix strokes. A subsequent wider-line NO-GO showed that relative
+references alone still lose partial prefix evidence. Direct connected neutral
+luminance components now independently veto text-height/support structures,
+without subtracting any lighting reference. Every strip pixel is visited once
+in this bounded traversal, with the same geometry/support bounds. Eighteen
+crossing-line controls and twenty-four stripe controls preserve the prefix.
 Unrelated full-height columns cannot erase shorter text evidence elsewhere.
 Twenty-four generated stripe width/position controls preserve the visible
 prefix; retained real ROIs continue to recover. No global threshold changes.
 
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
-two masks approximately32% of the ROI size plus bounded column/row lists. No extra capture,
+four byte planes approximately64% of the ROI size plus bounded column/row lists
+and a stack bounded by the strip pixel count. No extra capture,
 I/O, process, thread, dependency or polling change. The AST-pinned classifier
 and new helper baseline are intentionally advanced for this repair; the original
 state-machine and detector-loop AST pins and public timing constants remain.
