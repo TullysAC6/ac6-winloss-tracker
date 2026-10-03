@@ -316,24 +316,18 @@ def _leading_text_contrast(raw, width, height, x0, x1):
                 and cluster["density"] >= 0.060):
             return True
         # Independent columns retain text-height evidence when unrelated
-        # texture extends the averaged cluster. A full-height stripe in one
-        # column must not erase short runs in the other columns. Reuse the
-        # existing vertical bounds and 6% support requirement; uncertain
-        # leading text vetoes recovery even if its aggregate span is too tall.
+        # texture extends the averaged cluster. Use the same normalized bins
+        # and gap handling as the existing text profiles: glyph strokes can
+        # be interrupted, and a background line must not erase their support.
         text_columns = 0
         for x in range(strip_width):
-            y = 0
-            while y < height:
-                if not contrast[y * strip_width + x]:
-                    y += 1
-                    continue
-                start = y
-                while y < height and contrast[y * strip_width + x]:
-                    y += 1
-                if (0.40 <= (y - start) / height <= 0.70
-                        and 0.36 <= (y + start) / (2 * height) <= 0.64):
-                    text_columns += 1
-                    break
+            column = contrast[x::strip_width]
+            cluster = _center_cluster(_y_profile(column, 1, height, 16),
+                                      threshold=0.010, max_gap=1)
+            if (0.40 <= cluster['span'] <= 0.70
+                    and 0.36 <= cluster['center'] <= 0.64
+                    and cluster['density'] >= 0.060):
+                text_columns += 1
         if text_columns / strip_width >= 0.060:
             return True
     return False

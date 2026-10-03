@@ -67,7 +67,10 @@ limitation, not justification to lower the guards.
 A third independent NO-GO showed that a narrow vertical background stripe
 could extend both averaged profiles beyond their accepted text height, hiding
 the preserved dim prefix. Recovery now also examines each column's independent
-vertical runs with the same text-height/center bounds and >=6% column support.
+vertical profiles with the same normalized bins, text-height/center bounds,
+gap handling and >=6% column support. An additional independent NO-GO showed
+why raw uninterrupted runs were insufficient: crossing background lines split
+visible prefix strokes. Nine crossing-line controls now retain that evidence.
 Unrelated full-height columns cannot erase shorter text evidence elsewhere.
 Twenty-four generated stripe width/position controls preserve the visible
 prefix; retained real ROIs continue to recover. No global threshold changes.

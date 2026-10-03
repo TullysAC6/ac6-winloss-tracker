@@ -20,7 +20,7 @@ import result_detector as rd
 from t1.images import decode_image
 
 BASE_CORE_DIGESTS = {
-    '_leading_text_contrast': '57ccc1e9dbdff58d68ecb4d479eb5b5d183c43a5e2ff26ca57c531988bac44bd',
+    '_leading_text_contrast': '3e8482670661c522b18a535f126b01dc552dc372f97edd5452566531b94fdc6c',
     # Owner-authorized bright-result-band repair advances ONLY the classifier
     # baseline and pins its new prefix helper. State/run remain pinned to the
     # original #66 exact base.
