@@ -272,100 +272,76 @@ def _center_cluster(values, threshold=0.010, max_gap=2):
 
 
 def _leading_text_contrast(raw, width, height, x0, x1):
-    """Veto a text-height neutral prefix even when it is darker than gray80.
+    """Veto neutral prefix structure at any luminance, without a lighting reference.
 
-    Compare to the same columns in the lower margin, so a dim PHASE prefix
-    cannot disappear at the absolute bright-mask cutoff. Inspect only the
-    narrow leading strip and only for otherwise eligible recovery candidates.
+    Grow connected upper/lower luminance level sets in the narrow leading strip.
+    A glyph may vary in luminance or merge with one lighting stripe; its component
+    at another level still provides text-height evidence. No fixed brightness
+    cutoff, exact-colour equality or stroke continuity is treated as absence.
+    Each neutral pixel activates once per direction; union by size/path compression
+    bounds work and storage to the strip, never another full-frame traversal.
     """
     strip_width = x1 - x0
     if strip_width <= 0:
         return True
-    lower_start = height * 3 // 4
-    baseline = []
-    for x in range(x0, x1):
-        values = 0
-        for y in range(lower_start, height):
-            i = (y * width + x) * 4
-            b, g, r = raw[i], raw[i+1], raw[i+2]
-            values += (29*b + 150*g + 77*r) >> 8
-        baseline.append(values / (height - lower_start))
-    mask = bytearray(strip_width * height)
-    row_mask = bytearray(strip_width * height)
-    neutral_gray = bytearray(strip_width * height)
-    neutral_remaining = bytearray(strip_width * height)
+    total = strip_width * height
+    buckets = [[] for _ in range(256)]
     for y in range(height):
-        row_pixels = []
         for sx, x in enumerate(range(x0, x1)):
             i = (y * width + x) * 4
             b, g, r = raw[i], raw[i+1], raw[i+2]
-            gray = (29*b + 150*g + 77*r) >> 8
-            neutral = max(r, g, b)-min(r, g, b) < 42
-            row_pixels.append((gray, neutral))
-            neutral_gray[y * strip_width + sx] = gray
-            neutral_remaining[y * strip_width + sx] = neutral
-            if max(r, g, b)-min(r, g, b) < 42 and abs(gray-baseline[sx]) >= 5:
-                mask[y * strip_width + sx] = 1
-        # A uniform vertical change between this row and the lower margin
-        # must not swallow the smaller prefix. Use an independent row-relative
-        # contrast profile as well; do not merge masks into a taller cluster.
-        row_median = sorted(gray for gray, _ in row_pixels)[strip_width // 2]
-        for sx, (gray, neutral) in enumerate(row_pixels):
-            if neutral and abs(gray-row_median) >= 5:
-                row_mask[y * strip_width + sx] = 1
-    for contrast in (mask, row_mask):
-        cluster = _center_cluster(_y_profile(contrast, strip_width, height, 16),
-                                  threshold=0.010, max_gap=1)
-        if (0.40 <= cluster["span"] <= 0.70
-                and 0.36 <= cluster["center"] <= 0.64
-                and cluster["density"] >= 0.060):
-            return True
-        # Independent columns retain text-height evidence when unrelated
-        # texture extends the averaged cluster. Use the same normalized bins
-        # and gap handling as the existing text profiles: glyph strokes can
-        # be interrupted, and a background line must not erase their support.
-        text_columns = 0
-        for x in range(strip_width):
-            column = contrast[x::strip_width]
-            cluster = _center_cluster(_y_profile(column, 1, height, 16),
-                                      threshold=0.010, max_gap=1)
-            if (0.40 <= cluster['span'] <= 0.70
-                    and 0.36 <= cluster['center'] <= 0.64
-                    and cluster['density'] >= 0.060):
-                text_columns += 1
-        if text_columns / strip_width >= 0.060:
-            return True
-    # Relative lighting references are not proof that a prefix is absent:
-    # a crossing line can equal the letters and cancel its own contrast rows.
-    # Independently veto coherent neutral components directly from pixels,
-    # without subtracting either reference. Each pixel is visited once; the
-    # same text geometry/support bounds apply and this can only reject recovery.
-    for start in range(len(neutral_remaining)):
-        if not neutral_remaining[start]:
-            continue
-        level = neutral_gray[start]
-        stack = [start]
-        neutral_remaining[start] = 0
-        count, y_min, y_max = 0, height, -1
-        while stack:
-            i = stack.pop()
-            y, x = divmod(i, strip_width)
-            count += 1
-            y_min, y_max = min(y_min, y), max(y_max, y)
-            neighbors = (i-strip_width if y else -1,
-                         i+strip_width if y+1 < height else -1,
-                         i-1 if x else -1, i+1 if x+1 < strip_width else -1)
-            for j in neighbors:
-                if j >= 0 and neutral_remaining[j] and neutral_gray[j] == level:
-                    neutral_remaining[j] = 0
-                    stack.append(j)
-        span = (y_max-y_min+1) / height
-        center = (y_max+y_min+1) / (2*height)
-        density = count / (strip_width * (y_max-y_min+1))
-        if 0.40 <= span <= 0.70 and 0.36 <= center <= 0.64 and density >= 0.060:
-            return True
-    return False
+            if max(r, g, b)-min(r, g, b) < 42:
+                gray = (29*b + 150*g + 77*r) >> 8
+                buckets[gray].append(y * strip_width + sx)
 
+    for levels in (range(256), range(255, -1, -1)):
+        parent = [-1] * total
+        counts = [0] * total
+        y_min = [0] * total
+        y_max = [0] * total
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for level in levels:
+            new = buckets[level]
+            # Activate the whole level before inspecting components, so pixel
+            # iteration order cannot create temporary, text-shaped fragments.
+            for i in new:
+                parent[i] = i
+                counts[i] = 1
+                y_min[i] = y_max[i] = i // strip_width
+            for i in new:
+                y, x = divmod(i, strip_width)
+                neighbors = (i-strip_width if y else -1,
+                             i+strip_width if y+1 < height else -1,
+                             i-1 if x else -1, i+1 if x+1 < strip_width else -1)
+                for j in neighbors:
+                    if j < 0 or parent[j] < 0:
+                        continue
+                    a, b = find(i), find(j)
+                    if a == b:
+                        continue
+                    if counts[a] < counts[b]:
+                        a, b = b, a
+                    parent[b] = a
+                    counts[a] += counts[b]
+                    y_min[a] = min(y_min[a], y_min[b])
+                    y_max[a] = max(y_max[a], y_max[b])
+            # Only roots touched by this level changed; older components were
+            # already checked. Reuse the existing vertical/support bounds.
+            for a in {find(i) for i in new}:
+                rows = y_max[a]-y_min[a]+1
+                span = rows / height
+                center = (y_max[a]+y_min[a]+1) / (2*height)
+                density = counts[a] / (strip_width * rows)
+                if (0.40 <= span <= 0.70 and 0.36 <= center <= 0.64
+                        and density >= 0.060):
+                    return True
+    return False
 
 class ResultClassifier:
     REQUIRED_TEMPLATES = {

@@ -225,7 +225,8 @@ for stripe_fraction in (0.01, 0.05, 0.10, 0.20, 0.50, 1.0):
 
 # Crossing lighting stripes may suppress relative contrast on a few rows.
 # The existing normalized gap handling must retain independent text support.
-for band_gray in (74, 75, 79):
+for band_gray, variation in ((gray, variant) for gray in (74, 75, 79)
+                             for variant in ('uniform', 'rows', 'checker')):
     for band_height in (1, 2, 4, 6, 8, 10):
         lit = bytearray(lit_background(prefix, width, height, peripheral=True))
         x0, x1 = width * 18 // 100, width * 34 // 100
@@ -241,9 +242,11 @@ for band_gray in (74, 75, 79):
         for j in range(0, len(prefix), 4):
             b, g, r = prefix[j:j+3]
             if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
-                lit[j:j+4] = bytes((79, 79, 79, 255))
+                py, px = divmod(j // 4, width)
+                gray = 79 if variation == 'uniform' else 77 + ((py + (px if variation == 'checker' else 0)) % 2)
+                lit[j:j+4] = bytes((gray, gray, gray, 255))
         got, debug = classifier.classify_bgra(bytes(lit), width, height)
-        assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (band_gray, band_height, got, debug)
+        assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (band_gray, band_height, variation, got, debug)
 
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.

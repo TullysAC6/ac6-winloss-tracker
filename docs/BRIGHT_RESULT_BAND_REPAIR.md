@@ -49,14 +49,11 @@ WIN/LOSS letters. Existing PHASE and DRAW classification predicates are kept.
 Independent review rejected the first lower-margin-only implementation: a
 neutral PHASE prefix at gray120/125 fell below the old bright-mask threshold
 and admitted a false WIN. That NO-GO is preserved. The stronger background and
-leading-space checks reject those cases. A recovery-only relative-contrast
-check also rejects text-height neutral leading clusters even below gray80:
-compare each leading column to its lower-margin luminance and independently
-compare each row to its own median, require contrast >=5, and apply the
-existing normalized final-text vertical geometry. Never merge the two masks:
-a uniform upper/lower background change must not swallow the shorter prefix.
-The second independent NO-GO established that exact ambiguity in the initial
-column-only contrast check; its report and reproduction are retained. Sweeps
+leading-space checks reject those cases. Successive independent NO-GOs rejected
+relative-reference approaches: a background step swallowed the column profile;
+vertical texture elongated both profiles; crossing lines interrupted individual
+columns; wider/edge lines defeated gap handling; and one-level glyph variation
+fragmented exact-luminance components. All reports and repros are retained. Sweeps
 include gray0/40/79/80/81/120/125/126/220 on both broad-bright and peripheral-lit
 backgrounds including leading backdrops30/34/35/40/50/60; the visibly preserved
 prefix is never recovered as WIN. Equal foreground/background paint is not
@@ -64,26 +61,23 @@ claimed as visible PHASE evidence.
 Conservative abstention on legitimate textured frames is a T3 sensitivity
 limitation, not justification to lower the guards.
 
-A third independent NO-GO showed that a narrow vertical background stripe
-could extend both averaged profiles beyond their accepted text height, hiding
-the preserved dim prefix. Recovery now also examines each column's independent
-vertical profiles with the same normalized bins, text-height/center bounds,
-gap handling and >=6% column support. An additional independent NO-GO showed
-why raw uninterrupted runs were insufficient: crossing background lines split
-visible prefix strokes. A subsequent wider-line NO-GO showed that relative
-references alone still lose partial prefix evidence. Direct connected neutral
-luminance components now independently veto text-height/support structures,
-without subtracting any lighting reference. Every strip pixel is visited once
-in this bounded traversal, with the same geometry/support bounds. Eighteen
-crossing-line controls and twenty-four stripe controls preserve the prefix.
-Unrelated full-height columns cannot erase shorter text evidence elsewhere.
-Twenty-four generated stripe width/position controls preserve the visible
-prefix; retained real ROIs continue to recover. No global threshold changes.
+The final recovery-only helper replaces those brittle heuristics with connected
+neutral luminance level sets. It grows dark and light components through all
+present gray levels, activating a whole level before inspection. Glyphs can vary
+in brightness or merge with a stripe at one level; a different level retains
+their independent shape. Veto components meeting existing vertical bounds
+span0.40..0.70, center0.36..0.64 and strip-normalized density>=0.060. No fixed
+brightness reference, exact-level equality, gap budget or inferred absence from
+an over-tall aggregate controls recovery. Union by size/path compression gives
+bounded near-linear strip work. Fifty-four crossing-line/one-level-variation
+controls and twenty-four stripe controls preserve the prefix; retained real ROIs
+continue to recover. No global threshold changes.
 
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
-four byte planes approximately64% of the ROI size plus bounded column/row lists
-and a stack bounded by the strip pixel count. No extra capture,
+256 luminance buckets and four union/component lists bounded by strip pixel count.
+Each neutral pixel activates once per direction; no scan per intensity over the
+whole ROI. No extra capture,
 I/O, process, thread, dependency or polling change. The AST-pinned classifier
 and new helper baseline are intentionally advanced for this repair; the original
 state-machine and detector-loop AST pins and public timing constants remain.
@@ -99,9 +93,9 @@ missing/black margin negatives, cyan/red PHASE negatives and a preserved white
 PHASE-prefix negative. Full T0, T1 and isolated T2 evidence, independent review
 and exact-head CI belong to the repair PR; do not inherit PR65's old green CI.
 
-An offline alternating CPU-clock microbenchmark of the same three ROIs after
-the row-relative guard gave baseline72.92ms and repair83.33ms/ROI (+14.3%) on
-the coarse process clock; about10.4ms per frame for this result-heavy sample.
+An offline alternating CPU-clock microbenchmark of the same three ROIs with
+the final component-tree helper gave baseline67.71ms and repair88.54ms/ROI
+(+30.8%) on the coarse process clock; about20.8ms per frame for this result-heavy sample.
 The additional strip scans happen only for strong recovery candidates, not
 ordinary gameplay. This measurement does not establish zero overhead. It is a
 bounded local measurement, not AC6 FPS/GPU or real-session performance
