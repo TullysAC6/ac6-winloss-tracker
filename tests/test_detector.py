@@ -199,6 +199,30 @@ for level in (0, 40, 79, 80, 81, 120, 125, 126, 220):
         if not debug["result_band_like"]:
             assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (level, peripheral, backdrop, got, debug)
 
+# Leading texture cannot swallow preserved PHASE text in a taller profile.
+# Move full-height narrow stripes across the leading region, and also cover
+# the whole region; repaint the original prefix last so it stays visible.
+for stripe_fraction in (0.01, 0.05, 0.10, 0.20, 0.50, 1.0):
+    for stripe_position in (0.0, 0.25, 0.50, 0.75):
+        lit = bytearray(lit_background(prefix, width, height, peripheral=True))
+        x0, x1 = width * 18 // 100, width * 34 // 100
+        stripe_start = x0 + int((x1-x0) * stripe_position)
+        stripe_end = min(x1, stripe_start + max(1, int((x1-x0) * stripe_fraction)))
+        for y in range(height):
+            for x in range(x0, x1):
+                gray = 40 if y < height * 3 // 4 else 30
+                if stripe_start <= x < stripe_end:
+                    gray += 10
+                j = (y * width + x) * 4
+                lit[j:j+4] = bytes((gray, gray, gray, 255))
+        for j in range(0, len(prefix), 4):
+            b, g, r = prefix[j:j+3]
+            if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
+                lit[j:j+4] = bytes((79, 79, 79, 255))
+        got, debug = classifier.classify_bgra(bytes(lit), width, height)
+        assert not debug['result_band_like'], debug
+        assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (stripe_fraction, stripe_position, got, debug)
+
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.
 pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")

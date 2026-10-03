@@ -64,6 +64,14 @@ claimed as visible PHASE evidence.
 Conservative abstention on legitimate textured frames is a T3 sensitivity
 limitation, not justification to lower the guards.
 
+A third independent NO-GO showed that a narrow vertical background stripe
+could extend both averaged profiles beyond their accepted text height, hiding
+the preserved dim prefix. Recovery now also examines each column's independent
+vertical runs with the same text-height/center bounds and >=6% column support.
+Unrelated full-height columns cannot erase shorter text evidence elsewhere.
+Twenty-four generated stripe width/position controls preserve the visible
+prefix; retained real ROIs continue to recover. No global threshold changes.
+
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
 two masks approximately32% of the ROI size plus bounded column/row lists. No extra capture,
@@ -97,7 +105,7 @@ review must state whether any specific native behavior remains unverified.
 Do not start separate #68 T3 or fabricate historical rows. Retain every old
 failure/review and finish all isolated tests with zero owned resource residue.
 
-This shared-core repair T3 does not complete #15-5's metadata-ON acquisition,
+The conditional #68 T3 N/A decision does not complete #15-5's metadata-ON acquisition,
 confirmation, cancel/OFF/DRAW/shutdown and same-match gates. Those require a
 separately synced, reviewed and CI-green PR65 candidate followed by its FULL
 real-machine T3. #15-5 remains Accepted PENDING.
