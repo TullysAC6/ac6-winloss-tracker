@@ -1,12 +1,36 @@
 # Project state
 
-Last updated: 2026-10-01 JST
+Last updated: 2026-10-03 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current checkpoint — #59 resumed, 2026-10-01
+## Current checkpoint — #66 diagnostic-only, 2026-10-03
+
+GitHub is authoritative: #59 is CLOSED/completed, main27e5f49 has exact-main
+CI36842472785 SUCCESS, #15-0 through #15-4 Accepted + Merged + Unreleased.
+PR #65 remains OPEN/DRAFT at reviewed91dffac: Implemented YES, automated gates
+PASS, review GO, exact-head CI36981997103 SUCCESS, **T3 FAIL**, Merged NO,
+Accepted PENDING, Released NO. Owner's2026-10-03 first WIN was not saved; the
+following LOSS was. One FINAL_WIN was followed by CLEAR before the second hit;
+metadata was OFF. The exact classifier cause is unresolved; failed evidence
+is preserved, not relabelled.
+
+Owner-authorized [#66](https://github.com/TullysAC6/ac6-winloss-tracker/issues/66)
+adds only bounded passive candidate-transition evidence for the next natural
+miss. [Contract](ISSUE66_CANDIDATE_DIAGNOSTICS.md). Diagnostic work does not
+change thresholds, consecutive hits, ResultGate, CLEAR, capture, polls or
+history; no gameplay reproduction is required. Resolve its PR for local gates,
+fresh Astra/High review, exact-head/main CI and merge. Stable remainsv1.2.0.
+Maximum two unmerged generations: PR #65 and at most one #66 diagnostic PR.
+
+STOP after #66 exact-main closure/bookkeeping. PR #65 is untouched in this
+task; separate next task: sync/revalidate it, then repeat full #15-5 owner T3.
+No #15-6, semantic WIN repair or release is authorized. Older checkpoint text
+below is historical where it conflicts with this current GitHub position.
+
+## Historical checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
 as `848674115f842f7fcb22ce8c3fccc598502e7c45`, identical to reviewed head

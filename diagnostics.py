@@ -43,6 +43,30 @@ class DiagnosticRecorder:
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         self.frame_buffer = deque(maxlen=self.FRAME_BUFFER_SIZE)
+        self._candidate_writer = None
+
+    def submit_candidate_bundle(self, bundle):
+        try:
+            if self._candidate_writer is not None and self._candidate_writer.closed.is_set():
+                if self._candidate_writer.thread.is_alive():
+                    return  # Never overlap writers after a stalled shutdown.
+                self._candidate_writer = None
+            if self._candidate_writer is None:
+                from candidate_diagnostics import CandidateBundleWriter
+                self._candidate_writer = CandidateBundleWriter(self.root)
+            self._candidate_writer.submit(bundle)
+        except Exception:
+            pass
+
+    def close_candidate_bundles(self):
+        try:
+            if self._candidate_writer is not None:
+                # Inside the detector's existing 4s server join budget. No
+                # result loop disk wait and no existing timeout increase.
+                return self._candidate_writer.close(timeout=0.2)
+        except Exception:
+            pass
+        return True
 
     def _rotate(self):
         try:
@@ -239,6 +263,11 @@ class DiagnosticRecorder:
                 if self.image_dir.exists():
                     for path in sorted(self.image_dir.glob("*.png")):
                         zf.write(path, arcname=f"roi/{path.name}")
+                for path in sorted((self.root / 'candidate-bundles').glob('*.zip')):
+                    try:
+                        zf.write(path, arcname=f'candidate-bundles/{path.name}')
+                    except OSError:
+                        pass  # Concurrent pruning may remove old diagnostics.
         finally:
             if buffer_export is not None:
                 try:

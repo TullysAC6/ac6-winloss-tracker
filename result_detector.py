@@ -677,6 +677,8 @@ class ResultClassifier:
             "max_center_gap": max_center_gap,
             "central_continuous": central_continuous,
             "central_bright_density": central_density,
+            "final_win_geom": final_win_geom_early,
+            "final_loss_geom": final_loss_geom_early,
         }
 
         if draw_like:
@@ -707,6 +709,8 @@ class ResultClassifier:
             and loss_final_grid_score >= 0.82
             and loss_final_grid_score >= loss_phase_grid_score + 0.12
         )
+        debug["win_ok"] = win_ok
+        debug["loss_ok"] = loss_ok
 
         if win_ok and not loss_ok:
             return FINAL_WIN, debug
@@ -808,6 +812,14 @@ class ResultStateMachine:
                 self.activity_hits = 0
                 self.post_result_clear_since = None
                 self.last_reject_reason = None
+
+    def diagnostic_snapshot(self):
+        """Read-only complete state at an observation boundary, including clocks."""
+        with self.lock:
+            return {name: getattr(self, name) for name in (
+                'armed', 'candidate', 'candidate_hits', 'clear_hits', 'clear_ready',
+                'last_clear_at', 'last_activity_at', 'activity_hits', 'last_counted_at',
+                'post_result_lock', 'post_result_clear_since', 'last_reject_reason')}
 
     def note_capture_gap(self):
         """Break consecutive evidence, retaining only time-limited gameplay proof.
@@ -1262,6 +1274,61 @@ class ResultDetector:
         self._last_diagnostic_visual = None
         self._last_capture_gap_status = None
         self._last_capture_gap_log = 0.0
+        self._candidate_evidence = None
+        self._candidate_source_hash = None
+        self._candidate_classifier_hash = None
+        try:
+            if diagnostic_recorder is not None and callable(getattr(diagnostic_recorder, 'submit_candidate_bundle', None)):
+                import hashlib
+                from candidate_diagnostics import CandidateEvidence, classifier_fingerprint
+                self._candidate_evidence = CandidateEvidence(diagnostic_recorder.submit_candidate_bundle)
+                self._candidate_source_hash = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+                self._candidate_classifier_hash = classifier_fingerprint(self.classifier)
+        except Exception:
+            self._candidate_evidence = None
+
+    def _candidate_boundary(self, reason, flush=True):
+        try:
+            if self._candidate_evidence is not None:
+                if flush:
+                    self._candidate_evidence.boundary(reason, {
+                        'observed_at': time.monotonic(), 'state': self.state.diagnostic_snapshot(),
+                        'capture': self._candidate_capture_context()})
+                else:
+                    self._candidate_evidence.clear()
+        except Exception:
+            pass
+
+    def _candidate_capture_context(self):
+        from game_capture import result_region
+        target = getattr(self.capture, 'target', None)
+        return {'status': self.capture.status, 'identity': getattr(self.capture, 'identity', None),
+                'identity_changed': self.capture.identity_changed,
+                'discontinuity': self.capture.discontinuity,
+                'roi_geometry': result_region(target['client']) if target is not None else None,
+                'client_geometry': dict(target['client']) if target is not None else None,
+                'source': getattr(self.capture, 'source', None)}
+
+    def _candidate_state_before(self):
+        try:
+            if self._candidate_evidence is not None:
+                return self.state.diagnostic_snapshot()
+        except Exception:
+            pass
+        return None
+
+    def _candidate_observe(self, shot, frame_state, debug, before, after, result):
+        try:
+            if self._candidate_evidence is not None and before is not None:
+                self._candidate_evidence.observe(shot.raw, shot.width, shot.height, {
+                    'captured_at': self.capture.captured_at, 'observed_at': time.monotonic(),
+                    'frame_state': frame_state, 'debug': debug, 'gameplay_activity': debug['gameplay_activity'],
+                    'state_before': before, 'state_after': after, 'result': result,
+                    'capture': self._candidate_capture_context(), 'classifier_source_sha256': self._candidate_source_hash,
+                    'classifier_fingerprint': self._candidate_classifier_hash,
+                    'state_sampling': 'locked snapshots outside observe; concurrent external mutations possible'})
+        except Exception:
+            self._candidate_boundary('diagnostic_failure', flush=False)
 
     def _record_capture_gap(self):
         """Persist why no frame could be classified, rate-limited.
@@ -1329,6 +1396,7 @@ class ResultDetector:
                         enabled = c["result_detector_enabled"]
 
                         if enabled != self._was_enabled:
+                            self._candidate_boundary('enable_changed', flush=False)
                             self.state.reset_unarmed()
                             self.capture.close()
                             self._was_enabled = enabled
@@ -1343,8 +1411,10 @@ class ResultDetector:
 
                         shot = self.capture.grab(sct)
                         if self.capture.identity_changed:
+                            self._candidate_boundary('identity_changed')
                             self.state.note_foreground(False)
                         if shot is None:
+                            self._candidate_boundary('capture_gap')
                             self.state.note_capture_gap()
                             self._last_motion_signature = None
                             self.health.update(status="waiting", error=self.capture.status)
@@ -1352,6 +1422,7 @@ class ResultDetector:
                             self.stop_event.wait(poll)
                             continue
                         if self.capture.discontinuity:
+                            self._candidate_boundary('discontinuity')
                             self.state.note_capture_gap()
                             self._last_motion_signature = None
 
@@ -1435,6 +1506,7 @@ class ResultDetector:
                                 )
                                 self._last_reject_log = now
 
+                        candidate_before = self._candidate_state_before()
                         result = self.state.observe(
                             frame_state,
                             CONFIRM_HITS,
@@ -1443,6 +1515,7 @@ class ResultDetector:
                             gameplay_activity=gameplay_activity,
                             now=self.capture.captured_at,
                         )
+                        candidate_after = self._candidate_state_before()
 
                         if self.diagnostics and result is not None:
                             self.diagnostics.flush_frame_context("state_decision")
@@ -1529,9 +1602,11 @@ class ResultDetector:
                                     error=None,
                                 )
 
+                        self._candidate_observe(shot, frame_state, debug, candidate_before, candidate_after, result)
                         self.stop_event.wait(poll)
 
                     except Exception as e:
+                        self._candidate_boundary('detector_error')
                         msg = f"{type(e).__name__}: {e}"
                         print(f"[result] detector error: {msg}")
                         if self.diagnostics:
@@ -1551,9 +1626,15 @@ class ResultDetector:
             self.health.update(status="error", error=msg)
 
         finally:
+            self._candidate_boundary('shutdown', flush=False)
             try:
                 if self.diagnostics:
                     self.diagnostics.flush_frame_context("detector_stopped")
             except Exception:
                 pass  # Optional telemetry must never block worker cleanup.
             self.capture.close()
+            try:
+                if self.diagnostics:
+                    self.diagnostics.close_candidate_bundles()
+            except Exception:
+                pass

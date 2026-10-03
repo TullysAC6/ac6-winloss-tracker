@@ -1,5 +1,27 @@
 # Next session
 
+## Current owner scope — #66, 2026-10-03
+
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → Issue #66
+→ latest Issue #15 comments → PR #65 → exact current main/open PRs/CI.
+GitHub overrides historical checkpoints below. #59 CLOSED; #15-0 through #15-4
+Accepted + Merged + Unreleased; stablev1.2.0.
+
+PR #65 OPEN/DRAFT at91dffac, automated gates/review/exact-head green but T3 FAIL
+(first WIN candidate followed by CLEAR before confirmation while metadata OFF;
+second LOSS persisted). Root classifier subcondition unknown. Original failed
+evidence is preserved. Do not merge/change PR #65 or continue its T3 in #66.
+
+Issue #66 only: [bounded diagnostic contract](ISSUE66_CANDIDATE_DIAGNOSTICS.md).
+Three result ROI/context slots, targeted preconfirmation WIN/LOSS reset flush,
+one bounded asynchronous writer, eight local bundles, offline classifier replay.
+No threshold/cadence/state/ResultGate/CLEAR/history/metadata change. Finish local
+T0/T1/relevant T2 → fresh Astra/High independent review → fixes/affected reruns
+→ exact-head CI → #66-only merge → exact-main CI → bookkeeping/cleanup.
+T3 N/A requires independent confirmation. No reproducing gameplay until miss.
+
+Then STOP. Separate next task: sync/revalidate PR #65, then repeat FULL #15-5 T3.
+
 Last updated: 2026-10-01 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
