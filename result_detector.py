@@ -291,18 +291,31 @@ def _leading_text_contrast(raw, width, height, x0, x1):
             values += (29*b + 150*g + 77*r) >> 8
         baseline.append(values / (height - lower_start))
     mask = bytearray(strip_width * height)
+    row_mask = bytearray(strip_width * height)
     for y in range(height):
+        row_pixels = []
         for sx, x in enumerate(range(x0, x1)):
             i = (y * width + x) * 4
             b, g, r = raw[i], raw[i+1], raw[i+2]
             gray = (29*b + 150*g + 77*r) >> 8
+            row_pixels.append((gray, max(r, g, b)-min(r, g, b) < 42))
             if max(r, g, b)-min(r, g, b) < 42 and abs(gray-baseline[sx]) >= 5:
                 mask[y * strip_width + sx] = 1
-    cluster = _center_cluster(_y_profile(mask, strip_width, height, 16),
-                              threshold=0.010, max_gap=1)
-    return (0.40 <= cluster["span"] <= 0.70
-            and 0.36 <= cluster["center"] <= 0.64
-            and cluster["density"] >= 0.060)
+        # A uniform vertical change between this row and the lower margin
+        # must not swallow the smaller prefix. Use an independent row-relative
+        # contrast profile as well; do not merge masks into a taller cluster.
+        row_median = sorted(gray for gray, _ in row_pixels)[strip_width // 2]
+        for sx, (gray, neutral) in enumerate(row_pixels):
+            if neutral and abs(gray-row_median) >= 5:
+                row_mask[y * strip_width + sx] = 1
+    for contrast in (mask, row_mask):
+        cluster = _center_cluster(_y_profile(contrast, strip_width, height, 16),
+                                  threshold=0.010, max_gap=1)
+        if (0.40 <= cluster["span"] <= 0.70
+                and 0.36 <= cluster["center"] <= 0.64
+                and cluster["density"] >= 0.060):
+            return True
+    return False
 
 
 class ResultClassifier:

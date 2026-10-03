@@ -7,10 +7,12 @@ miss during metadata-OFF #15-5 T3. [Root cause, precise boundary and T3](BRIGHT_
 This supersedes the diagnostic-only implementation restriction below for this
 repair only. Main02e0de1 and PR65 exact057d553 share the classifier defect;
 the new repair branches from main and leaves PR65 unchanged OPEN/DRAFT.
-Do not merge either branch before the relevant new owner T3 passes. Failed T3
-remains FAIL, #15-5 Accepted PENDING, public stablev1.2.0. No #15-6/release work.
-Finish T0/T1/isolated T2 → independent review/fixes/affected reruns → exact-head
-CI → STOP before owner T3. Resolve the repair PR for current evidence.
+2026-10-04 owner continuation authorizes #68 publication/merge/closure after
+gates, fresh Astra/High review, affected reruns, exact-head CI and legitimately
+reviewed T3 N/A (or STOP before specific required gameplay). Require exact-main
+green before closure. Failed #15-5 T3 remains FAIL, Accepted PENDING; stable
+v1.2.0. No PR65 sync/T3/merge, #15-6 or release here. Resolve Issue68/repair PR
+for current evidence; STOP after #68 closure/bookkeeping/owned cleanup.
 
 ## Current owner scope — #66, 2026-10-03
 

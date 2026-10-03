@@ -180,15 +180,24 @@ print("Lighting recovery: WIN/LOSS, missing/black margin and PHASE controls pass
 # brightening the background, rather than deleting the evidence in the test.
 prefix, width, height = read_ppm(Path(__file__).parent / "fixtures" / "phase_white_prefix_synthetic.ppm")
 for level in (0, 40, 79, 80, 81, 120, 125, 126, 220):
-    for peripheral in (False, True):
+    for peripheral, backdrop in [(False, 90)] + [(True, v) for v in (30, 34, 35, 40, 50, 60)]:
+        if peripheral and level == backdrop:
+            # Equal paint erases the prefix against its own background. This
+            # combination cannot serve as evidence of a visible PHASE word.
+            continue
         lit = bytearray(lit_background(prefix, width, height, peripheral=peripheral))
+        if peripheral:
+            for y in range(height * 3 // 4):
+                for x in range(width * 18 // 100, width * 34 // 100):
+                    j = (y * width + x) * 4
+                    lit[j:j+4] = bytes((backdrop, backdrop, backdrop, 255))
         for j in range(0, len(prefix), 4):
             b, g, r = prefix[j:j+3]
             if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
                 lit[j:j+4] = bytes((level, level, level, 255))
         got, debug = classifier.classify_bgra(bytes(lit), width, height)
         if not debug["result_band_like"]:
-            assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (level, peripheral, got, debug)
+            assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (level, peripheral, backdrop, got, debug)
 
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.

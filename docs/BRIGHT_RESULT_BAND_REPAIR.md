@@ -1,8 +1,13 @@
 # Owner-confirmed bright-result-band WIN miss — 2026-10-03
 
-The owner authorized product repair after the real #15-5 T3 failed. This
-supersedes the earlier diagnostic-only restriction for this narrowly scoped
-classifier repair. It does not authorize merge, Acceptance, release or #15-6.
+The owner authorized product repair after the real #15-5 T3 failed. The
+2026-10-04 continuation specifically authorizes Issue #68 PR publication,
+review/fixes/CI, pinned merge, exact-main CI and closure. Issue #68 alone may
+use T3 N/A if a fresh independent review agrees that retained real pixels,
+canonical negatives and runtime gates establish the repair deterministically.
+If specific native evidence is still needed, STOP before separate gameplay.
+This supersedes the earlier diagnostic-only/merge restrictions for this repair
+only. It does not authorize PR65 sync/T3/merge, Acceptance, release or #15-6.
 Branch from main `02e0de101df0b5289c3057ae1ea84b8bb24f5eb7`; preserve PR65
 exact `057d5532c2737f07853127d015f134bad04395ec` unchanged and OPEN/DRAFT.
 
@@ -46,16 +51,22 @@ neutral PHASE prefix at gray120/125 fell below the old bright-mask threshold
 and admitted a false WIN. That NO-GO is preserved. The stronger background and
 leading-space checks reject those cases. A recovery-only relative-contrast
 check also rejects text-height neutral leading clusters even below gray80:
-compare each leading column to its lower-margin luminance, require contrast
->=5, and apply the existing normalized final-text vertical geometry. Sweeps
+compare each leading column to its lower-margin luminance and independently
+compare each row to its own median, require contrast >=5, and apply the
+existing normalized final-text vertical geometry. Never merge the two masks:
+a uniform upper/lower background change must not swallow the shorter prefix.
+The second independent NO-GO established that exact ambiguity in the initial
+column-only contrast check; its report and reproduction are retained. Sweeps
 include gray0/40/79/80/81/120/125/126/220 on both broad-bright and peripheral-lit
-backgrounds; the clearly visible preserved prefix is never recovered as WIN.
+backgrounds including leading backdrops30/34/35/40/50/60; the visibly preserved
+prefix is never recovered as WIN. Equal foreground/background paint is not
+claimed as visible PHASE evidence.
 Conservative abstention on legitimate textured frames is a T3 sensitivity
 limitation, not justification to lower the guards.
 
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
-a mask16% of the ROI size plus one column-baseline list. No extra capture,
+two masks approximately32% of the ROI size plus bounded column/row lists. No extra capture,
 I/O, process, thread, dependency or polling change. The AST-pinned classifier
 and new helper baseline are intentionally advanced for this repair; the original
 state-machine and detector-loop AST pins and public timing constants remain.
@@ -72,23 +83,19 @@ PHASE-prefix negative. Full T0, T1 and isolated T2 evidence, independent review
 and exact-head CI belong to the repair PR; do not inherit PR65's old green CI.
 
 An offline alternating CPU-clock microbenchmark of the same three ROIs after
-the stronger guards gave baseline and repair median83.33ms/ROI on the coarse
-process clock. This measurement does not establish zero overhead. It is a
+the row-relative guard gave baseline72.92ms and repair83.33ms/ROI (+14.3%) on
+the coarse process clock; about10.4ms per frame for this result-heavy sample.
+The additional strip scans happen only for strong recovery candidates, not
+ordinary gameplay. This measurement does not establish zero overhead. It is a
 bounded local measurement, not AC6 FPS/GPU or real-session performance
 acceptance. No new work occurs between detector polls.
 
-T3 is required before any merge because this changes recorded-result eligibility.
-After reviewed exact-head CI is green, start a new clean isolated data root on
-that exact repair head, confirm ordinary Launcher/Tracker startup, keep metadata
-OFF, verify visible lobby/gameplay readiness, play naturally and compare owner
-WIN/LOSS outcomes to saved history and result ROIs. Specifically verify WIN
-through the bright arena transition, ordinary LOSS, one result per match,
-next-match re-arming, startup on an already visible result without counting it,
-UNDO without recounting the same visible result, and unavailable/minimized
-capture without stale counting. Never change AC6 focus automatically; restore
-the game to a visible lobby before establishing capture readiness. Retain
-diagnostics for any mismatch and finish by authenticated owned shutdown and
-zero child/port/runtime/lock residue. Do not fabricate missing historical rows.
+The earlier implementation proposed a separate mandatory #68 gameplay T3 under
+the default project rule. The owner's 2026-10-04 instructions supersede that
+proposal with the conditional N/A decision above, not automatic N/A. A fresh
+review must state whether any specific native behavior remains unverified.
+Do not start separate #68 T3 or fabricate historical rows. Retain every old
+failure/review and finish all isolated tests with zero owned resource residue.
 
 This shared-core repair T3 does not complete #15-5's metadata-ON acquisition,
 confirmation, cancel/OFF/DRAW/shutdown and same-match gates. Those require a
