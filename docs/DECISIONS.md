@@ -1,5 +1,19 @@
 # Decisions
 
+## A natural candidate miss is instrumented before detector semantics change
+
+Owner-authorized [#66](https://github.com/TullysAC6/ac6-winloss-tracker/issues/66),
+2026-10-03: one FINAL_WIN then CLEAR explains why confirmation did not occur,
+but does not establish the exact classifier cause. Retain three small existing
+result ROI/context samples and asynchronously flush only suspicious unconfirmed
+WIN/LOSS resets. Bound memory, queue and local stored bundles; failures fail
+open. Replay the identical pixels/debug/state boundary offline before proposing
+semantic repair. [Limits, lifecycle and replay](ISSUE66_CANDIDATE_DIAGNOSTICS.md).
+No threshold/hit-count/ResultGate/CLEAR/poll/capture/history or #15-5 change.
+Preserve the original failed T3 honestly. #66 completion is diagnostic merge
+plus exact-main green, not reproducing/fixing the underlying miss. PR #65 sync
+and full T3 are a separate subsequent task.
+
 Decisions that must not be reversed silently. If one of these needs to change, change it here first and say why.
 
 The requirement these decisions serve is [`MASTER_REQUIREMENTS.md`](MASTER_REQUIREMENTS.md).

@@ -1,29 +1,57 @@
 # Project state
 
-Last updated: 2026-10-02 JST
+Last updated: 2026-10-03 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current checkpoint — #15-5 owner-authorized implementation
+## Current checkpoint — #15-5 sync after #66 closure, 2026-10-03
 
-Live base main `27e5f49aa7bb73b9a90f04a0465624e4e5d58008`, exact-main
-CI36842472785 SUCCESS attempt1. #59 CLOSED; #15-0 through #15-4 Accepted +
-Merged + Unreleased. Stable v1.2.0; Issue #15 OPEN.
-The [owner adopted the assisted runtime architecture and authorized production
-implementation](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5943012970).
-[#15-5 contract](ISSUE15_5_RUNTIME_CONTRACT.md) and [T3 procedure](ISSUE15_5_T3.md).
-#15-5 remains Accepted PENDING, T3 PENDING, Merged NO, Released NO; gate/review
-and exact-head evidence belong to its PR. STOP for owner-operated T3 before merge;
-after later explicit T3 PASS, pinned merge/exact-main verification are required.
-First owner T3 on PR #65 head `1bf2ed53` is FAIL/STOP: acquisition became
-`unknown/capture_gap` (first target-unavailable attempt excluded). The owner has
-authorized the bounded acquisition gap/capture ordering correction; see DECISIONS.
-Corrected-head gates/delta review/CI and a fresh owner T3 are required. The old
-passing CI is historical evidence only, not corrected-head proof.
-No next slice or release is authorized. Historical checkpoints below are superseded
-only where they conflict with this latest owner decision.
+[Owner resume authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5966303013).
+Exact main `02e0de101df0b5289c3057ae1ea84b8bb24f5eb7`; #66 CLOSED/completed,
+PR #67 merged, exact-head37095752526 and exact-main37096445318 SUCCESS.
+PR #65 remains OPEN/DRAFT, Merged NO, Accepted PENDING, Released NO.
+Ordinary merge from historical reviewed head `91dffacdddb48d2d96413617a904b72163873e5e`
+preserves both acquisition capture_gap T3 FAIL and 2026-10-03 OFF-baseline WIN miss
+(FINAL_WIN once then CLEAR; next LOSS saved; exact classifier cause UNKNOWN).
+#66 provides passive evidence, not a semantic WIN fix. The existing user Tracker
+uses the original capture-gap worktree; sync/tests use an isolated worktree instead.
+
+Rerun composition T0/full canonical T1/affected lifecycle T2, fresh-context
+Astra/High delta review, exact-head CI, then STOP for FULL owner T3.
+[T3 procedure](ISSUE15_5_T3.md): one OFF baseline match; explicit supported lobby
+acquisition; exactly ONE metadata-bearing match; STOP gameplay and show fixed
+request/event/result; owner personally attests same match before confirmation;
+only then play the no-acquisition match. No automatic --same-match or timing
+inference. If a natural core miss occurs, preserve #66 bundle, STOP, replay offline.
+No real T3 starts in this task. No merge before explicit owner T3 PASS, no #15-6.
+Stable v1.2.0; #15-0 through #15-4 Accepted + Merged + Unreleased.
+Older checkpoints below are historical wherever superseded.
+
+## Historical checkpoint — #66 diagnostic-only, 2026-10-03
+
+GitHub is authoritative: #59 is CLOSED/completed, main27e5f49 has exact-main
+CI36842472785 SUCCESS, #15-0 through #15-4 Accepted + Merged + Unreleased.
+PR #65 remains OPEN/DRAFT at reviewed91dffac: Implemented YES, automated gates
+PASS, review GO, exact-head CI36981997103 SUCCESS, **T3 FAIL**, Merged NO,
+Accepted PENDING, Released NO. Owner's2026-10-03 first WIN was not saved; the
+following LOSS was. One FINAL_WIN was followed by CLEAR before the second hit;
+metadata was OFF. The exact classifier cause is unresolved; failed evidence
+is preserved, not relabelled.
+
+Owner-authorized [#66](https://github.com/TullysAC6/ac6-winloss-tracker/issues/66)
+adds only bounded passive candidate-transition evidence for the next natural
+miss. [Contract](ISSUE66_CANDIDATE_DIAGNOSTICS.md). Diagnostic work does not
+change thresholds, consecutive hits, ResultGate, CLEAR, capture, polls or
+history; no gameplay reproduction is required. Resolve its PR for local gates,
+fresh Astra/High review, exact-head/main CI and merge. Stable remainsv1.2.0.
+Maximum two unmerged generations: PR #65 and at most one #66 diagnostic PR.
+
+STOP after #66 exact-main closure/bookkeeping. PR #65 is untouched in this
+task; separate next task: sync/revalidate it, then repeat full #15-5 owner T3.
+No #15-6, semantic WIN repair or release is authorized. Older checkpoint text
+below is historical where it conflicts with this current GitHub position.
 
 ## Historical checkpoint — #59 resumed, 2026-10-01
 

@@ -3,7 +3,12 @@
 Owner [adopted architecture and implementation authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5943012970), 2026-10-02.
 Base main: `27e5f49aa7bb73b9a90f04a0465624e4e5d58008`; #59 closed;
 #15-0 through #15-4 Accepted + Merged + Unreleased; stable v1.2.0.
-This slice is **Acceptance PENDING, T3 PENDING, unmerged, unreleased**.
+Historical base above is retained. Resume authorization2026-10-03 syncs exact main
+`02e0de101df0b5289c3057ae1ea84b8bb24f5eb7` by ordinary merge after #66 closure.
+This slice is **Acceptance PENDING, historical T3 FAIL, unmerged, unreleased**.
+#66 does not fix the unresolved OFF-baseline WIN miss. Full repeated owner T3 is
+pending on the newly reviewed/exact-head-green candidate; stop after its ONE
+metadata-bearing match for personal exact-event attestation before another match.
 
 ## Explicit control and capture
 

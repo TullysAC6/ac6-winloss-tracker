@@ -107,6 +107,24 @@ with fixture_clock():
         elif cmd == "rows":
             c = sqlite3.connect(server.DATA_ROOT / "history.db")
             message["rows"] = c.execute("SELECT event_id,result,created_at FROM matches ORDER BY id").fetchall(); c.close()
+        elif cmd == "diagnostic_composition":
+            import zipfile
+            import result_detector as rd
+            from diagnostics import DiagnosticRecorder
+            from composition_helpers import detector_sequence
+            recorder = DiagnosticRecorder()
+            results, states, order = detector_sequence(recorder, server.metadata_notify,
+                [rd.CLEAR]*3 + [rd.FINAL_WIN, rd.CLEAR])
+            assert results == [] and order == []
+            writer = recorder._candidate_writer
+            assert writer is not None and writer.close(timeout=2)
+            assert not writer.thread.is_alive()
+            bundles = list(writer.root.glob("*.zip"))
+            assert len(bundles) == 1 and not list(writer.root.glob("*.partial"))
+            with zipfile.ZipFile(bundles[0]) as archive:
+                manifest = json.loads(archive.read("manifest.json"))
+            message["frames"] = [f["context"]["frame_state"] for f in manifest["frames"]]
+            message["writer_dead"] = not writer.thread.is_alive()
         elif cmd == "stop":
             server.server_stop = True
             break
@@ -328,6 +346,44 @@ class ServerTests(unittest.TestCase):
                 self.assertNotIn("event_id",self.post({"action":"status"})[1])
             self.assertFalse((self.root/"AC6WinLossTracker"/"enrichment.db").exists())
         self.assertEqual(len(self.command("rows")["rows"]),2)
+
+    def test_diagnostics_off_and_during_actual_owned_metadata_child(self):
+        # Real server/HTTP, real contained child and real asynchronous ZIP writer;
+        # classifier/capture inputs alone are synthetic, never a game/T3 claim.
+        off = self.command("diagnostic_composition")
+        self.assertEqual(off["frames"], ["CLEAR", "FINAL_WIN", "CLEAR"])
+        self.assertTrue(off["writer_dead"])
+        self.assertEqual(self.post({"action":"status"})[1]["state"], "disabled")
+        self.assertFalse((self.root/"AC6WinLossTracker"/"enrichment.db").exists())
+        # Preserve first completed evidence while giving the ON phase its own ring.
+        for bundle in (self.root/"AC6WinLossTracker"/"diagnostics"/"candidate-bundles").glob("*.zip"):
+            bundle.rename(bundle.with_suffix(".preserved"))
+        self.post({"action":"enable","enabled":True})
+        marker, release = self.root/"composition-child", self.root/"composition-release"
+        script = self.root/"composition-worker.py"
+        mode = (f"Path({str(marker)!r}).write_text(str(os.getpid()))\n"
+                f"    while not Path({str(release)!r}).exists(): time.sleep(.01)")
+        script.write_text(FAKE_WORKER.replace("SOURCE",repr(str(ROOT))).replace("MODE",mode),encoding="utf-8")
+        self.command("native_install",script=str(script))
+        self.assertEqual(self.post({"action":"acquire"})[1]["state"],"acquiring")
+        deadline = time.monotonic()+10
+        while not marker.exists() and time.monotonic()<deadline: threading.Event().wait(.01)
+        self.assertTrue(marker.exists())
+        kernel,handle = self.retain_child(int(marker.read_text()))
+        try:
+            on = self.command("diagnostic_composition")
+            self.assertEqual(on["frames"],off["frames"])
+            self.assertTrue(on["writer_dead"])
+            self.assertEqual(kernel.WaitForSingleObject(handle,0),258)
+            self.assertEqual(self.post({"action":"status"})[1]["state"],"acquiring")
+            self.post({"action":"cancel"})
+        finally:
+            release.write_text("GO",encoding="utf-8")
+            self.command("finish")
+        self.assertEqual(kernel.WaitForSingleObject(handle,0),0)
+        self.assertNotIn("event_id",self.post({"action":"status"})[1])
+        self.assertEqual(self.command("rows")["rows"],[])
+        self.assertFalse((self.root/"AC6WinLossTracker"/"enrichment.db").exists())
 
 
 @unittest.skipUnless(os.name=="nt","Windows contained process")

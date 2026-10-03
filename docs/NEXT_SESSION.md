@@ -1,6 +1,51 @@
 # Next session
 
-Last updated: 2026-10-02 JST
+## Current checkpoint — #15-5 sync after #66 closure, 2026-10-03
+
+[Owner resume authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5966303013).
+Exact main `02e0de101df0b5289c3057ae1ea84b8bb24f5eb7`; #66 CLOSED/completed,
+PR #67 merged, exact-head37095752526 and exact-main37096445318 SUCCESS.
+PR #65 remains OPEN/DRAFT, Merged NO, Accepted PENDING, Released NO.
+Ordinary merge from historical reviewed head `91dffacdddb48d2d96413617a904b72163873e5e`
+preserves both acquisition capture_gap T3 FAIL and 2026-10-03 OFF-baseline WIN miss
+(FINAL_WIN once then CLEAR; next LOSS saved; exact classifier cause UNKNOWN).
+#66 provides passive evidence, not a semantic WIN fix. The existing user Tracker
+uses the original capture-gap worktree; sync/tests use an isolated worktree instead.
+
+Rerun composition T0/full canonical T1/affected lifecycle T2, fresh-context
+Astra/High delta review, exact-head CI, then STOP for FULL owner T3.
+[T3 procedure](ISSUE15_5_T3.md): one OFF baseline match; explicit supported lobby
+acquisition; exactly ONE metadata-bearing match; STOP gameplay and show fixed
+request/event/result; owner personally attests same match before confirmation;
+only then play the no-acquisition match. No automatic --same-match or timing
+inference. If a natural core miss occurs, preserve #66 bundle, STOP, replay offline.
+No real T3 starts in this task. No merge before explicit owner T3 PASS, no #15-6.
+Stable v1.2.0; #15-0 through #15-4 Accepted + Merged + Unreleased.
+Older checkpoints below are historical wherever superseded.
+
+## Historical owner scope — #66, 2026-10-03
+
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → Issue #66
+→ latest Issue #15 comments → PR #65 → exact current main/open PRs/CI.
+GitHub overrides historical checkpoints below. #59 CLOSED; #15-0 through #15-4
+Accepted + Merged + Unreleased; stablev1.2.0.
+
+PR #65 OPEN/DRAFT at91dffac, automated gates/review/exact-head green but T3 FAIL
+(first WIN candidate followed by CLEAR before confirmation while metadata OFF;
+second LOSS persisted). Root classifier subcondition unknown. Original failed
+evidence is preserved. Do not merge/change PR #65 or continue its T3 in #66.
+
+Issue #66 only: [bounded diagnostic contract](ISSUE66_CANDIDATE_DIAGNOSTICS.md).
+Three result ROI/context slots, targeted preconfirmation WIN/LOSS reset flush,
+one bounded asynchronous writer, eight local bundles, offline classifier replay.
+No threshold/cadence/state/ResultGate/CLEAR/history/metadata change. Finish local
+T0/T1/relevant T2 → fresh Astra/High independent review → fixes/affected reruns
+→ exact-head CI → #66-only merge → exact-main CI → bookkeeping/cleanup.
+T3 N/A requires independent confirmation. No reproducing gameplay until miss.
+
+Then STOP. Separate next task: sync/revalidate PR #65, then repeat FULL #15-5 T3.
+
+Last updated: 2026-10-01 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
