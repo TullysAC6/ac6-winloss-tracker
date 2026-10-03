@@ -56,8 +56,9 @@ class CandidateEvidence:
                 return
             previous = self.frames[-1]['context']['state_after'] if self.frames else {}
             # Copy only already available result-strip pixels, after the decision.
-            self.frames.append({'raw': bytes(raw), 'width': width, 'height': height,
-                                'context': copy.deepcopy(context)})
+            current = {'raw': bytes(raw), 'width': width, 'height': height,
+                       'context': copy.deepcopy(context)}
+            self.frames.append(current)
             candidate = previous.get('candidate')
             after = context['state_after']
             if context['result'] is not None:
@@ -69,6 +70,8 @@ class CandidateEvidence:
                 self.submit({'schema_version': 1, 'trigger': 'candidate_reset',
                              'boundary': None, 'frames': list(self.frames)})
                 self.clear()
+                if after.get('candidate') in ('win', 'loss') and after.get('candidate_hits', 0) > 0:
+                    self.frames.append(current)  # Keep a new/switching candidate observable.
         except Exception:
             self.clear()
 

@@ -26,6 +26,8 @@ flush the preceding candidate with a no-pixel boundary record, never fabricate
 a missing frame. Normal successful results clear without a new bundle.
 Enable changes and shutdown clear the ring. Other frames evict the oldest slot;
 there is no full-match archive or post-trigger capture window.
+If a reset frame starts a different unconfirmed candidate, that same immutable
+frame seeds the cleared ring so its own next reset remains observable.
 
 ## Bounds and local storage
 
@@ -85,9 +87,9 @@ thread or partial files. A blocked writer is not replaced/overlapped. Restarted
 detectors can replace a closed, exited writer.
 
 Synthetic local Python3.14.7 measurement (1,000 copy/context iterations,
-1152x75 bytes; existing normal fixture debug): median0.046ms, p950.0588ms,
-max0.1942ms. Traced retained1,045,395 bytes, peak1,395,244 bytes. Existing757x50
-classifier fixture median34.578ms (12 iterations). These are component costs,
+1152x75 bytes; existing normal fixture debug): median0.0458ms, p950.0582ms,
+max0.1203ms. Traced retained1,045,395 bytes, peak1,395,244 bytes. Existing757x50
+classifier fixture median34.423ms (12 iterations). These are component costs,
 not AC6 frametime or hardware-independent thresholds; nativegame performance
 was not measured. The mechanism avoids new hot-path disk/encoding waits.
 

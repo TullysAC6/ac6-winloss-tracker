@@ -125,6 +125,21 @@ class CandidateEvidenceTests(unittest.TestCase):
             self.assertFalse(evidence.frames)
             sink.assert_not_called()
 
+    def test_switched_candidate_then_clear_or_success(self):
+        for first, second in ((rd.FINAL_WIN, rd.FINAL_LOSS), (rd.FINAL_LOSS, rd.FINAL_WIN)):
+            for last in (rd.CLEAR, second):
+                bundles = []
+                evidence, _, results = sequence([rd.CLEAR]*3 + [first, second, last], bundles.append)
+                if last == rd.CLEAR:
+                    self.assertEqual(len(bundles), 2)
+                    self.assertEqual([f['context']['frame_state'] for f in bundles[-1]['frames']], [second, rd.CLEAR])
+                    self.assertEqual(bundles[-1]['frames'][-1]['context']['state_before']['candidate_hits'], 1)
+                    self.assertIsNone(results[-1])
+                else:
+                    self.assertEqual(len(bundles), 1)  # switch only; confirmed new candidate adds no bundle
+                    self.assertEqual(results[-1], 'win' if second == rd.FINAL_WIN else 'loss')
+                self.assertFalse(evidence.frames)
+
     def test_rejection_and_gap_identity_boundaries(self):
         for label in (rd.PHASE, rd.NON_CLEAR, rd.FINAL_LOSS):
             sink = Mock()
