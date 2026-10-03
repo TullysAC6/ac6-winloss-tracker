@@ -137,7 +137,7 @@ if not ok:
 
 # Keep glyphs fixed while arena lighting changes. These transformed controls
 # exercise both colours, the dark margin requirement and the PHASE veto.
-def lit_background(source, width, height, lower_gray=30):
+def lit_background(source, width, height, lower_gray=30, peripheral=False):
     changed = bytearray(source)
     for y in range(height):
         for x in range(width):
@@ -147,15 +147,20 @@ def lit_background(source, width, height, lower_gray=30):
             red = r > 130 and r-g > 35 and r-b > 45 and g > 50
             if not (cyan or red):
                 gray = lower_gray if y >= height * 3 // 4 else 90
+                if peripheral and x < width * 66 // 100:
+                    gray = lower_gray
                 changed[j:j+4] = bytes((gray, gray, gray, 255))
     return bytes(changed)
 
 for name, expected in (("final_win_01.ppm", FINAL_WIN), ("final_loss_01.ppm", FINAL_LOSS)):
     pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / name)
-    lit = lit_background(pixels, width, height)
+    lit = lit_background(pixels, width, height, peripheral=True)
     got, debug = classifier.classify_bgra(lit, width, height)
     assert not debug["result_band_like"] and debug["lower_band_like"], debug
     assert got == expected, (name, got, debug)
+    # Even a dark lower margin cannot validate an otherwise bright field.
+    got, debug = classifier.classify_bgra(lit_background(pixels, width, height), width, height)
+    assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (name, got, debug)
     # An all-bright background cannot pass merely because the letters match.
     got, debug = classifier.classify_bgra(lit_background(pixels, width, height, 90), width, height)
     assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (name, got, debug)
@@ -174,14 +179,37 @@ print("Lighting recovery: WIN/LOSS, missing/black margin and PHASE controls pass
 # even when the global dark-band test fails. Preserve the white prefix while
 # brightening the background, rather than deleting the evidence in the test.
 prefix, width, height = read_ppm(Path(__file__).parent / "fixtures" / "phase_white_prefix_synthetic.ppm")
-lit = bytearray(lit_background(prefix, width, height))
-for j in range(0, len(prefix), 4):
-    b, g, r = prefix[j:j+3]
-    if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
-        lit[j:j+4] = prefix[j:j+4]
+for level in (0, 40, 79, 80, 81, 120, 125, 126, 220):
+    for peripheral in (False, True):
+        lit = bytearray(lit_background(prefix, width, height, peripheral=peripheral))
+        for j in range(0, len(prefix), 4):
+            b, g, r = prefix[j:j+3]
+            if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
+                lit[j:j+4] = bytes((level, level, level, 255))
+        got, debug = classifier.classify_bgra(bytes(lit), width, height)
+        if not debug["result_band_like"]:
+            assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (level, peripheral, got, debug)
+
+# Red mask pixels can themselves be dark. Background density removes the
+# same pixels from numerator and denominator; do not inflate the band score.
+pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")
+lit = bytearray(lit_background(pixels, width, height, peripheral=True))
+for j in range(0, len(lit), 4):
+    b, g, r = lit[j:j+3]
+    if r > 130 and r-g > 35 and r-b > 45 and g > 50 and (j // 4 // width) % 2 == 0:
+        lit[j:j+4] = bytes((0, 51, 131, 255))
 got, debug = classifier.classify_bgra(bytes(lit), width, height)
-assert not debug["result_band_like"], debug
-assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (got, debug)
+background = []
+for j in range(0, len(lit), 4):
+    b, g, r = lit[j:j+3]
+    if not (r > 130 and r-g > 35 and r-b > 45 and g > 50):
+        background.append((29*b + 150*g + 77*r) >> 8)
+assert abs(debug["loss_background_dark_ratio"] - sum(v < 80 for v in background)/len(background)) < 1e-12
+assert got == FINAL_LOSS, (got, debug)
+
+for width, height in ((1, 1), (2, 2), (4, 1)):
+    got, _ = classifier.classify_bgra(bytes((220, 220, 40, 255))*(width*height), width, height)
+    assert got not in (FINAL_WIN, FINAL_LOSS)
 
 if failed:
     print("\nFAILED")

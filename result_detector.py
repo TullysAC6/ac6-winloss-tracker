@@ -271,6 +271,40 @@ def _center_cluster(values, threshold=0.010, max_gap=2):
     }
 
 
+def _leading_text_contrast(raw, width, height, x0, x1):
+    """Veto a text-height neutral prefix even when it is darker than gray80.
+
+    Compare to the same columns in the lower margin, so a dim PHASE prefix
+    cannot disappear at the absolute bright-mask cutoff. Inspect only the
+    narrow leading strip and only for otherwise eligible recovery candidates.
+    """
+    strip_width = x1 - x0
+    if strip_width <= 0:
+        return True
+    lower_start = height * 3 // 4
+    baseline = []
+    for x in range(x0, x1):
+        values = 0
+        for y in range(lower_start, height):
+            i = (y * width + x) * 4
+            b, g, r = raw[i], raw[i+1], raw[i+2]
+            values += (29*b + 150*g + 77*r) >> 8
+        baseline.append(values / (height - lower_start))
+    mask = bytearray(strip_width * height)
+    for y in range(height):
+        for sx, x in enumerate(range(x0, x1)):
+            i = (y * width + x) * 4
+            b, g, r = raw[i], raw[i+1], raw[i+2]
+            gray = (29*b + 150*g + 77*r) >> 8
+            if max(r, g, b)-min(r, g, b) < 42 and abs(gray-baseline[sx]) >= 5:
+                mask[y * strip_width + sx] = 1
+    cluster = _center_cluster(_y_profile(mask, strip_width, height, 16),
+                              threshold=0.010, max_gap=1)
+    return (0.40 <= cluster["span"] <= 0.70
+            and 0.36 <= cluster["center"] <= 0.64
+            and cluster["density"] >= 0.060)
+
+
 class ResultClassifier:
     REQUIRED_TEMPLATES = {
         "final_win",
@@ -385,10 +419,16 @@ class ResultClassifier:
         lower_start = height * 3 // 4
         lower_total = width * (height - lower_start)
         lower_dark_n = lower_gray_sum = 0
+        prefix_x0, prefix_x1 = width * 18 // 100, width * 34 // 100
+        prefix_y0, prefix_y1 = height // 4, height * 3 // 4
+        prefix_total = (prefix_x1 - prefix_x0) * (prefix_y1 - prefix_y0)
+        prefix_dark_n = loss_dark_n = 0
 
         for y in range(height):
             row = y * width * 4
             base = y * width
+            prefix_row = prefix_y0 <= y < prefix_y1
+            lower_row = y >= lower_start
             for x in range(width):
                 i = row + x * 4
                 b = int(data[i])
@@ -399,7 +439,9 @@ class ResultClassifier:
                 gray_sum += gray
                 if gray < 80:
                     dark_n += 1
-                if y >= lower_start:
+                    if prefix_row and prefix_x0 <= x < prefix_x1:
+                        prefix_dark_n += 1
+                if lower_row:
                     lower_gray_sum += gray
                     if gray < 80:
                         lower_dark_n += 1
@@ -447,6 +489,8 @@ class ResultClassifier:
                     and g > 50
                 )
                 if is_loss:
+                    if gray < 80:
+                        loss_dark_n += 1
                     loss_mask[base + x] = 1
                     loss_n += 1
                     loss_min = min(loss_min, x)
@@ -526,6 +570,23 @@ class ResultClassifier:
             and 8.0 <= lower_mean_gray <= 90.0
             and 8.0 <= mean_gray <= 90.0
         )
+        prefix_dark_ratio = prefix_dark_n / prefix_total if prefix_total else 0.0
+        # Band evidence must cover the whole background, not just one dark
+        # margin. Remove the candidate's own colour pixels from BOTH counts.
+        # Cyan mask pixels cannot be dark (g,b>120 gives gray>=84), whereas
+        # low-luminance red mask pixels can, so subtract those explicitly.
+        win_background_n = total - win_n
+        loss_background_n = total - loss_n
+        win_background_dark_ratio = dark_n / win_background_n if win_background_n else 0.0
+        loss_background_dark_ratio = ((dark_n - loss_dark_n) / loss_background_n
+                                      if loss_background_n else 0.0)
+        recovery_band_like = lower_band_like and prefix_total > 0 and prefix_dark_ratio >= 0.90
+        prefix_contrast_like = False
+        if recovery_band_like and not result_band_like and (
+            (win_final_score >= 0.95 and win_final_grid_score >= 0.95)
+            or (loss_final_score >= 0.95 and loss_final_grid_score >= 0.95)
+        ):
+            prefix_contrast_like = _leading_text_contrast(data, width, height, prefix_x0, prefix_x1)
 
         # DRAW is intentionally precision-first. v20/v21 used only a compact
         # neutral-white cluster, which allowed brief combat explosions/AC parts
@@ -680,6 +741,10 @@ class ResultClassifier:
             "lower_dark_ratio": lower_dark_ratio,
             "lower_mean_gray": lower_mean_gray,
             "lower_band_like": lower_band_like,
+            "prefix_dark_ratio": prefix_dark_ratio,
+            "win_background_dark_ratio": win_background_dark_ratio,
+            "loss_background_dark_ratio": loss_background_dark_ratio,
+            "prefix_contrast_like": prefix_contrast_like,
             "win_cluster": win_cluster,
             "loss_cluster": loss_cluster,
             "win_y_cluster": win_y_cluster,
@@ -721,7 +786,9 @@ class ResultClassifier:
         # DRAW/PHASE classification and the CLEAR fallback remain unchanged.
         win_ok = (
             (result_band_like or (
-                lower_band_like and not phase_prefix_shape
+                recovery_band_like and not phase_prefix_shape and not prefix_contrast_like
+                and win_background_n >= total * 0.50
+                and win_background_dark_ratio >= 0.72
                 and win_final_score >= 0.95
                 and win_final_grid_score >= 0.95
             ))
@@ -732,7 +799,9 @@ class ResultClassifier:
         )
         loss_ok = (
             (result_band_like or (
-                lower_band_like and not phase_prefix_shape
+                recovery_band_like and not phase_prefix_shape and not prefix_contrast_like
+                and loss_background_n >= total * 0.50
+                and loss_background_dark_ratio >= 0.72
                 and loss_final_score >= 0.95
                 and loss_final_grid_score >= 0.95
             ))

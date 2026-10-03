@@ -77,6 +77,8 @@ DEBUG_SCALARS = (
     "phase_template_like", "phase_bright_like", "bright_run_fraction", "bright_run_crosses_center",
     "central_active_fraction", "max_center_gap", "central_continuous", "central_bright_density",
     "lower_dark_ratio", "lower_mean_gray", "lower_band_like",
+    "prefix_dark_ratio", "win_background_dark_ratio", "loss_background_dark_ratio",
+    "prefix_contrast_like",
 )
 DEBUG_METRICS = ("win", "loss", "bright", "draw")
 DEBUG_CLUSTERS = ("draw_cluster", "draw_y_cluster", "win_cluster", "loss_cluster", "win_y_cluster",

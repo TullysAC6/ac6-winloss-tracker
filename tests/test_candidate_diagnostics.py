@@ -20,9 +20,11 @@ import result_detector as rd
 from t1.images import decode_image
 
 BASE_CORE_DIGESTS = {
+    '_leading_text_contrast': 'b6a6acd4b62d48f179145dc33523570f74b979c7fa9dcd57a15d2876b4145e51',
     # Owner-authorized bright-result-band repair advances ONLY the classifier
-    # baseline. State/run remain pinned to the original #66 exact base.
-    'ResultClassifier.classify_bgra': 'f9b45d31fecb561c0896a716ef21f63aa02a5f3e7e84487966a1b6db66ab290e',
+    # baseline and pins its new prefix helper. State/run remain pinned to the
+    # original #66 exact base.
+    'ResultClassifier.classify_bgra': 'c5c2bacd01d9e940bb0706474cbcd6c7d73211e3be32acc27bd465538647bdfe',
     'ResultStateMachine': '93eb802002513bdeecea900f1ff7633b01151ef0f3ee57962172843a9aaf7122',
     'ResultDetector.run': 'f88eee3619d97bb14684a7edd9880b0a62a4c0efe0f8d1a8cd350835211f0eae',
 }
@@ -76,6 +78,8 @@ def core_digests(source):
             return self.generic_visit(node)
     output = {}
     for cls in tree.body:
+        if isinstance(cls, ast.FunctionDef) and cls.name == '_leading_text_contrast':
+            output[cls.name] = hashlib.sha256(ast.dump(cls, include_attributes=False).encode()).hexdigest()
         if not isinstance(cls, ast.ClassDef): continue
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
         for method in methods:
