@@ -6,7 +6,30 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current checkpoint — #66 diagnostic-only, 2026-10-03
+## Current checkpoint — #15-5 sync after #66 closure, 2026-10-03
+
+[Owner resume authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5966303013).
+Exact main `02e0de101df0b5289c3057ae1ea84b8bb24f5eb7`; #66 CLOSED/completed,
+PR #67 merged, exact-head37095752526 and exact-main37096445318 SUCCESS.
+PR #65 remains OPEN/DRAFT, Merged NO, Accepted PENDING, Released NO.
+Ordinary merge from historical reviewed head `91dffacdddb48d2d96413617a904b72163873e5e`
+preserves both acquisition capture_gap T3 FAIL and 2026-10-03 OFF-baseline WIN miss
+(FINAL_WIN once then CLEAR; next LOSS saved; exact classifier cause UNKNOWN).
+#66 provides passive evidence, not a semantic WIN fix. The existing user Tracker
+uses the original capture-gap worktree; sync/tests use an isolated worktree instead.
+
+Rerun composition T0/full canonical T1/affected lifecycle T2, fresh-context
+Astra/High delta review, exact-head CI, then STOP for FULL owner T3.
+[T3 procedure](ISSUE15_5_T3.md): one OFF baseline match; explicit supported lobby
+acquisition; exactly ONE metadata-bearing match; STOP gameplay and show fixed
+request/event/result; owner personally attests same match before confirmation;
+only then play the no-acquisition match. No automatic --same-match or timing
+inference. If a natural core miss occurs, preserve #66 bundle, STOP, replay offline.
+No real T3 starts in this task. No merge before explicit owner T3 PASS, no #15-6.
+Stable v1.2.0; #15-0 through #15-4 Accepted + Merged + Unreleased.
+Older checkpoints below are historical wherever superseded.
+
+## Historical checkpoint — #66 diagnostic-only, 2026-10-03
 
 GitHub is authoritative: #59 is CLOSED/completed, main27e5f49 has exact-main
 CI36842472785 SUCCESS, #15-0 through #15-4 Accepted + Merged + Unreleased.

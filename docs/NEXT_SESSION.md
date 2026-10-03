@@ -1,6 +1,29 @@
 # Next session
 
-## Current owner scope — #66, 2026-10-03
+## Current checkpoint — #15-5 sync after #66 closure, 2026-10-03
+
+[Owner resume authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5966303013).
+Exact main `02e0de101df0b5289c3057ae1ea84b8bb24f5eb7`; #66 CLOSED/completed,
+PR #67 merged, exact-head37095752526 and exact-main37096445318 SUCCESS.
+PR #65 remains OPEN/DRAFT, Merged NO, Accepted PENDING, Released NO.
+Ordinary merge from historical reviewed head `91dffacdddb48d2d96413617a904b72163873e5e`
+preserves both acquisition capture_gap T3 FAIL and 2026-10-03 OFF-baseline WIN miss
+(FINAL_WIN once then CLEAR; next LOSS saved; exact classifier cause UNKNOWN).
+#66 provides passive evidence, not a semantic WIN fix. The existing user Tracker
+uses the original capture-gap worktree; sync/tests use an isolated worktree instead.
+
+Rerun composition T0/full canonical T1/affected lifecycle T2, fresh-context
+Astra/High delta review, exact-head CI, then STOP for FULL owner T3.
+[T3 procedure](ISSUE15_5_T3.md): one OFF baseline match; explicit supported lobby
+acquisition; exactly ONE metadata-bearing match; STOP gameplay and show fixed
+request/event/result; owner personally attests same match before confirmation;
+only then play the no-acquisition match. No automatic --same-match or timing
+inference. If a natural core miss occurs, preserve #66 bundle, STOP, replay offline.
+No real T3 starts in this task. No merge before explicit owner T3 PASS, no #15-6.
+Stable v1.2.0; #15-0 through #15-4 Accepted + Merged + Unreleased.
+Older checkpoints below are historical wherever superseded.
+
+## Historical owner scope — #66, 2026-10-03
 
 Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → Issue #66
 → latest Issue #15 comments → PR #65 → exact current main/open PRs/CI.
@@ -26,7 +49,24 @@ Last updated: 2026-10-01 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
-## Current checkpoint — #59 resumed, 2026-10-01
+## Current checkpoint — #15-5 owner-authorized implementation
+
+Base main `27e5f49aa7bb73b9a90f04a0465624e4e5d58008`; CI36842472785
+SUCCESS attempt1. #59 CLOSED; #15-0 through #15-4 Accepted + Merged +
+Unreleased. Stable v1.2.0, Issue #15 OPEN. [Owner adoption and implementation
+authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5943012970)
+supersedes earlier STOP/pending statements below.
+Read [#15-5 runtime contract](ISSUE15_5_RUNTIME_CONTRACT.md), its live PR/gates/
+fresh Astra High review/exact-head CI, and [T3 procedure](ISSUE15_5_T3.md).
+STOP for owner-operated T3: do not merge without explicit owner T3 PASS.
+Owner T3 on `1bf2ed53` failed with `capture_gap`; its first target-unavailable
+attempt is excluded. Continue only the authorized gap/capture ordering correction
+in PR #65, then affected gates, fresh delta review, new exact-head CI and new T3.
+Acquisition may adopt only a native frame strictly after the latest detector gap;
+pending/confirmation still discard on any gap. Do not retry the old candidate for PASS.
+Acceptance remains PENDING; release and #15-6 are not authorized.
+
+## Historical checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
 as `848674115f842f7fcb22ce8c3fccc598502e7c45`, identical to reviewed head
