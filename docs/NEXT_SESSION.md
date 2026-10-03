@@ -1,5 +1,17 @@
 # Next session
 
+## Current owner scope — bright-result-band product repair, 2026-10-03
+
+Owner explicitly requested product repair after a newly evidenced natural WIN
+miss during metadata-OFF #15-5 T3. [Root cause, precise boundary and T3](BRIGHT_RESULT_BAND_REPAIR.md).
+This supersedes the diagnostic-only implementation restriction below for this
+repair only. Main02e0de1 and PR65 exact057d553 share the classifier defect;
+the new repair branches from main and leaves PR65 unchanged OPEN/DRAFT.
+Do not merge either branch before the relevant new owner T3 passes. Failed T3
+remains FAIL, #15-5 Accepted PENDING, public stablev1.2.0. No #15-6/release work.
+Finish T0/T1/isolated T2 → independent review/fixes/affected reruns → exact-head
+CI → STOP before owner T3. Resolve the repair PR for current evidence.
+
 ## Current owner scope — #66, 2026-10-03
 
 Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → Issue #66

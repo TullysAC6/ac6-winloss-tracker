@@ -6,6 +6,17 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
+## Current product repair — bright-result-band WIN miss, 2026-10-03
+
+Owner authorized a narrow shared-classifier repair after the newly preserved
+metadata-OFF natural WIN miss. [Evidence, implementation boundary and T3](BRIGHT_RESULT_BAND_REPAIR.md).
+Main02e0de1 and PR65 exact057d553 reproduce the failure; the repair branches
+from main and leaves PR65 OPEN/DRAFT unchanged. Implemented locally; automated
+gates/review/CI must be resolved from the repair evidence. T3 PENDING, Accepted
+PENDING, Merged NO, Released NO. #15-5's real T3 remains FAIL and Accepted
+PENDING. #66 diagnostic closure is historical and unchanged; older unproven
+misses remain UNKNOWN. Public stablev1.2.0; STOP before T3/merge/#15-6.
+
 ## Current checkpoint — #66 diagnostic-only, 2026-10-03
 
 GitHub is authoritative: #59 is CLOSED/completed, main27e5f49 has exact-main

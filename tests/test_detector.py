@@ -18,6 +18,8 @@ sys.path.insert(0, str(ROOT))
 
 from result_detector import (
     FINAL_WIN,
+    FINAL_LOSS,
+    FINAL_DRAW,
     NON_CLEAR,
     PHASE,
     ResultClassifier,
@@ -132,6 +134,54 @@ ok = got == FINAL_WIN
 print(f"{'final_win_with_side_cyan_noise':32s} expected=FINAL_WIN  got={got:10s} {'OK' if ok else 'NG'}")
 if not ok:
     failed.append(("final_win_with_side_cyan_noise", FINAL_WIN, got, debug))
+
+# Keep glyphs fixed while arena lighting changes. These transformed controls
+# exercise both colours, the dark margin requirement and the PHASE veto.
+def lit_background(source, width, height, lower_gray=30):
+    changed = bytearray(source)
+    for y in range(height):
+        for x in range(width):
+            j = (y * width + x) * 4
+            b, g, r = changed[j:j+3]
+            cyan = g > 120 and b > 120 and g-r > 25 and b-r > 20 and abs(g-b) < 70
+            red = r > 130 and r-g > 35 and r-b > 45 and g > 50
+            if not (cyan or red):
+                gray = lower_gray if y >= height * 3 // 4 else 90
+                changed[j:j+4] = bytes((gray, gray, gray, 255))
+    return bytes(changed)
+
+for name, expected in (("final_win_01.ppm", FINAL_WIN), ("final_loss_01.ppm", FINAL_LOSS)):
+    pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / name)
+    lit = lit_background(pixels, width, height)
+    got, debug = classifier.classify_bgra(lit, width, height)
+    assert not debug["result_band_like"] and debug["lower_band_like"], debug
+    assert got == expected, (name, got, debug)
+    # An all-bright background cannot pass merely because the letters match.
+    got, debug = classifier.classify_bgra(lit_background(pixels, width, height, 90), width, height)
+    assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (name, got, debug)
+    # A black lower margin carries no visible band information.
+    got, debug = classifier.classify_bgra(lit_background(pixels, width, height, 0), width, height)
+    assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (name, got, debug)
+
+for name in ("phase_win_01.ppm", "phase_loss_01.ppm"):
+    pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / name)
+    got, debug = classifier.classify_bgra(lit_background(pixels, width, height), width, height)
+    assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (name, got, debug)
+
+print("Lighting recovery: WIN/LOSS, missing/black margin and PHASE controls passed.")
+
+# A neutral PHASE prefix must still veto a near-perfect final-like substring
+# even when the global dark-band test fails. Preserve the white prefix while
+# brightening the background, rather than deleting the evidence in the test.
+prefix, width, height = read_ppm(Path(__file__).parent / "fixtures" / "phase_white_prefix_synthetic.ppm")
+lit = bytearray(lit_background(prefix, width, height))
+for j in range(0, len(prefix), 4):
+    b, g, r = prefix[j:j+3]
+    if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
+        lit[j:j+4] = prefix[j:j+4]
+got, debug = classifier.classify_bgra(bytes(lit), width, height)
+assert not debug["result_band_like"], debug
+assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (got, debug)
 
 if failed:
     print("\nFAILED")

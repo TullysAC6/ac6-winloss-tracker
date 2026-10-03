@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "id": "result.sequence.bright-band-two-hits-once",
+  "family": "results",
+  "category": "sequences",
+  "input": {
+    "kind": "sequence",
+    "capture": "frame_source",
+    "processing_ms": 30,
+    "steps": [
+      {
+        "id": "s01",
+        "at_ms": 750,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s02",
+        "at_ms": 1500,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s03",
+        "at_ms": 2250,
+        "frame": "result.clear.normal-01"
+      },
+      {
+        "id": "s04",
+        "at_ms": 3000,
+        "frame": "result.owner-bright-band.1"
+      },
+      {
+        "id": "s05",
+        "at_ms": 3750,
+        "frame": "result.owner-bright-band.2"
+      },
+      {
+        "id": "s06",
+        "at_ms": 4500,
+        "frame": "result.owner-bright-band.2"
+      },
+      {
+        "id": "s07",
+        "at_ms": 5250,
+        "frame": "result.owner-bright-band.2"
+      }
+    ]
+  },
+  "truth": {
+    "scenario": "Composed CLEAR prefix then the exact two consecutive natural WIN frames. Lighting changes but two final hits count once; visible repetition never counts twice.",
+    "expected_results": [
+      "win"
+    ],
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_detector_run.v1",
+    "steps": {
+      "s01": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s02": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": false
+        }
+      },
+      "s03": {
+        "frame_class": "CLEAR",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "armed": true,
+          "clear_ready": true
+        }
+      },
+      "s04": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "candidate": "win",
+          "candidate_hits": 1
+        }
+      },
+      "s05": {
+        "frame_class": "FINAL_WIN",
+        "detection": "win",
+        "gate": "accepted",
+        "state": {
+          "post_result_lock": true,
+          "candidate": null,
+          "candidate_hits": 0
+        }
+      },
+      "s06": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true
+        }
+      },
+      "s07": {
+        "frame_class": "FINAL_WIN",
+        "detection": null,
+        "gate": null,
+        "state": {
+          "post_result_lock": true
+        }
+      }
+    },
+    "totals": {
+      "accepted": {
+        "win": 1,
+        "loss": 0
+      },
+      "detections": {
+        "win": 1,
+        "loss": 0,
+        "draw": 0
+      },
+      "gate_rejected": 0,
+      "frames_classified": 7,
+      "detector_errors": 0
+    }
+  },
+  "coverage": [
+    "sequence.capture_gap",
+    "sequence.bright_band_confirmation"
+  ],
+  "provenance": {
+    "source_type": "composed_sequence",
+    "reference": "Owner natural T3 consecutive WIN frames plus composed arming/repetition prefix/suffix.",
+    "origin": "Two final ROIs are consecutive captured samples; CLEAR prefix and repeated suffix are composed contract controls, not a reconstruction of the entire match."
+  },
+  "review": {
+    "truth": {
+      "status": "contract_scenario_over_reviewed_fixtures",
+      "basis": "Expectations were derived step by step from ResultDetector.run, ResultStateMachine, ResultGate and server.record_result, not copied from a replay; each referenced frame's class is its reviewed truth."
+    },
+    "privacy": {
+      "status": "inherits_referenced_fixtures"
+    },
+    "redistribution": {
+      "status": "inherits_referenced_fixtures"
+    }
+  }
+}

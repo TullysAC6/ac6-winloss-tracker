@@ -20,7 +20,9 @@ import result_detector as rd
 from t1.images import decode_image
 
 BASE_CORE_DIGESTS = {
-    'ResultClassifier.classify_bgra': 'c6ea099ee3645bbb542ec9768a0d4aaf6b661225e527e4527eb3845c9cb26c89',
+    # Owner-authorized bright-result-band repair advances ONLY the classifier
+    # baseline. State/run remain pinned to the original #66 exact base.
+    'ResultClassifier.classify_bgra': 'f9b45d31fecb561c0896a716ef21f63aa02a5f3e7e84487966a1b6db66ab290e',
     'ResultStateMachine': '93eb802002513bdeecea900f1ff7633b01151ef0f3ee57962172843a9aaf7122',
     'ResultDetector.run': 'f88eee3619d97bb14684a7edd9880b0a62a4c0efe0f8d1a8cd350835211f0eae',
 }
@@ -87,7 +89,7 @@ def core_digests(source):
 
 
 class CandidateEvidenceTests(unittest.TestCase):
-    def test_core_ast_and_public_constants_unchanged_from_exact_base(self):
+    def test_core_ast_and_public_constants_match_approved_baseline(self):
         self.assertEqual(core_digests((ROOT / 'result_detector.py').read_text()), BASE_CORE_DIGESTS)
         self.assertEqual((rd.POLL_SECONDS, rd.CONFIRM_HITS, rd.CLEAR_HITS_REQUIRED, rd.COOLDOWN_SECONDS), (.75, 2, 3, 5.0))
     def test_bounded_long_normal_sequence_and_input_ownership(self):

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "id": "result.owner-bright-band.1",
+  "family": "results",
+  "category": "win",
+  "input": {
+    "kind": "roi",
+    "path": "results/win/owner-bright-band-1.ppm",
+    "format": "ppm",
+    "width": 1152,
+    "height": 75,
+    "bytes": 259215,
+    "sha256": "14ddb0a9479d998fcf971693459b89fe829c5319425597b0a5e5e5a1c255873a"
+  },
+  "truth": {
+    "result": "win",
+    "screen": "final_result",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "FINAL_WIN"
+  },
+  "coverage": [
+    "result.win.positive"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "Owner real T3 2026-10-03; SHA256 350ef3c63526e241f3cecc0ba266f268038441c538b575edb30c10ebcf1e4bd2; frame 1",
+    "origin": "Exact full 1152x75 production result ROI from native 1920x1080 WGC; BGRA to RGB channel copy only.",
+    "synthetic": false,
+    "template_partition": "not_applicable",
+    "legacy": null
+  },
+  "review": {
+    "truth": {
+      "status": "owner_label_visually_confirmed",
+      "basis": "Owner confirmed this match was WIN. Implementer inspected the full ROI: cyan YOU WIN remains visible; surrounding arena lighting differs."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "Inspected the entire ROI. Only arena imagery and result text; none of the listed personal data. Exact P6 header has no comments/metadata."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Owner supplied AC6 gameplay through explicitly authorized real-machine testing and authorized the product repair. Only the result ROI is retained; game imagery provenance, not a licence determination."
+    }
+  }
+}

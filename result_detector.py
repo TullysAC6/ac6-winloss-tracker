@@ -379,6 +379,12 @@ class ResultClassifier:
         win_max = loss_max = bright_max = draw_max = -1
         win_sum = loss_sum = bright_sum = draw_sum = 0
         gray_sum = 0
+        # The translucent strip's lower margin remains dark when arena light
+        # brightens the area around the letters. Collect it in the existing
+        # pixel pass; it is supplementary evidence for very strong finals only.
+        lower_start = height * 3 // 4
+        lower_total = width * (height - lower_start)
+        lower_dark_n = lower_gray_sum = 0
 
         for y in range(height):
             row = y * width * 4
@@ -393,6 +399,10 @@ class ResultClassifier:
                 gray_sum += gray
                 if gray < 80:
                     dark_n += 1
+                if y >= lower_start:
+                    lower_gray_sum += gray
+                    if gray < 80:
+                        lower_dark_n += 1
 
                 is_bright = gray > 125
                 if is_bright:
@@ -509,6 +519,13 @@ class ResultClassifier:
             dark_ratio >= 0.72
             and 8.0 <= mean_gray <= 90.0
         )
+        lower_dark_ratio = lower_dark_n / lower_total
+        lower_mean_gray = lower_gray_sum / lower_total
+        lower_band_like = (
+            lower_dark_ratio >= 0.90
+            and 8.0 <= lower_mean_gray <= 90.0
+            and 8.0 <= mean_gray <= 90.0
+        )
 
         # DRAW is intentionally precision-first. v20/v21 used only a compact
         # neutral-white cluster, which allowed brief combat explosions/AC parts
@@ -619,9 +636,8 @@ class ResultClassifier:
         # Some PHASE banners have a white/gray prefix while YOU WIN/LOSE is
         # colored. In that case the total bright text is much wider than the
         # colored final-like portion.
-        phase_prefix_like = (
-            result_band_like
-            and (final_win_geom_early or final_loss_geom_early)
+        phase_prefix_shape = (
+            (final_win_geom_early or final_loss_geom_early)
             and bright["coverage"] >= 0.055
             and 0.40 <= bright_cluster["span"] <= 0.75
             and (bright_cluster["span"] - colored_span) >= 0.10
@@ -629,6 +645,7 @@ class ResultClassifier:
             and central_continuous
             and central_density >= 0.045
         )
+        phase_prefix_like = result_band_like and phase_prefix_shape
 
         phase_bright_like = (
             result_band_like
@@ -660,6 +677,9 @@ class ResultClassifier:
             "loss_final_grid_score": loss_final_grid_score,
             "loss_phase_grid_score": loss_phase_grid_score,
             "result_band_like": result_band_like,
+            "lower_dark_ratio": lower_dark_ratio,
+            "lower_mean_gray": lower_mean_gray,
+            "lower_band_like": lower_band_like,
             "win_cluster": win_cluster,
             "loss_cluster": loss_cluster,
             "win_y_cluster": win_y_cluster,
@@ -695,15 +715,27 @@ class ResultClassifier:
         # 1-D profile plus the new 2-D glyph fingerprint.  The previous 0.50
         # profile threshold was intentionally permissive and is the reason a
         # cyan garage model could become FINAL_WIN.
+        # If arena lighting defeats the global band check, recovery requires
+        # a much stronger glyph match AND a >=90% dark, visible lower margin.
+        # A final-like substring with a white PHASE prefix cannot recover.
+        # DRAW/PHASE classification and the CLEAR fallback remain unchanged.
         win_ok = (
-            result_band_like
+            (result_band_like or (
+                lower_band_like and not phase_prefix_shape
+                and win_final_score >= 0.95
+                and win_final_grid_score >= 0.95
+            ))
             and win_geom
             and win_final_score >= 0.78
             and win_final_grid_score >= 0.82
             and win_final_grid_score >= win_phase_grid_score + 0.12
         )
         loss_ok = (
-            result_band_like
+            (result_band_like or (
+                lower_band_like and not phase_prefix_shape
+                and loss_final_score >= 0.95
+                and loss_final_grid_score >= 0.95
+            ))
             and loss_geom
             and loss_final_score >= 0.78
             and loss_final_grid_score >= 0.82
