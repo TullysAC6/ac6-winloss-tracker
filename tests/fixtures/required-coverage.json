@@ -3,6 +3,7 @@
   "required": {
     "result.win.bright_band": "Owner-confirmed WIN remains FINAL_WIN as arena lighting brightens, despite the global dark-band test failing.",
     "sequence.bright_band_confirmation": "Two real consecutive WIN samples across arena lighting change reach ResultGate exactly once.",
+    "sequence.clear_breaks_confirmation": "Actual gameplay CLEAR cancels an unconfirmed final; two fresh final samples are then needed.",
     "result.win.positive": "A genuine YOU WIN final result classifies as FINAL_WIN.",
     "result.loss.positive": "A genuine YOU LOSE final result classifies as FINAL_LOSS.",
     "result.draw.positive": "A genuine DRAW result classifies as FINAL_DRAW.",

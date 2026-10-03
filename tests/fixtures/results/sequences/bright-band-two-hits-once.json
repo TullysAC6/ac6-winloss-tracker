@@ -133,7 +133,8 @@
     }
   },
   "coverage": [
-    "sequence.capture_gap",
+    "sequence.exactly_once",
+    "sequence.repeated_final_screen",
     "sequence.bright_band_confirmation"
   ],
   "provenance": {

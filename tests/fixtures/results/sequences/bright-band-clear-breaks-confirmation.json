@@ -136,11 +136,11 @@
     }
   },
   "coverage": [
-    "sequence.capture_gap"
+    "sequence.clear_breaks_confirmation"
   ],
   "provenance": {
     "source_type": "composed_sequence",
-    "reference": "tests/test_game_capture.py CaptureGapTests (labels) with real pixels",
+    "reference": "Owner WIN/gameplay ROIs with composed CLEAR interruption and two fresh final hits.",
     "origin": "Composed scenario over reviewed repository fixtures; the frames do not come from one recording."
   },
   "review": {
