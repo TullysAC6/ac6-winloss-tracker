@@ -349,26 +349,23 @@ def _leading_text_contrast(raw, width, height, x0, x1):
                 if (0.40 <= span <= 0.70 and 0.36 <= center <= 0.64
                         and density >= 0.060):
                     return True
-            # A same-luminance vertical stripe can connect several letters to
-            # a full-height component. It must not erase independent shorter
-            # columns. Require two separated coherent stroke groups, rather
-            # than collecting unrelated scattered background columns. Reuse
-            # the existing vertical and 6% support bounds; no colour cutoff.
-            groups = run = 0
-            for x in range(strip_width + 1):
-                text_column = False
-                if x < strip_width and column_count[x]:
+            # Connected texture must not erase shorter text-height columns.
+            # Pool their actual occupied area, preserving the existing density
+            # unit (pixels / strip area). Do not reinterpret area density as a
+            # minimum contiguous width or require separate glyph groups: stripes
+            # can fragment those groups while leaving the text visible.
+            text_pixels, text_min, text_max = 0, height, -1
+            for x in range(strip_width):
+                if column_count[x]:
                     rows = column_max[x]-column_min[x]+1
                     text_column = (0.40 <= rows / height <= 0.70
                         and 0.36 <= (column_max[x]+column_min[x]+1) / (2*height) <= 0.64
                         and column_count[x] / rows >= 0.060)
-                if text_column:
-                    run += 1
-                else:
-                    if run / strip_width >= 0.060:
-                        groups += 1
-                    run = 0
-            if groups >= 2:
+                    if text_column:
+                        text_pixels += column_count[x]
+                        text_min = min(text_min, column_min[x])
+                        text_max = max(text_max, column_max[x])
+            if text_pixels and text_pixels / (strip_width * (text_max-text_min+1)) >= 0.060:
                 return True
     return False
 

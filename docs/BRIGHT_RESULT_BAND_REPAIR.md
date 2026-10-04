@@ -54,7 +54,8 @@ relative-reference approaches: a background step swallowed the column profile;
 vertical texture elongated both profiles; crossing lines interrupted individual
 columns; wider/edge lines defeated gap handling; and one-level glyph variation
 fragmented exact-luminance components; a connected stripe then merged all text
-components, while a neutral-color cutoff missed tinted prefixes. All reports
+components, while a neutral-color cutoff missed tinted prefixes. A two-group
+contiguous-width heuristic then lost support under multiple stripes. All reports
 and repros are retained. Sweeps
 include gray0/40/79/80/81/120/125/126/220 on both broad-bright and peripheral-lit
 backgrounds including leading backdrops30/34/35/40/50/60; the visibly preserved
@@ -71,14 +72,19 @@ their independent shape. Veto components meeting existing vertical bounds
 span0.40..0.70, center0.36..0.64 and strip-normalized density>=0.060. No fixed
 brightness reference, exact-level equality, gap budget or inferred absence from
 an over-tall aggregate controls recovery. Connected texture is also checked via
-independent column extents at each level: veto two separated coherent stroke
-groups, each >=6% strip width, with the same vertical bounds and support. A
-full-height connecting stripe cannot erase shorter columns elsewhere; scattered
-background columns do not establish this multi-stroke evidence. No color cutoff
+independent column extents at each level: pool actual occupied pixels in
+text-height columns and veto area density >=0.060 across their strip-width
+vertical envelope. The unit remains pixels / area, never a minimum contiguous
+width or number of glyph groups. A full-height connecting stripe cannot erase
+shorter columns elsewhere. Scattered background pixels do not provide enough
+occupied area. Independent measurements give maximum pooled density0.04562
+for the retained recovered ROI, versus minimum0.06499 across the64 multiple-
+stripe negative controls. No threshold is tuned from those measurements. No color cutoff
 allows tinted text to escape the veto. Union by size/path compression gives
 bounded strip work plus at most256 checks of strip-width column lists per
 direction; empty levels do no work. Fifty-four crossing-line/one-level-variation,
-twenty-seven connected-stripe/color-cast and twenty-four stripe controls preserve the prefix; retained real ROIs
+twenty-seven connected-stripe/color-cast, sixty-four multiple-stripe and
+twenty-four stripe controls preserve the prefix; retained real ROIs
 continue to recover. No global threshold changes.
 
 The existing pixel pass collects bounded scalar counters. Only otherwise

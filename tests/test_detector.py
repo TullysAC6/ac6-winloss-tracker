@@ -271,6 +271,25 @@ for prefix_bgr in ((79, 79, 79), (100, 70, 58), (104, 70, 54)):
             got, debug = classifier.classify_bgra(bytes(lit), width, height)
             assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (prefix_bgr, band_gray, band_height, got, debug)
 
+# Multiple stripes can fragment horizontal support without removing the
+# visible prefix. Area support must retain both equal and unequal luminances.
+for foreground in (77, 79):
+    for period in (8, 12, 18, 24, 27, 30, 36, 48):
+        for shift in (0, period//4, period//2, 3*period//4):
+            lit = bytearray(lit_background(prefix, width, height, peripheral=True))
+            x0, x1 = width * 18 // 100, width * 34 // 100
+            for y in range(height):
+                for x in range(x0, x1):
+                    gray = (40 if y < height * 3 // 4 else 30) + 39 * int((x-x0+shift) % period < period//2)
+                    j = (y * width + x) * 4
+                    lit[j:j+4] = bytes((gray, gray, gray, 255))
+            for j in range(0, len(prefix), 4):
+                b, g, r = prefix[j:j+3]
+                if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
+                    lit[j:j+4] = bytes((foreground, foreground, foreground, 255))
+            got, debug = classifier.classify_bgra(bytes(lit), width, height)
+            assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (foreground, period, shift, got, debug)
+
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.
 pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")
