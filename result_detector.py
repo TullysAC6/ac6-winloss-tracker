@@ -272,13 +272,13 @@ def _center_cluster(values, threshold=0.010, max_gap=2):
 
 
 def _leading_text_contrast(raw, width, height, x0, x1):
-    """Veto neutral prefix structure at any luminance, without a lighting reference.
+    """Veto prefix structure at any luminance, without a lighting reference.
 
     Grow connected upper/lower luminance level sets in the narrow leading strip.
     A glyph may vary in luminance or merge with one lighting stripe; its component
     at another level still provides text-height evidence. No fixed brightness
     cutoff, exact-colour equality or stroke continuity is treated as absence.
-    Each neutral pixel activates once per direction; union by size/path compression
+    Each strip pixel activates once per direction; union by size/path compression
     bounds work and storage to the strip, never another full-frame traversal.
     """
     strip_width = x1 - x0
@@ -290,15 +290,17 @@ def _leading_text_contrast(raw, width, height, x0, x1):
         for sx, x in enumerate(range(x0, x1)):
             i = (y * width + x) * 4
             b, g, r = raw[i], raw[i+1], raw[i+2]
-            if max(r, g, b)-min(r, g, b) < 42:
-                gray = (29*b + 150*g + 77*r) >> 8
-                buckets[gray].append(y * strip_width + sx)
+            gray = (29*b + 150*g + 77*r) >> 8
+            buckets[gray].append(y * strip_width + sx)
 
     for levels in (range(256), range(255, -1, -1)):
         parent = [-1] * total
         counts = [0] * total
         y_min = [0] * total
         y_max = [0] * total
+        column_min = [height] * strip_width
+        column_max = [-1] * strip_width
+        column_count = [0] * strip_width
 
         def find(i):
             while parent[i] != i:
@@ -308,12 +310,18 @@ def _leading_text_contrast(raw, width, height, x0, x1):
 
         for level in levels:
             new = buckets[level]
+            if not new:
+                continue
             # Activate the whole level before inspecting components, so pixel
             # iteration order cannot create temporary, text-shaped fragments.
             for i in new:
                 parent[i] = i
                 counts[i] = 1
                 y_min[i] = y_max[i] = i // strip_width
+                y, x = divmod(i, strip_width)
+                column_min[x] = min(column_min[x], y)
+                column_max[x] = max(column_max[x], y)
+                column_count[x] += 1
             for i in new:
                 y, x = divmod(i, strip_width)
                 neighbors = (i-strip_width if y else -1,
@@ -341,6 +349,27 @@ def _leading_text_contrast(raw, width, height, x0, x1):
                 if (0.40 <= span <= 0.70 and 0.36 <= center <= 0.64
                         and density >= 0.060):
                     return True
+            # A same-luminance vertical stripe can connect several letters to
+            # a full-height component. It must not erase independent shorter
+            # columns. Require two separated coherent stroke groups, rather
+            # than collecting unrelated scattered background columns. Reuse
+            # the existing vertical and 6% support bounds; no colour cutoff.
+            groups = run = 0
+            for x in range(strip_width + 1):
+                text_column = False
+                if x < strip_width and column_count[x]:
+                    rows = column_max[x]-column_min[x]+1
+                    text_column = (0.40 <= rows / height <= 0.70
+                        and 0.36 <= (column_max[x]+column_min[x]+1) / (2*height) <= 0.64
+                        and column_count[x] / rows >= 0.060)
+                if text_column:
+                    run += 1
+                else:
+                    if run / strip_width >= 0.060:
+                        groups += 1
+                    run = 0
+            if groups >= 2:
+                return True
     return False
 
 class ResultClassifier:

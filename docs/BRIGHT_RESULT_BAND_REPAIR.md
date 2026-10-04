@@ -53,7 +53,9 @@ leading-space checks reject those cases. Successive independent NO-GOs rejected
 relative-reference approaches: a background step swallowed the column profile;
 vertical texture elongated both profiles; crossing lines interrupted individual
 columns; wider/edge lines defeated gap handling; and one-level glyph variation
-fragmented exact-luminance components. All reports and repros are retained. Sweeps
+fragmented exact-luminance components; a connected stripe then merged all text
+components, while a neutral-color cutoff missed tinted prefixes. All reports
+and repros are retained. Sweeps
 include gray0/40/79/80/81/120/125/126/220 on both broad-bright and peripheral-lit
 backgrounds including leading backdrops30/34/35/40/50/60; the visibly preserved
 prefix is never recovered as WIN. Equal foreground/background paint is not
@@ -62,21 +64,27 @@ Conservative abstention on legitimate textured frames is a T3 sensitivity
 limitation, not justification to lower the guards.
 
 The final recovery-only helper replaces those brittle heuristics with connected
-neutral luminance level sets. It grows dark and light components through all
+luminance level sets of all colours. It grows dark and light components through all
 present gray levels, activating a whole level before inspection. Glyphs can vary
 in brightness or merge with a stripe at one level; a different level retains
 their independent shape. Veto components meeting existing vertical bounds
 span0.40..0.70, center0.36..0.64 and strip-normalized density>=0.060. No fixed
 brightness reference, exact-level equality, gap budget or inferred absence from
-an over-tall aggregate controls recovery. Union by size/path compression gives
-bounded near-linear strip work. Fifty-four crossing-line/one-level-variation
-controls and twenty-four stripe controls preserve the prefix; retained real ROIs
+an over-tall aggregate controls recovery. Connected texture is also checked via
+independent column extents at each level: veto two separated coherent stroke
+groups, each >=6% strip width, with the same vertical bounds and support. A
+full-height connecting stripe cannot erase shorter columns elsewhere; scattered
+background columns do not establish this multi-stroke evidence. No color cutoff
+allows tinted text to escape the veto. Union by size/path compression gives
+bounded strip work plus at most256 checks of strip-width column lists per
+direction; empty levels do no work. Fifty-four crossing-line/one-level-variation,
+twenty-seven connected-stripe/color-cast and twenty-four stripe controls preserve the prefix; retained real ROIs
 continue to recover. No global threshold changes.
 
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
-256 luminance buckets and four union/component lists bounded by strip pixel count.
-Each neutral pixel activates once per direction; no scan per intensity over the
+256 luminance buckets, four union/component lists bounded by strip pixel count
+and three strip-width column lists. Each pixel activates once per direction; no scan per intensity over the
 whole ROI. No extra capture,
 I/O, process, thread, dependency or polling change. The AST-pinned classifier
 and new helper baseline are intentionally advanced for this repair; the original
@@ -94,8 +102,8 @@ PHASE-prefix negative. Full T0, T1 and isolated T2 evidence, independent review
 and exact-head CI belong to the repair PR; do not inherit PR65's old green CI.
 
 An offline alternating CPU-clock microbenchmark of the same three ROIs with
-the final component-tree helper gave baseline67.71ms and repair88.54ms/ROI
-(+30.8%) on the coarse process clock; about20.8ms per frame for this result-heavy sample.
+the final component-tree helper gave baseline67.71ms and repair93.75ms/ROI
+(+38.5%) on the coarse process clock; about26.0ms per frame for this result-heavy sample.
 The additional strip scans happen only for strong recovery candidates, not
 ordinary gameplay. This measurement does not establish zero overhead. It is a
 bounded local measurement, not AC6 FPS/GPU or real-session performance

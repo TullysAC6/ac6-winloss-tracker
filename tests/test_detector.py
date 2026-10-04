@@ -248,6 +248,29 @@ for band_gray, variation in ((gray, variant) for gray in (74, 75, 79)
         got, debug = classifier.classify_bgra(bytes(lit), width, height)
         assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (band_gray, band_height, variation, got, debug)
 
+# A same-luminance stripe may connect the prefix to full-height background.
+# Slight colour cast must not make the still-visible prefix disappear either.
+for prefix_bgr in ((79, 79, 79), (100, 70, 58), (104, 70, 54)):
+    for band_gray in (79, 80, 90):
+        for band_height in (1, 2, 4):
+            lit = bytearray(lit_background(prefix, width, height, peripheral=True))
+            x0, x1 = width * 18 // 100, width * 34 // 100
+            for y in range(height):
+                for x in range(x0, x1):
+                    gray = 40 if y < height * 3 // 4 else 30
+                    if x < x0 + max(1, (x1-x0) * 5 // 100):
+                        gray = 79
+                    if height // 2 <= y < height // 2 + band_height:
+                        gray = band_gray
+                    j = (y * width + x) * 4
+                    lit[j:j+4] = bytes((gray, gray, gray, 255))
+            for j in range(0, len(prefix), 4):
+                b, g, r = prefix[j:j+3]
+                if min(b, g, r) > 125 and max(b, g, r)-min(b, g, r) < 42:
+                    lit[j:j+4] = bytes((*prefix_bgr, 255))
+            got, debug = classifier.classify_bgra(bytes(lit), width, height)
+            assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (prefix_bgr, band_gray, band_height, got, debug)
+
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.
 pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")
