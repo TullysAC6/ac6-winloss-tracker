@@ -272,7 +272,38 @@ def _center_cluster(values, threshold=0.010, max_gap=2):
 
 
 def _leading_text_contrast(raw, width, height, x0, x1):
-    """Veto prefix structure at any luminance, without a lighting reference.
+    """Inspect original contrast and contrast independent of row/column light.
+
+    The two-way additive residual removes pure horizontal/vertical lighting
+    fields. Its zero sign is exact integer arithmetic, not a fitted brightness
+    cutoff. Globally elongated extents alone do not establish absence of text;
+    inspect the independent residual too. Both views use the same bounds.
+    """
+    strip_width = x1 - x0
+    if strip_width <= 0:
+        return True
+    gray_values = []
+    row_sum = [0] * height
+    column_sum = [0] * strip_width
+    for y in range(height):
+        for sx, x in enumerate(range(x0, x1)):
+            i = (y * width + x) * 4
+            gray = (29*raw[i] + 150*raw[i+1] + 77*raw[i+2]) >> 8
+            gray_values.append(gray)
+            row_sum[y] += gray
+            column_sum[sx] += gray
+    if _leading_level_shape(gray_values, strip_width, height):
+        return True
+    grand_sum = sum(row_sum)
+    total = strip_width * height
+    residual_sign = [int(gray * total - row_sum[i // strip_width] * height
+                         - column_sum[i % strip_width] * strip_width + grand_sum > 0)
+                     for i, gray in enumerate(gray_values)]
+    return _leading_level_shape(residual_sign, strip_width, height)
+
+
+def _leading_level_shape(gray_values, strip_width, height):
+    """Veto prefix structure at any level, without a lighting reference.
 
     Grow connected upper/lower luminance level sets in the narrow leading strip.
     A glyph may vary in luminance or merge with one lighting stripe; its component
@@ -281,17 +312,10 @@ def _leading_text_contrast(raw, width, height, x0, x1):
     Each strip pixel activates once per direction; union by size/path compression
     bounds work and storage to the strip, never another full-frame traversal.
     """
-    strip_width = x1 - x0
-    if strip_width <= 0:
-        return True
     total = strip_width * height
     buckets = [[] for _ in range(256)]
-    for y in range(height):
-        for sx, x in enumerate(range(x0, x1)):
-            i = (y * width + x) * 4
-            b, g, r = raw[i], raw[i+1], raw[i+2]
-            gray = (29*b + 150*g + 77*r) >> 8
-            buckets[gray].append(y * strip_width + sx)
+    for i, gray in enumerate(gray_values):
+        buckets[gray].append(i)
 
     for levels in (range(256), range(255, -1, -1)):
         parent = [-1] * total

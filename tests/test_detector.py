@@ -289,6 +289,7 @@ for foreground in (77, 79):
                     lit[j:j+4] = bytes((foreground, foreground, foreground, 255))
             got, debug = classifier.classify_bgra(bytes(lit), width, height)
             assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (foreground, period, shift, got, debug)
+            striped = bytes(lit)
 
             # Four unrelated pixels must not dilute the unchanged PHASE text.
             # The independent review reproduced false WIN for period24/shift12
@@ -305,6 +306,18 @@ for foreground in (77, 79):
                     lit[j:j+4] = bytes((foreground, foreground, foreground, 255))
             got, debug = classifier.classify_bgra(bytes(lit), width, height)
             assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), ('outliers', foreground, period, shift, got, debug)
+
+            # Independent review also reproduced false WIN after two thin
+            # crossbars outside every original prefix stroke stretched all
+            # column extents. The visible prefix itself is unchanged.
+            for background in (striped, bytes(lit)):
+                bars = bytearray(background)
+                for y in (0, height-1):
+                    for x in range(x0, x1):
+                        j = (y * width + x) * 4
+                        bars[j:j+4] = bytes((foreground, foreground, foreground, 255))
+                got, debug = classifier.classify_bgra(bytes(bars), width, height)
+                assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), ('outer crossbars', foreground, period, shift, got, debug)
 
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.

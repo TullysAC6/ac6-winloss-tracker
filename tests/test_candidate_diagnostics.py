@@ -20,7 +20,8 @@ import result_detector as rd
 from t1.images import decode_image
 
 BASE_CORE_DIGESTS = {
-    '_leading_text_contrast': 'b094ccefab67124eccee0b43002f572de9b1f673ea6996c777452376ec14e052',
+    '_leading_text_contrast': '981559261008b5e4cbfdbf3a6fbf9950374aeab1ddef719ca488ac65ab4fb445',
+    '_leading_level_shape': 'b0a6ae06fb93f135c80e5ec4cfe9c25f2b192df56694321e3cb10442e06ca21b',
     # Owner-authorized bright-result-band repair advances ONLY the classifier
     # baseline and pins its new prefix helper. State/run remain pinned to the
     # original #66 exact base.
@@ -78,7 +79,7 @@ def core_digests(source):
             return self.generic_visit(node)
     output = {}
     for cls in tree.body:
-        if isinstance(cls, ast.FunctionDef) and cls.name == '_leading_text_contrast':
+        if isinstance(cls, ast.FunctionDef) and cls.name in ('_leading_text_contrast', '_leading_level_shape'):
             output[cls.name] = hashlib.sha256(ast.dump(cls, include_attributes=False).encode()).hexdigest()
         if not isinstance(cls, ast.ClassDef): continue
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]

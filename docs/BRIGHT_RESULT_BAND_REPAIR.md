@@ -57,7 +57,10 @@ fragmented exact-luminance components; a connected stripe then merged all text
 components, while a neutral-color cutoff missed tinted prefixes. A two-group
 contiguous-width heuristic then lost support under multiple stripes. Pooling all
 column extents then let four unrelated pixels expand the denominator and dilute
-unchanged PHASE text; independent review reproduced two false finals. All reports
+unchanged PHASE text; independent review reproduced two false finals. Window
+selection fixed that dilution but two outer rows could still make every column
+ineligible:22/32 false finals. Local active runs were rejected as a fix because
+they vetoed the real WIN. All reports
 and repros are retained. Sweeps
 include gray0/40/79/80/81/120/125/126/220 on both broad-bright and peripheral-lit
 backgrounds including leading backdrops30/34/35/40/50/60; the visibly preserved
@@ -94,10 +97,28 @@ sixty-four sparse-outlier variants and
 twenty-four stripe controls preserve the prefix; retained real ROIs
 continue to recover. No global threshold changes.
 
+Globally elongated extents alone do not prove absence of text. If original
+contrast has no veto, also inspect the sign of the two-way additive luminance
+residual: R = gray*S*H - rowSum*H - columnSum*S + grandSum, where S is strip
+width and H is height. This projects out additive row/column lighting fields;
+each residual row and column sums to zero. The sign R>0 is exact integer
+arithmetic, not a fitted brightness threshold. The same component/window
+geometry and area-density bounds inspect this independent binary view; either
+view vetoes recovery. No original veto is relaxed. Pure additive fields yield
+zero residual, and additive lighting without clipping cannot alter it. This
+is a limited background model, not proof against every nonlinear texture.
+Independent probes pass517 adverse controls, including64 outer-crossbar
+variants, plus all generated bright WIN/LOSS controls and all three real ROIs.
+T0 also retains128 crossbar variants with/without sparse outliers. No gameplay
+or detector-state behavior is substituted for missing classifier evidence.
+
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
 256 luminance buckets, four union/component lists bounded by strip pixel count
-and three strip-width column lists plus the bounded endpoint table.
+and three strip-width column lists plus the bounded endpoint table. The wrapper
+also holds bounded strip grayscale/residual values and row/column sums. The
+extra residual view has only two levels and is inspected only if the original
+view has no veto.
 Each pixel activates once per direction; no scan per intensity over the
 whole ROI. No extra capture,
 I/O, process, thread, dependency or polling change. The AST-pinned classifier
@@ -116,8 +137,10 @@ PHASE-prefix negative. Full T0, T1 and isolated T2 evidence, independent review
 and exact-head CI belong to the repair PR; do not inherit PR65's old green CI.
 
 An offline alternating CPU-clock microbenchmark of the same three ROIs with
-the final window-support helper gave baseline75.52ms and repair96.35ms/ROI
-(+27.6%) on the coarse process clock; about20.8ms per frame for this result-heavy sample.
+the final residual/component-window helper gave baseline72.92ms and
+repair119.79ms/ROI (+64.3%) on the coarse process clock; about46.9ms per frame
+for this result-heavy sample. This material increase is an explicit precision
+tradeoff, not negligible overhead; no arbitrary timing gate was introduced.
 The additional strip scans happen only for strong recovery candidates, not
 ordinary gameplay. This measurement does not establish zero overhead. It is a
 bounded local measurement, not AC6 FPS/GPU or real-session performance
