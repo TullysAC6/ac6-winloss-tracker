@@ -350,11 +350,12 @@ def _leading_text_contrast(raw, width, height, x0, x1):
                         and density >= 0.060):
                     return True
             # Connected texture must not erase shorter text-height columns.
-            # Pool their actual occupied area, preserving the existing density
-            # unit (pixels / strip area). Do not reinterpret area density as a
-            # minimum contiguous width or require separate glyph groups: stripes
-            # can fragment those groups while leaving the text visible.
-            text_pixels, text_min, text_max = 0, height, -1
+            # Maximize occupied area support over eligible vertical envelopes.
+            # Unrelated outlying columns are optional evidence: adding them must
+            # not dilute existing text support by expanding its denominator.
+            # Compress to observed endpoints; the table has at most
+            # min(height, strip_width)**2 cells, bounded by strip pixel count.
+            text_columns = []
             for x in range(strip_width):
                 if column_count[x]:
                     rows = column_max[x]-column_min[x]+1
@@ -362,11 +363,28 @@ def _leading_text_contrast(raw, width, height, x0, x1):
                         and 0.36 <= (column_max[x]+column_min[x]+1) / (2*height) <= 0.64
                         and column_count[x] / rows >= 0.060)
                     if text_column:
-                        text_pixels += column_count[x]
-                        text_min = min(text_min, column_min[x])
-                        text_max = max(text_max, column_max[x])
-            if text_pixels and text_pixels / (strip_width * (text_max-text_min+1)) >= 0.060:
-                return True
+                        text_columns.append((column_min[x], column_max[x], column_count[x]))
+            if not text_columns:
+                continue
+            starts = sorted({lo for lo, _, _ in text_columns})
+            ends = sorted({hi for _, hi, _ in text_columns})
+            start_index = {lo: i for i, lo in enumerate(starts)}
+            end_index = {hi: i for i, hi in enumerate(ends)}
+            support = [[0] * len(ends) for _ in starts]
+            for lo, hi, pixels in text_columns:
+                support[start_index[lo]][end_index[hi]] += pixels
+            # Suffix over starts, prefix over ends: counts for every column
+            # whose complete text-height extent is contained in the envelope.
+            for i in range(len(starts)-1, -1, -1):
+                running = 0
+                for j in range(len(ends)):
+                    running += support[i][j]
+                    support[i][j] = running + (support[i+1][j] if i+1 < len(starts) else 0)
+                    rows = ends[j]-starts[i]+1
+                    if (0.40 <= rows / height <= 0.70
+                            and 0.36 <= (ends[j]+starts[i]+1) / (2*height) <= 0.64
+                            and support[i][j] / (strip_width * rows) >= 0.060):
+                        return True
     return False
 
 class ResultClassifier:

@@ -55,7 +55,9 @@ vertical texture elongated both profiles; crossing lines interrupted individual
 columns; wider/edge lines defeated gap handling; and one-level glyph variation
 fragmented exact-luminance components; a connected stripe then merged all text
 components, while a neutral-color cutoff missed tinted prefixes. A two-group
-contiguous-width heuristic then lost support under multiple stripes. All reports
+contiguous-width heuristic then lost support under multiple stripes. Pooling all
+column extents then let four unrelated pixels expand the denominator and dilute
+unchanged PHASE text; independent review reproduced two false finals. All reports
 and repros are retained. Sweeps
 include gray0/40/79/80/81/120/125/126/220 on both broad-bright and peripheral-lit
 backgrounds including leading backdrops30/34/35/40/50/60; the visibly preserved
@@ -72,25 +74,31 @@ their independent shape. Veto components meeting existing vertical bounds
 span0.40..0.70, center0.36..0.64 and strip-normalized density>=0.060. No fixed
 brightness reference, exact-level equality, gap budget or inferred absence from
 an over-tall aggregate controls recovery. Connected texture is also checked via
-independent column extents at each level: pool actual occupied pixels in
-text-height columns and veto area density >=0.060 across their strip-width
-vertical envelope. The unit remains pixels / area, never a minimum contiguous
-width or number of glyph groups. A full-height connecting stripe cannot erase
-shorter columns elsewhere. Scattered background pixels do not provide enough
-occupied area. Independent measurements give maximum pooled density0.04562
-for the retained recovered ROI, versus minimum0.06499 across the64 multiple-
-stripe negative controls. No threshold is tuned from those measurements. No color cutoff
+independent column extents at each level: maximize actual occupied pixels in
+text-height columns over eligible vertical envelopes, retaining the same span,
+center and area-density >=0.060 bounds. Columns wholly contained in a window
+contribute their occupied pixels; unrelated outlying columns are optional and
+cannot expand every denominator. The unit remains pixels / area, never a
+minimum contiguous width or number of glyph groups. A full-height connecting
+stripe cannot erase shorter columns elsewhere. Independent measurements give
+maximum window density0.04505 for the retained recovered ROI, versus
+minimum0.06499 across64 multiple-stripe negatives and64 sparse-outlier variants.
+No threshold is tuned from those measurements. No color cutoff
 allows tinted text to escape the veto. Union by size/path compression gives
-bounded strip work plus at most256 checks of strip-width column lists per
-direction; empty levels do no work. Fifty-four crossing-line/one-level-variation,
-twenty-seven connected-stripe/color-cast, sixty-four multiple-stripe and
+bounded strip work plus at most256 checks of strip-width column lists and
+compressed endpoint tables per direction; empty levels do no work. Each table
+has at most min(strip-width,height)^2 cells, bounded by strip pixel count.
+Fifty-four crossing-line/one-level-variation,
+twenty-seven connected-stripe/color-cast, sixty-four multiple-stripe,
+sixty-four sparse-outlier variants and
 twenty-four stripe controls preserve the prefix; retained real ROIs
 continue to recover. No global threshold changes.
 
 The existing pixel pass collects bounded scalar counters. Only otherwise
 strong recovery candidates inspect the narrow leading strip again, allocating
 256 luminance buckets, four union/component lists bounded by strip pixel count
-and three strip-width column lists. Each pixel activates once per direction; no scan per intensity over the
+and three strip-width column lists plus the bounded endpoint table.
+Each pixel activates once per direction; no scan per intensity over the
 whole ROI. No extra capture,
 I/O, process, thread, dependency or polling change. The AST-pinned classifier
 and new helper baseline are intentionally advanced for this repair; the original
@@ -108,8 +116,8 @@ PHASE-prefix negative. Full T0, T1 and isolated T2 evidence, independent review
 and exact-head CI belong to the repair PR; do not inherit PR65's old green CI.
 
 An offline alternating CPU-clock microbenchmark of the same three ROIs with
-the final component-tree helper gave baseline67.71ms and repair93.75ms/ROI
-(+38.5%) on the coarse process clock; about26.0ms per frame for this result-heavy sample.
+the final window-support helper gave baseline75.52ms and repair96.35ms/ROI
+(+27.6%) on the coarse process clock; about20.8ms per frame for this result-heavy sample.
 The additional strip scans happen only for strong recovery candidates, not
 ordinary gameplay. This measurement does not establish zero overhead. It is a
 bounded local measurement, not AC6 FPS/GPU or real-session performance

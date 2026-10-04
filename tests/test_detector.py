@@ -290,6 +290,22 @@ for foreground in (77, 79):
             got, debug = classifier.classify_bgra(bytes(lit), width, height)
             assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (foreground, period, shift, got, debug)
 
+            # Four unrelated pixels must not dilute the unchanged PHASE text.
+            # The independent review reproduced false WIN for period24/shift12
+            # and period30/shift7 with these sparse outlying valley columns.
+            prefix_columns = {j // 4 % width for j in range(0, len(prefix), 4)
+                              if min(prefix[j:j+3]) > 125
+                              and max(prefix[j:j+3])-min(prefix[j:j+3]) < 42}
+            valleys = [x for x in range(x0, x1) if x not in prefix_columns
+                       and (x-x0+shift) % period >= period//2]
+            assert len(valleys) >= 2
+            for x, ys in ((valleys[0], (3, 32)), (valleys[-1], (17, 46))):
+                for y in ys:
+                    j = (y * width + x) * 4
+                    lit[j:j+4] = bytes((foreground, foreground, foreground, 255))
+            got, debug = classifier.classify_bgra(bytes(lit), width, height)
+            assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), ('outliers', foreground, period, shift, got, debug)
+
 # Red mask pixels can themselves be dark. Background density removes the
 # same pixels from numerator and denominator; do not inflate the band score.
 pixels, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")
