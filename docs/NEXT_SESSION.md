@@ -1,6 +1,56 @@
 # Next session
 
-## Current owner scope — bright-result-band product repair, 2026-10-03
+## Current checkpoint — #15-5 revalidation after #68, 2026-10-05
+
+[Owner authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5981356526).
+Sync exact main `ef4af555a5187b370dafea334bac6ab1bac81df4` into historical PR65
+head `057d5532c2737f07853127d015f134bad04395ec` by ordinary merge. #66 and #68
+are CLOSED/completed; PR69 reviewed f8493b3, head37203260188/main37204078273
+SUCCESS attempt1 all6. Resolve current PR65 for this candidate's new gates,
+fresh Astra/High delta review and exact-head CI; historical green is not proof
+for the new head. PR65 OPEN/DRAFT; Merged NO, Accepted PENDING, Released NO.
+
+Preserve #68 classifier, #66 passive diagnostics and optional #15-5 notifications.
+Full T0, canonical T1 61/61 (original53 unchanged), affected T2 sequentially.
+Strict captured_at > latest monotonic gap, epoch revocation and personal owner
+same-match attestation remain mandatory. Metadata OFF starts no optional work.
+Historical acquisition capture_gap and core WIN-miss T3 FAIL remain FAIL; #68
+repairs the proven retained WIN pair, not earlier misses without decisive pixels.
+
+[Full T3 handoff](ISSUE15_5_T3.md): Phase A OFF free play until owner says
+「終わりました」; Phase B exactly ONE acquired match, STOP before another,
+show fixed event/result/time, owner answers 「合っています」 or 「違います」,
+only affirmative personal attestation permits --same-match; Phase C free play
+WITHOUT acquisition, then verify no inheritance. Passive observer may be prepared
+but MUST NOT start here. Launcher/UI and cleanup remain part of later full T3.
+STOP after new local gates/review/exact-head green and handoff preparation.
+No live T3, merge, Acceptance, #15-6 or release; stable v1.2.0; Issue15 OPEN.
+All older checkpoints below are historical wherever superseded.
+
+## Historical checkpoint — #15-5 sync after #66 closure, 2026-10-03
+
+[Owner resume authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5966303013).
+Exact main `02e0de101df0b5289c3057ae1ea84b8bb24f5eb7`; #66 CLOSED/completed,
+PR #67 merged, exact-head37095752526 and exact-main37096445318 SUCCESS.
+PR #65 remains OPEN/DRAFT, Merged NO, Accepted PENDING, Released NO.
+Ordinary merge from historical reviewed head `91dffacdddb48d2d96413617a904b72163873e5e`
+preserves both acquisition capture_gap T3 FAIL and 2026-10-03 OFF-baseline WIN miss
+(FINAL_WIN once then CLEAR; next LOSS saved; exact classifier cause UNKNOWN).
+#66 provides passive evidence, not a semantic WIN fix. The existing user Tracker
+uses the original capture-gap worktree; sync/tests use an isolated worktree instead.
+
+Rerun composition T0/full canonical T1/affected lifecycle T2, fresh-context
+Astra/High delta review, exact-head CI, then STOP for FULL owner T3.
+[T3 procedure](ISSUE15_5_T3.md): one OFF baseline match; explicit supported lobby
+acquisition; exactly ONE metadata-bearing match; STOP gameplay and show fixed
+request/event/result; owner personally attests same match before confirmation;
+only then play the no-acquisition match. No automatic --same-match or timing
+inference. If a natural core miss occurs, preserve #66 bundle, STOP, replay offline.
+No real T3 starts in this task. No merge before explicit owner T3 PASS, no #15-6.
+Stable v1.2.0; #15-0 through #15-4 Accepted + Merged + Unreleased.
+Older checkpoints below are historical wherever superseded.
+
+## Historical owner scope — bright-result-band product repair, 2026-10-03
 
 Owner explicitly requested product repair after a newly evidenced natural WIN
 miss during metadata-OFF #15-5 T3. [Root cause, precise boundary and T3](BRIGHT_RESULT_BAND_REPAIR.md).
@@ -14,7 +64,7 @@ green before closure. Failed #15-5 T3 remains FAIL, Accepted PENDING; stable
 v1.2.0. No PR65 sync/T3/merge, #15-6 or release here. Resolve Issue68/repair PR
 for current evidence; STOP after #68 closure/bookkeeping/owned cleanup.
 
-## Current owner scope — #66, 2026-10-03
+## Historical owner scope — #66, 2026-10-03
 
 Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → Issue #66
 → latest Issue #15 comments → PR #65 → exact current main/open PRs/CI.
@@ -40,7 +90,24 @@ Last updated: 2026-10-01 JST
 
 Read [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) first, then [PROJECT_STATE.md](PROJECT_STATE.md), and the current GitHub branches/PRs/releases. **Read GitHub as the source of truth** — do not trust a SHA, version or status quoted in a chat log or in an older document, including this one.
 
-## Current checkpoint — #59 resumed, 2026-10-01
+## Current checkpoint — #15-5 owner-authorized implementation
+
+Base main `27e5f49aa7bb73b9a90f04a0465624e4e5d58008`; CI36842472785
+SUCCESS attempt1. #59 CLOSED; #15-0 through #15-4 Accepted + Merged +
+Unreleased. Stable v1.2.0, Issue #15 OPEN. [Owner adoption and implementation
+authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5943012970)
+supersedes earlier STOP/pending statements below.
+Read [#15-5 runtime contract](ISSUE15_5_RUNTIME_CONTRACT.md), its live PR/gates/
+fresh Astra High review/exact-head CI, and [T3 procedure](ISSUE15_5_T3.md).
+STOP for owner-operated T3: do not merge without explicit owner T3 PASS.
+Owner T3 on `1bf2ed53` failed with `capture_gap`; its first target-unavailable
+attempt is excluded. Continue only the authorized gap/capture ordering correction
+in PR #65, then affected gates, fresh delta review, new exact-head CI and new T3.
+Acquisition may adopt only a native frame strictly after the latest detector gap;
+pending/confirmation still discard on any gap. Do not retry the old candidate for PASS.
+Acceptance remains PENDING; release and #15-6 are not authorized.
+
+## Historical checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
 as `848674115f842f7fcb22ce8c3fccc598502e7c45`, identical to reviewed head

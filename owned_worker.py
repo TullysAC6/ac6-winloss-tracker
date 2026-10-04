@@ -5,9 +5,9 @@ import os
 from ctypes import wintypes
 
 
-def owned_entry(ready, target, args):
+def owned_entry(ready, target, args, owner=None):
     """Do no native work until the parent has installed containment."""
-    owner = mp.parent_process()
+    owner = mp.parent_process() if owner is None else owner
     while owner is not None and owner.is_alive():
         if ready.wait(.1):
             target(*args)

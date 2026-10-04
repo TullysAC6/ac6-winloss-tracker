@@ -67,6 +67,7 @@ class SettingsFileTests(unittest.TestCase):
             "overlay_stats_scope": "session",
             "player_streak_status_enabled": True,
             "broadcast_show_best_streak": True,
+            "match_metadata_detection": False,
         })
         settings.save_settings({"effect_enabled": False, "overlay_stats_scope": "lifetime"})
         stored = json.loads(self.path.read_text(encoding="utf-8"))
@@ -78,6 +79,7 @@ class SettingsFileTests(unittest.TestCase):
             "overlay_stats_scope": "lifetime",
             "player_streak_status_enabled": True,
             "broadcast_show_best_streak": True,
+            "match_metadata_detection": False,
         })
         # The screenshot helper still edits only its own key.
         settings.save_screenshot_setting(True)
@@ -639,7 +641,7 @@ class LiveServerPurgeTests(unittest.TestCase):
 
         # An invalid or too-new file: /config still answers, keeps the last
         # valid value, and nothing rewrites the user's file.
-        for bad in ("{broken", '{"preferences_version": 4, "broadcast_show_best_streak": true}',
+        for bad in ("{broken", '{"preferences_version": 5, "broadcast_show_best_streak": true}',
                     '{"preferences_version": 2, "broadcast_show_best_streak": "yes"}'):
             with self.subTest(bad=bad):
                 before = write(bad)
@@ -947,6 +949,7 @@ class SettingsWindowTests(unittest.TestCase):
             "overlay_stats_scope": "lifetime",
             "player_streak_status_enabled": False,
             "broadcast_show_best_streak": False,
+            "match_metadata_detection": False,
         })
         self.window.window.withdraw()
         # Put the reused window's variables back to the default so the reopen
@@ -971,7 +974,7 @@ class SettingsWindowTests(unittest.TestCase):
         self.window.broadcast_best.set(False)
         self.window.save_button.invoke()
         self.assertEqual(self.preferences_file(), {
-            "preferences_version": 2, "player_streak_status_enabled": True, "broadcast_show_best_streak": False})
+            "preferences_version": 3, "player_streak_status_enabled": True, "broadcast_show_best_streak": False})
         self.reopen()
         self.assertTrue(self.window.streak_status.get(), "Broadcast OFF never turns the Player status off")
         self.assertFalse(self.window.broadcast_best.get())
@@ -982,7 +985,7 @@ class SettingsWindowTests(unittest.TestCase):
         self.window.broadcast_best.set(True)
         self.window.save_button.invoke()
         self.assertEqual(self.preferences_file(), {
-            "preferences_version": 2, "player_streak_status_enabled": False, "broadcast_show_best_streak": True})
+            "preferences_version": 3, "player_streak_status_enabled": False, "broadcast_show_best_streak": True})
         # The window also saves its config-owned options, so config.json is
         # rewritten, but never with a new key or a changed value.
         self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), config_before)

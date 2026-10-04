@@ -1458,13 +1458,15 @@ class DetectorHealth:
 
 
 class ResultDetector:
-    def __init__(self, root, config_loader, on_result, event_callback, stop_event, diagnostic_recorder=None):
+    def __init__(self, root, config_loader, on_result, event_callback, stop_event, diagnostic_recorder=None,
+                 on_optional_event=None):
         self.root = Path(root)
         self.config_loader = config_loader
         self.on_result = on_result
         self.event_callback = event_callback
         self.stop_event = stop_event
         self.diagnostics = diagnostic_recorder
+        self.on_optional_event = on_optional_event
         self.classifier = ResultClassifier(self.root / "detector_templates.json")
         self.state = ResultStateMachine()
         self.health = DetectorHealth(event_callback)
@@ -1555,6 +1557,14 @@ class ResultDetector:
         self.diagnostics.record("capture_unavailable", status=self.capture.status,
                                 state=self.state.snapshot())
 
+    def _optional_event(self, kind, **payload):
+        callback = getattr(self, "on_optional_event", None)
+        if callback is not None:
+            try:
+                callback(kind, **payload)
+            except Exception:
+                pass
+
     def external_mutation(self):
         self.state.external_mutation()
 
@@ -1613,14 +1623,17 @@ class ResultDetector:
                             )
 
                         if not enabled:
+                            self._optional_event("detector_disabled")
                             self.stop_event.wait(min(1.0, poll))
                             continue
 
                         shot = self.capture.grab(sct)
                         if self.capture.identity_changed:
+                            self._optional_event("target_changed")
                             self._candidate_boundary('identity_changed')
                             self.state.note_foreground(False)
                         if shot is None:
+                            self._optional_event("capture_gap")
                             self._candidate_boundary('capture_gap')
                             self.state.note_capture_gap()
                             self._last_motion_signature = None
@@ -1629,6 +1642,7 @@ class ResultDetector:
                             self.stop_event.wait(poll)
                             continue
                         if self.capture.discontinuity:
+                            self._optional_event("capture_gap")
                             self._candidate_boundary('discontinuity')
                             self.state.note_capture_gap()
                             self._last_motion_signature = None
@@ -1796,11 +1810,13 @@ class ResultDetector:
                                 self._last_gate_reject_log = now
 
                         if result == "draw":
+                            self._optional_event("result", result="draw")
                             # DRAW intentionally leaves WIN/LOSE/streak unchanged.
                             self.health.update(
                                 last_result="draw", status="active", error=None
                             )
                         elif result:
+                            self._optional_event("decision")
                             accepted = self.on_result(result, "auto")
                             if accepted:
                                 self.health.update(
@@ -1813,6 +1829,7 @@ class ResultDetector:
                         self.stop_event.wait(poll)
 
                     except Exception as e:
+                        self._optional_event("capture_gap")
                         self._candidate_boundary('detector_error')
                         msg = f"{type(e).__name__}: {e}"
                         print(f"[result] detector error: {msg}")
