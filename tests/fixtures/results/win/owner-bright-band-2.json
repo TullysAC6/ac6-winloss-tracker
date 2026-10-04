@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "id": "result.owner-bright-band.2",
+  "family": "results",
+  "category": "win",
+  "input": {
+    "kind": "roi",
+    "path": "results/win/owner-bright-band-2.ppm",
+    "format": "ppm",
+    "width": 1152,
+    "height": 75,
+    "bytes": 259215,
+    "sha256": "f32ad0193beca40522b28537a384e3f530117f0885108da1046b5d7186e183bc"
+  },
+  "truth": {
+    "result": "win",
+    "screen": "final_result",
+    "match_type": "unknown",
+    "match_format": "unknown"
+  },
+  "checks": {
+    "adapter": "result_classifier.v1",
+    "frame_class": "FINAL_WIN",
+    "debug": [
+      {
+        "path": "result_band_like",
+        "equals": false
+      },
+      {
+        "path": "win_final_grid_score",
+        "at_least": 0.95
+      },
+      {
+        "path": "lower_band_like",
+        "equals": true
+      }
+    ]
+  },
+  "coverage": [
+    "result.win.positive",
+    "result.win.bright_band"
+  ],
+  "provenance": {
+    "source_type": "repository_asset",
+    "reference": "Owner real T3 2026-10-03; SHA256 350ef3c63526e241f3cecc0ba266f268038441c538b575edb30c10ebcf1e4bd2; frame 2",
+    "origin": "Exact full 1152x75 production result ROI from native 1920x1080 WGC; BGRA to RGB channel copy only.",
+    "synthetic": false,
+    "template_partition": "not_applicable",
+    "legacy": null
+  },
+  "review": {
+    "truth": {
+      "status": "owner_label_visually_confirmed",
+      "basis": "Owner confirmed this match was WIN. Implementer inspected the full ROI: cyan YOU WIN remains visible; surrounding arena lighting differs."
+    },
+    "privacy": {
+      "status": "inspected_no_personal_data",
+      "checked": [
+        "player_name",
+        "opponent_name",
+        "steam_identifier",
+        "notification",
+        "overlay",
+        "desktop",
+        "local_path",
+        "token_or_secret",
+        "embedded_metadata"
+      ],
+      "notes": "Inspected the entire ROI. Only arena imagery and result text; none of the listed personal data. Exact P6 header has no comments/metadata."
+    },
+    "redistribution": {
+      "status": "owner_supplied_repository_asset",
+      "notes": "Owner supplied AC6 gameplay through explicitly authorized real-machine testing and authorized the product repair. Only the result ROI is retained; game imagery provenance, not a licence determination."
+    }
+  }
+}

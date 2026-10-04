@@ -20,7 +20,12 @@ import result_detector as rd
 from t1.images import decode_image
 
 BASE_CORE_DIGESTS = {
-    'ResultClassifier.classify_bgra': 'c6ea099ee3645bbb542ec9768a0d4aaf6b661225e527e4527eb3845c9cb26c89',
+    '_leading_text_contrast': '981559261008b5e4cbfdbf3a6fbf9950374aeab1ddef719ca488ac65ab4fb445',
+    '_leading_level_shape': 'b0a6ae06fb93f135c80e5ec4cfe9c25f2b192df56694321e3cb10442e06ca21b',
+    # Owner-authorized bright-result-band repair advances ONLY the classifier
+    # baseline and pins its new prefix helper. State/run remain pinned to the
+    # original #66 exact base.
+    'ResultClassifier.classify_bgra': 'c5c2bacd01d9e940bb0706474cbcd6c7d73211e3be32acc27bd465538647bdfe',
     'ResultStateMachine': '93eb802002513bdeecea900f1ff7633b01151ef0f3ee57962172843a9aaf7122',
     'ResultDetector.run': 'f88eee3619d97bb14684a7edd9880b0a62a4c0efe0f8d1a8cd350835211f0eae',
 }
@@ -74,6 +79,8 @@ def core_digests(source):
             return self.generic_visit(node)
     output = {}
     for cls in tree.body:
+        if isinstance(cls, ast.FunctionDef) and cls.name in ('_leading_text_contrast', '_leading_level_shape'):
+            output[cls.name] = hashlib.sha256(ast.dump(cls, include_attributes=False).encode()).hexdigest()
         if not isinstance(cls, ast.ClassDef): continue
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
         for method in methods:
@@ -87,7 +94,7 @@ def core_digests(source):
 
 
 class CandidateEvidenceTests(unittest.TestCase):
-    def test_core_ast_and_public_constants_unchanged_from_exact_base(self):
+    def test_core_ast_and_public_constants_match_approved_baseline(self):
         self.assertEqual(core_digests((ROOT / 'result_detector.py').read_text()), BASE_CORE_DIGESTS)
         self.assertEqual((rd.POLL_SECONDS, rd.CONFIRM_HITS, rd.CLEAR_HITS_REQUIRED, rd.COOLDOWN_SECONDS), (.75, 2, 3, 5.0))
     def test_bounded_long_normal_sequence_and_input_ownership(self):

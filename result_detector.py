@@ -271,6 +271,146 @@ def _center_cluster(values, threshold=0.010, max_gap=2):
     }
 
 
+def _leading_text_contrast(raw, width, height, x0, x1):
+    """Inspect original contrast and contrast independent of row/column light.
+
+    The two-way additive residual removes pure horizontal/vertical lighting
+    fields. Its zero sign is exact integer arithmetic, not a fitted brightness
+    cutoff. Globally elongated extents alone do not establish absence of text;
+    inspect the independent residual too. Both views use the same bounds.
+    """
+    strip_width = x1 - x0
+    if strip_width <= 0:
+        return True
+    gray_values = []
+    row_sum = [0] * height
+    column_sum = [0] * strip_width
+    for y in range(height):
+        for sx, x in enumerate(range(x0, x1)):
+            i = (y * width + x) * 4
+            gray = (29*raw[i] + 150*raw[i+1] + 77*raw[i+2]) >> 8
+            gray_values.append(gray)
+            row_sum[y] += gray
+            column_sum[sx] += gray
+    if _leading_level_shape(gray_values, strip_width, height):
+        return True
+    grand_sum = sum(row_sum)
+    total = strip_width * height
+    residual_sign = [int(gray * total - row_sum[i // strip_width] * height
+                         - column_sum[i % strip_width] * strip_width + grand_sum > 0)
+                     for i, gray in enumerate(gray_values)]
+    return _leading_level_shape(residual_sign, strip_width, height)
+
+
+def _leading_level_shape(gray_values, strip_width, height):
+    """Veto prefix structure at any level, without a lighting reference.
+
+    Grow connected upper/lower luminance level sets in the narrow leading strip.
+    A glyph may vary in luminance or merge with one lighting stripe; its component
+    at another level still provides text-height evidence. No fixed brightness
+    cutoff, exact-colour equality or stroke continuity is treated as absence.
+    Each strip pixel activates once per direction; union by size/path compression
+    bounds work and storage to the strip, never another full-frame traversal.
+    """
+    total = strip_width * height
+    buckets = [[] for _ in range(256)]
+    for i, gray in enumerate(gray_values):
+        buckets[gray].append(i)
+
+    for levels in (range(256), range(255, -1, -1)):
+        parent = [-1] * total
+        counts = [0] * total
+        y_min = [0] * total
+        y_max = [0] * total
+        column_min = [height] * strip_width
+        column_max = [-1] * strip_width
+        column_count = [0] * strip_width
+
+        def find(i):
+            while parent[i] != i:
+                parent[i] = parent[parent[i]]
+                i = parent[i]
+            return i
+
+        for level in levels:
+            new = buckets[level]
+            if not new:
+                continue
+            # Activate the whole level before inspecting components, so pixel
+            # iteration order cannot create temporary, text-shaped fragments.
+            for i in new:
+                parent[i] = i
+                counts[i] = 1
+                y_min[i] = y_max[i] = i // strip_width
+                y, x = divmod(i, strip_width)
+                column_min[x] = min(column_min[x], y)
+                column_max[x] = max(column_max[x], y)
+                column_count[x] += 1
+            for i in new:
+                y, x = divmod(i, strip_width)
+                neighbors = (i-strip_width if y else -1,
+                             i+strip_width if y+1 < height else -1,
+                             i-1 if x else -1, i+1 if x+1 < strip_width else -1)
+                for j in neighbors:
+                    if j < 0 or parent[j] < 0:
+                        continue
+                    a, b = find(i), find(j)
+                    if a == b:
+                        continue
+                    if counts[a] < counts[b]:
+                        a, b = b, a
+                    parent[b] = a
+                    counts[a] += counts[b]
+                    y_min[a] = min(y_min[a], y_min[b])
+                    y_max[a] = max(y_max[a], y_max[b])
+            # Only roots touched by this level changed; older components were
+            # already checked. Reuse the existing vertical/support bounds.
+            for a in {find(i) for i in new}:
+                rows = y_max[a]-y_min[a]+1
+                span = rows / height
+                center = (y_max[a]+y_min[a]+1) / (2*height)
+                density = counts[a] / (strip_width * rows)
+                if (0.40 <= span <= 0.70 and 0.36 <= center <= 0.64
+                        and density >= 0.060):
+                    return True
+            # Connected texture must not erase shorter text-height columns.
+            # Maximize occupied area support over eligible vertical envelopes.
+            # Unrelated outlying columns are optional evidence: adding them must
+            # not dilute existing text support by expanding its denominator.
+            # Compress to observed endpoints; the table has at most
+            # min(height, strip_width)**2 cells, bounded by strip pixel count.
+            text_columns = []
+            for x in range(strip_width):
+                if column_count[x]:
+                    rows = column_max[x]-column_min[x]+1
+                    text_column = (0.40 <= rows / height <= 0.70
+                        and 0.36 <= (column_max[x]+column_min[x]+1) / (2*height) <= 0.64
+                        and column_count[x] / rows >= 0.060)
+                    if text_column:
+                        text_columns.append((column_min[x], column_max[x], column_count[x]))
+            if not text_columns:
+                continue
+            starts = sorted({lo for lo, _, _ in text_columns})
+            ends = sorted({hi for _, hi, _ in text_columns})
+            start_index = {lo: i for i, lo in enumerate(starts)}
+            end_index = {hi: i for i, hi in enumerate(ends)}
+            support = [[0] * len(ends) for _ in starts]
+            for lo, hi, pixels in text_columns:
+                support[start_index[lo]][end_index[hi]] += pixels
+            # Suffix over starts, prefix over ends: counts for every column
+            # whose complete text-height extent is contained in the envelope.
+            for i in range(len(starts)-1, -1, -1):
+                running = 0
+                for j in range(len(ends)):
+                    running += support[i][j]
+                    support[i][j] = running + (support[i+1][j] if i+1 < len(starts) else 0)
+                    rows = ends[j]-starts[i]+1
+                    if (0.40 <= rows / height <= 0.70
+                            and 0.36 <= (ends[j]+starts[i]+1) / (2*height) <= 0.64
+                            and support[i][j] / (strip_width * rows) >= 0.060):
+                        return True
+    return False
+
 class ResultClassifier:
     REQUIRED_TEMPLATES = {
         "final_win",
@@ -379,10 +519,22 @@ class ResultClassifier:
         win_max = loss_max = bright_max = draw_max = -1
         win_sum = loss_sum = bright_sum = draw_sum = 0
         gray_sum = 0
+        # The translucent strip's lower margin remains dark when arena light
+        # brightens the area around the letters. Collect it in the existing
+        # pixel pass; it is supplementary evidence for very strong finals only.
+        lower_start = height * 3 // 4
+        lower_total = width * (height - lower_start)
+        lower_dark_n = lower_gray_sum = 0
+        prefix_x0, prefix_x1 = width * 18 // 100, width * 34 // 100
+        prefix_y0, prefix_y1 = height // 4, height * 3 // 4
+        prefix_total = (prefix_x1 - prefix_x0) * (prefix_y1 - prefix_y0)
+        prefix_dark_n = loss_dark_n = 0
 
         for y in range(height):
             row = y * width * 4
             base = y * width
+            prefix_row = prefix_y0 <= y < prefix_y1
+            lower_row = y >= lower_start
             for x in range(width):
                 i = row + x * 4
                 b = int(data[i])
@@ -393,6 +545,12 @@ class ResultClassifier:
                 gray_sum += gray
                 if gray < 80:
                     dark_n += 1
+                    if prefix_row and prefix_x0 <= x < prefix_x1:
+                        prefix_dark_n += 1
+                if lower_row:
+                    lower_gray_sum += gray
+                    if gray < 80:
+                        lower_dark_n += 1
 
                 is_bright = gray > 125
                 if is_bright:
@@ -437,6 +595,8 @@ class ResultClassifier:
                     and g > 50
                 )
                 if is_loss:
+                    if gray < 80:
+                        loss_dark_n += 1
                     loss_mask[base + x] = 1
                     loss_n += 1
                     loss_min = min(loss_min, x)
@@ -509,6 +669,30 @@ class ResultClassifier:
             dark_ratio >= 0.72
             and 8.0 <= mean_gray <= 90.0
         )
+        lower_dark_ratio = lower_dark_n / lower_total
+        lower_mean_gray = lower_gray_sum / lower_total
+        lower_band_like = (
+            lower_dark_ratio >= 0.90
+            and 8.0 <= lower_mean_gray <= 90.0
+            and 8.0 <= mean_gray <= 90.0
+        )
+        prefix_dark_ratio = prefix_dark_n / prefix_total if prefix_total else 0.0
+        # Band evidence must cover the whole background, not just one dark
+        # margin. Remove the candidate's own colour pixels from BOTH counts.
+        # Cyan mask pixels cannot be dark (g,b>120 gives gray>=84), whereas
+        # low-luminance red mask pixels can, so subtract those explicitly.
+        win_background_n = total - win_n
+        loss_background_n = total - loss_n
+        win_background_dark_ratio = dark_n / win_background_n if win_background_n else 0.0
+        loss_background_dark_ratio = ((dark_n - loss_dark_n) / loss_background_n
+                                      if loss_background_n else 0.0)
+        recovery_band_like = lower_band_like and prefix_total > 0 and prefix_dark_ratio >= 0.90
+        prefix_contrast_like = False
+        if recovery_band_like and not result_band_like and (
+            (win_final_score >= 0.95 and win_final_grid_score >= 0.95)
+            or (loss_final_score >= 0.95 and loss_final_grid_score >= 0.95)
+        ):
+            prefix_contrast_like = _leading_text_contrast(data, width, height, prefix_x0, prefix_x1)
 
         # DRAW is intentionally precision-first. v20/v21 used only a compact
         # neutral-white cluster, which allowed brief combat explosions/AC parts
@@ -619,9 +803,8 @@ class ResultClassifier:
         # Some PHASE banners have a white/gray prefix while YOU WIN/LOSE is
         # colored. In that case the total bright text is much wider than the
         # colored final-like portion.
-        phase_prefix_like = (
-            result_band_like
-            and (final_win_geom_early or final_loss_geom_early)
+        phase_prefix_shape = (
+            (final_win_geom_early or final_loss_geom_early)
             and bright["coverage"] >= 0.055
             and 0.40 <= bright_cluster["span"] <= 0.75
             and (bright_cluster["span"] - colored_span) >= 0.10
@@ -629,6 +812,7 @@ class ResultClassifier:
             and central_continuous
             and central_density >= 0.045
         )
+        phase_prefix_like = result_band_like and phase_prefix_shape
 
         phase_bright_like = (
             result_band_like
@@ -660,6 +844,13 @@ class ResultClassifier:
             "loss_final_grid_score": loss_final_grid_score,
             "loss_phase_grid_score": loss_phase_grid_score,
             "result_band_like": result_band_like,
+            "lower_dark_ratio": lower_dark_ratio,
+            "lower_mean_gray": lower_mean_gray,
+            "lower_band_like": lower_band_like,
+            "prefix_dark_ratio": prefix_dark_ratio,
+            "win_background_dark_ratio": win_background_dark_ratio,
+            "loss_background_dark_ratio": loss_background_dark_ratio,
+            "prefix_contrast_like": prefix_contrast_like,
             "win_cluster": win_cluster,
             "loss_cluster": loss_cluster,
             "win_y_cluster": win_y_cluster,
@@ -695,15 +886,31 @@ class ResultClassifier:
         # 1-D profile plus the new 2-D glyph fingerprint.  The previous 0.50
         # profile threshold was intentionally permissive and is the reason a
         # cyan garage model could become FINAL_WIN.
+        # If arena lighting defeats the global band check, recovery requires
+        # a much stronger glyph match AND a >=90% dark, visible lower margin.
+        # A final-like substring with a white PHASE prefix cannot recover.
+        # DRAW/PHASE classification and the CLEAR fallback remain unchanged.
         win_ok = (
-            result_band_like
+            (result_band_like or (
+                recovery_band_like and not phase_prefix_shape and not prefix_contrast_like
+                and win_background_n >= total * 0.50
+                and win_background_dark_ratio >= 0.72
+                and win_final_score >= 0.95
+                and win_final_grid_score >= 0.95
+            ))
             and win_geom
             and win_final_score >= 0.78
             and win_final_grid_score >= 0.82
             and win_final_grid_score >= win_phase_grid_score + 0.12
         )
         loss_ok = (
-            result_band_like
+            (result_band_like or (
+                recovery_band_like and not phase_prefix_shape and not prefix_contrast_like
+                and loss_background_n >= total * 0.50
+                and loss_background_dark_ratio >= 0.72
+                and loss_final_score >= 0.95
+                and loss_final_grid_score >= 0.95
+            ))
             and loss_geom
             and loss_final_score >= 0.78
             and loss_final_grid_score >= 0.82

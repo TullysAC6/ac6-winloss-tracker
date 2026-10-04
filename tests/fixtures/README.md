@@ -100,6 +100,13 @@ The runner also enforces contract checks no record can switch off:
   - `review.redistribution`: where the asset came from. This is not a licence determination.
 - **Sequences** inherit privacy and redistribution from the frames they reference.
 
+New owner-confirmed images use `owner_label_visually_confirmed`; this does not
+claim they were legacy fixtures. The 2026-10-03 bright-band regression retains
+three exact production ROIs (1152×75), without resizing or colour correction.
+Its two final samples are consecutive real captures. Arming, repetition,
+capture-gap, CLEAR and UNDO sequence controls are explicitly composed; they do
+not claim to reconstruct unsampled events from the match.
+
 `template_partition`:
 
 - `training` and `holdout` follow `tests/template_training.json`.
