@@ -19,10 +19,16 @@ from candidate_diagnostics import CandidateEvidence, CandidateBundleWriter, FRAM
 import result_detector as rd
 from t1.images import decode_image
 
-# Classifier/state pinned to pre-#66 main27e5f49; run pinned to reviewed PR65
-# 91dffac, INCLUDING every optional notification. Only #66 observers are removed.
+# Classifier/helpers pinned to reviewed #68 main ef4af555; state unchanged.
+# Run pinned to reviewed PR65 91dffac INCLUDING optional notifications.
+# Only #66 observers are removed; sync introduces no loop/state decisions.
 BASE_CORE_DIGESTS = {
-    'ResultClassifier.classify_bgra': 'c6ea099ee3645bbb542ec9768a0d4aaf6b661225e527e4527eb3845c9cb26c89',
+    '_leading_text_contrast': '981559261008b5e4cbfdbf3a6fbf9950374aeab1ddef719ca488ac65ab4fb445',
+    '_leading_level_shape': 'b0a6ae06fb93f135c80e5ec4cfe9c25f2b192df56694321e3cb10442e06ca21b',
+    # Owner-authorized bright-result-band repair advances ONLY the classifier
+    # baseline and pins its new prefix helpers. State stays unchanged; the
+    # PR65 loop pin includes all previously reviewed optional callbacks.
+    'ResultClassifier.classify_bgra': 'c5c2bacd01d9e940bb0706474cbcd6c7d73211e3be32acc27bd465538647bdfe',
     'ResultStateMachine': '93eb802002513bdeecea900f1ff7633b01151ef0f3ee57962172843a9aaf7122',
     'ResultDetector.run': 'dab379b61426689b13b067bc62470d09ce66ec6969649754f2ee1be76cbf406e',
 }
@@ -76,6 +82,8 @@ def core_digests(source):
             return self.generic_visit(node)
     output = {}
     for cls in tree.body:
+        if isinstance(cls, ast.FunctionDef) and cls.name in ('_leading_text_contrast', '_leading_level_shape'):
+            output[cls.name] = hashlib.sha256(ast.dump(cls, include_attributes=False).encode()).hexdigest()
         if not isinstance(cls, ast.ClassDef): continue
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
         for method in methods:
@@ -89,6 +97,75 @@ def core_digests(source):
 
 
 class CandidateEvidenceTests(unittest.TestCase):
+    def test_bright_win_pixels_compose_with_off_on_busy_and_throwing_callbacks(self):
+        from composition_helpers import detector_sequence
+        from metadata_runtime import MetadataRuntime
+        # Explicit composed arming; the following WIN pair is retained native
+        # production ROI truth, not a claim of a naturally captured full match.
+        decoded = [decode_image((ROOT / 'tests/fixtures/results/win' /
+                                 f'owner-bright-band-{n}.ppm').read_bytes(), 'ppm') for n in (1, 2)]
+        frames = [(image.bgra, image.width, image.height) for image in decoded]
+        inputs = [None]*3 + frames
+        labels = [rd.CLEAR]*3 + [rd.FINAL_WIN]*2
+        baseline = detector_sequence(None, None, labels, stored_frames=inputs)
+        self.assertEqual(baseline[0], ['win'])
+        self.assertEqual(baseline[2], [('optional', 'decision'), ('accept', 'win')])
+        for enabled in (False, True):
+            with tempfile.TemporaryDirectory() as directory:
+                worker, target, service = Mock(), Mock(), Mock()
+                runtime = MetadataRuntime(Path(directory), enabled=lambda: enabled,
+                    worker=worker, target=target, service=service)
+                bundles = []
+                recorder = Mock()
+                recorder.submit_candidate_bundle = bundles.append
+                def throwing(*args, **kwargs):
+                    raise RuntimeError('optional notification failure')
+                try:
+                    for callback in (runtime.notify, throwing):
+                        self.assertEqual(detector_sequence(recorder, callback, labels,
+                            stored_frames=inputs), baseline)
+                    # A contended optional lock cannot wait on core acceptance.
+                    with runtime.lock:
+                        self.assertEqual(detector_sequence(recorder, runtime.notify,
+                            labels, stored_frames=inputs), baseline)
+                    self.assertTrue(runtime.lost.is_set())
+                    self.assertFalse(bundles)
+                    self.assertIsNone(runtime.task)
+                    self.assertIsNone(runtime.pending)
+                    self.assertIsNone(runtime.candidate)
+                    worker.assert_not_called(); target.assert_not_called(); service.assert_not_called()
+                    self.assertFalse((Path(directory) / 'enrichment.db').exists())
+                finally:
+                    runtime.shutdown()
+
+    def test_bright_candidate_then_real_clear_keeps_diagnostics_metadata_off(self):
+        from composition_helpers import detector_sequence
+        from metadata_runtime import MetadataRuntime
+        decoded = [decode_image((ROOT / 'tests/fixtures/results' / path).read_bytes(), 'ppm')
+                   for path in ('win/owner-bright-band-2.ppm', 'clear/owner-bright-band-0.ppm')]
+        inputs = [None]*3 + [(image.bgra, image.width, image.height) for image in decoded]
+        labels = [rd.CLEAR]*3 + [rd.FINAL_WIN, rd.CLEAR]
+        with tempfile.TemporaryDirectory() as directory:
+            worker, target, service = Mock(), Mock(), Mock()
+            runtime = MetadataRuntime(Path(directory), enabled=lambda: False,
+                worker=worker, target=target, service=service)
+            bundles = []
+            recorder = Mock(); recorder.submit_candidate_bundle = bundles.append
+            try:
+                actual = detector_sequence(recorder, runtime.notify, labels, stored_frames=inputs)
+                self.assertEqual(actual[0], [])
+                self.assertEqual(len(bundles), 1)
+                self.assertEqual([f['context']['frame_state'] for f in bundles[0]['frames']],
+                                 [rd.CLEAR, rd.FINAL_WIN, rd.CLEAR])
+                self.assertEqual(bundles[0]['frames'][-2]['raw'], bytes(inputs[-2][0]))
+                worker.assert_not_called(); target.assert_not_called(); service.assert_not_called()
+                self.assertIsNone(runtime.task)
+                self.assertIsNone(runtime.pending)
+                self.assertIsNone(runtime.candidate)
+                self.assertFalse((Path(directory) / 'enrichment.db').exists())
+            finally:
+                runtime.shutdown()
+
     def test_metadata_off_and_on_callbacks_preserve_diagnostics_and_core_state(self):
         from composition_helpers import detector_sequence
         from metadata_runtime import MetadataRuntime
@@ -118,7 +195,7 @@ class CandidateEvidenceTests(unittest.TestCase):
                 finally:
                     runtime.shutdown()
 
-    def test_core_ast_and_public_constants_unchanged_from_exact_base(self):
+    def test_core_ast_and_public_constants_match_approved_baseline(self):
         self.assertEqual(core_digests((ROOT / 'result_detector.py').read_text()), BASE_CORE_DIGESTS)
         self.assertEqual((rd.POLL_SECONDS, rd.CONFIRM_HITS, rd.CLEAR_HITS_REQUIRED, rd.COOLDOWN_SECONDS), (.75, 2, 3, 5.0))
     def test_bounded_long_normal_sequence_and_input_ownership(self):

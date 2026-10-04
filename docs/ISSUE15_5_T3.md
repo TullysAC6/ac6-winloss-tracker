@@ -9,8 +9,10 @@ Use an isolated data root; these steps do not copy or alter your usual history.
 Earlier acquisition T3 on1bf2ed53 failed capture_gap;91dffac preserves the strict
 native captured_at > newest monotonic gap correction. The2026-10-03 T3 on91dffac
 also FAILED: OFF-baseline first WIN had one FINAL_WIN then CLEAR, no saved WIN;
-second LOSS saved. Exact classifier cause remains UNKNOWN. #66 diagnostics are
-passive evidence, not a WIN fix. Both historical failures remain preserved.
+second LOSS saved. Later #66 evidence proved a shared classifier defect on a
+retained genuine WIN pair: #68 repaired it on exact main ef4af555. Earlier misses
+without decisive pixels remain UNKNOWN. Neither #66 nor #68 turns historical
+#15-5 T3 into PASS. All failed roots/bundles remain preserved.
 
 If any natural WIN/LOSS miss recurs: STOP T3/gameplay, preserve the isolated root
 and diagnostics/candidate-bundles/*.zip, then replay offline on the current main
@@ -61,11 +63,14 @@ after inspecting owned runtime/processes; never delete an active root.
 & $python control.py metadata-status
 ```
 
-Status must be disabled. Play exactly ONE baseline match, then STOP and verify the normal WIN/LOSE count and
-streak before any next match. A miss fails T3: preserve the #66 bundle and stop. Note Tracker CPU/memory in Task Manager and your game responsiveness.
+Status must be disabled. PHASE A is FREE PLAY: play Ranked Match for as long as
+desired, with no fixed match count, until the owner says 「終わりました」. Then
+verify every reported outcome against exact saved events/counts/streak before
+Phase B. A read-only observer must be running and have written observer-ready.json
+before a later authorized task tells the owner 「検証準備OKです」. A miss fails T3: preserve the #66 bundle and stop. Note Tracker CPU/memory in Task Manager and your game responsiveness.
 No lobby_worker.py should appear in process command lines while OFF.
 
-## Match 1: explicit acquisition and confirmation
+## Phase B: exactly ONE explicit acquisition match and personal confirmation
 
 Set AC6 to the accepted **English RANK MATCH: SINGLE, native 1920x1080** lobby.
 Use a visible nonminimized native client (for example borderless/windowed 1920x1080)
@@ -97,6 +102,10 @@ event_id, WIN/LOSS and recorded_at to the owner, and verify that event exists in
 normal history. The owner personally attests: "this displayed event is the same
 match whose lobby I acquired; no intervening match/mode change occurred."
 
+Show event_id/result/recorded_at and ask the owner to answer 「合っています」
+or 「違います」. Only 「合っています」 personally attests this exact match. A
+negative answer, expiry or mismatch means STOP/no write.
+
 Only AFTER that explicit attestation may the following command run, using the
 fixed IDs just shown. If the owner runs it themselves, --same-match is their
 personal attestation. An assistant/observer must wait for the owner's explicit
@@ -125,12 +134,14 @@ rank-single-header.v1. A conflict must preserve earlier facts rather than relabe
 Note acquisition completion time, Tracker CPU/memory delta and game responsiveness;
 report observations, with no arbitrary pass threshold.
 
-## Match 2: no acquisition
+## Phase C: FREE PLAY without acquisition
 
-Only after the exact snapshot above is verified, play ONE next match **without metadata-acquire**. Normal result/streak must update.
+Only after the exact snapshot above is verified, play Ranked Match freely for
+as long as desired **without metadata-acquire**, until the owner says
+「終わりました」. Normal result/streak must update for every match.
 Status must not offer the old event as a confirmation for this match. Its metadata
-must remain unknown/unwritten by #15-5. Verify the second fixed event with the
-same read-only lookup command: it must have no #15-5 snapshot; NULL ranks alone
+must remain unknown/unwritten by #15-5. Verify EVERY Phase C event with the
+same read-only lookup command: all must have no #15-5 snapshot; NULL ranks alone
 are not proof of no inheritance. The previous last_write is a historical
 status receipt, not evidence assigned to Match 2.
 
@@ -164,26 +175,44 @@ Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue
 Get-ChildItem -LiteralPath $t3Data -Force | Where-Object { $_.Name -match 'runtime|lock|tmp' }
 ```
 
-Report PASS/FAIL for OFF, Match1 saved fields/result/streak, Match2 no inheritance,
+Report PASS/FAIL for OFF free-play events, Phase B saved fields/result/streak,
+ALL Phase C events/no inheritance,
 cancel/OFF, shutdown residue and performance observations. Keep the isolated T3
 data until evidence is recorded. Explicitly say **T3 PASS** only if all checks pass.
 Any DRAW you happen to observe must consume pending; a separate DRAW gameplay
 session is not required when automated evidence passes. STOP; no next slice.
 
-## Optional passive observer — authorization before starting
+## Prepared passive observer — DO NOT start in this sync task
 
-No observer is prepared or started by this sync task. The old continuous-two-match
-observer must not be reused. If the owner later requests background observation,
-it must stop for each checkpoint above: OFF baseline verification, fixed-event
-human attestation, confirmed snapshot verification, no-acquisition verification.
-It cannot prevent a player from entering another match, so the owner must honor
-the stop point. No readiness-to-play message is issued during this task.
+The local handoff includes an audited bounded observer prepared outside Git.
+It is not a product worker and is NOT started here. The later owner-authorized
+T3 uses a NEW empty isolated root, exact reviewed/CI-green worktree and normal
+launcher.pyw UI (Player Overlay; Launcher Dashboard action if needed; full Exit).
+Do not substitute server-only/headless startup for the Launcher/UI lifecycle.
+Starting launcher.pyw with WindowStyle Hidden avoids an extra console; its normal
+Tk UI/overlay remain the required product path. Never use the installed shortcut
+to select an old build. Relaunch the same isolated candidate for normal Exit and
+verify no server/overlay/dashboard/lobby child/grandchild or listener/runtime/lock.
 
-Allowed design: read-only status/history sampling at most once/second; process,
-CPU/RAM sampling at most once/5seconds; bounded total lifetime; known PID ownership;
-no focus/window changes/game inputs, automatic acquisition/confirmation, history
-mutations, or retry-until-green. Declare these rates/load before actual use.
-Status/read-only SQLite and diagnostics monitoring still consume local CPU/I/O;
-no AC6 performance PASS is inferred from synthetic test measurements.
-Existing user Tracker must be closed by the owner before T3 setup; this task does
-not stop it. Retain the full failed/successful T3 root and diagnostics for evidence.
+Observer session.json pins exact candidate SHA/worktree, data_root/runtime,
+server_pid, overlay_pid, launcher_pid and port; it contains NO token. The observer
+reads that root's runtime token only in memory and holds the server process handle.
+resume-baseline.json contains expected_history=[] for this new root; phase.json
+starts at preparation, changes to A/B/C only at owner checkpoints; observer-stop
+ends it. It cannot start acquisition, confirm, mutate history or control gameplay.
+
+Allowed sampling: metadata/status, stats and read-only history at most 1 Hz per
+source; health/process/CPU/RAM at most 0.2 Hz. Four-hour observer lifetime only
+(not a product/watchdog change), 64 MiB log and 256 MiB/64 bundles. Declare this
+load before T3. Rates drift downward on slow I/O, never catch up with burst polling.
+Readiness requires active detector/healthy pinned server, OFF/no sidecar, empty
+history and no observer failures. A/B/C are evidence labels, never same-match proof.
+In B, owner plays exactly one match and stops; show fixed confirmation before its
+unchanged 60-second expiry. Background observer NEVER supplies --same-match.
+
+OFF free play does not infer missed wins from absent rows: compare owner's actual
+outcomes. Candidate-loss bundle means preserve/hold and offline review; it is not
+automatically a missed result. No game input/focus manipulation, continuous screen
+capture/OCR, high-rate polling, automatic retries or repair is allowed. Native
+minimize/focus gaps still revoke evidence. Preparation does not claim T3 PASS.
+STOP after this sync; await owner instruction to start the full real-machine T3.

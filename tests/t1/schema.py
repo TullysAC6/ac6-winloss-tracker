@@ -56,7 +56,7 @@ CATEGORY_RESULT = {"win": "win", "lose": "loss", "draw": "draw", "clear": "none"
 SOURCE_TYPES_IMAGE = ("repository_asset",)
 SOURCE_TYPES_SEQUENCE = ("recorded_sequence", "composed_sequence")
 TEMPLATE_PARTITIONS = ("not_applicable", "unmapped", "training", "holdout")
-TRUTH_REVIEW = ("legacy_label_visually_confirmed",)
+TRUTH_REVIEW = ("legacy_label_visually_confirmed", "owner_label_visually_confirmed")
 # Sequence truth is a scenario over reviewed frames: either the migrated legacy
 # regression itself, or a scenario whose expectations follow the documented
 # production contract (tests/fixtures/README.md) step by step.
@@ -76,6 +76,9 @@ DEBUG_SCALARS = (
     "phase_win_geom", "phase_loss_geom", "phase_color_geom", "phase_prefix_like",
     "phase_template_like", "phase_bright_like", "bright_run_fraction", "bright_run_crosses_center",
     "central_active_fraction", "max_center_gap", "central_continuous", "central_bright_density",
+    "lower_dark_ratio", "lower_mean_gray", "lower_band_like",
+    "prefix_dark_ratio", "win_background_dark_ratio", "loss_background_dark_ratio",
+    "prefix_contrast_like",
 )
 DEBUG_METRICS = ("win", "loss", "bright", "draw")
 DEBUG_CLUSTERS = ("draw_cluster", "draw_y_cluster", "win_cluster", "loss_cluster", "win_y_cluster",

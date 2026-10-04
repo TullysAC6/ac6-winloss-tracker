@@ -2,7 +2,7 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-def detector_sequence(recorder, optional, labels):
+def detector_sequence(recorder, optional, labels, *, stored_frames=None):
     import result_detector as rd
     from mss.screenshot import ScreenShot
     cursor, results, states, order = [0], [], [], []
@@ -24,11 +24,19 @@ def detector_sequence(recorder, optional, labels):
                    target=None, source=None, identity=None)
     def grab(_):
         capture.captured_at = 100 + cursor[0] * .75
+        if stored_frames is not None and stored_frames[cursor[0]] is not None:
+            raw, width, height = stored_frames[cursor[0]]
+            return ScreenShot.from_size(bytearray(raw), width, height)
         return shot
     capture.grab.side_effect = grab
     detector.capture = capture
+    real_classifier = detector.classifier
     detector.classifier = Mock()
-    detector.classifier.classify_bgra.side_effect = lambda *_: (labels[cursor[0]], {'gameplay_activity': False})
+    def classify(raw, width, height):
+        if stored_frames is not None and stored_frames[cursor[0]] is not None:
+            return real_classifier.classify_bgra(raw, width, height)
+        return labels[cursor[0]], {'gameplay_activity': False}
+    detector.classifier.classify_bgra.side_effect = classify
     observe = detector.state.observe
     def sampled(*args, **kwargs):
         result = observe(*args, **kwargs)

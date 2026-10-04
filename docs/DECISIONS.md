@@ -1,5 +1,19 @@
 # Decisions
 
+## Recover a verified bright-band final using independent spatial evidence
+
+2026-10-03 owner-authorized product repair follows the diagnostic-first decision
+below. New natural pixels establish that arena brightness defeats the global
+band check while the WIN glyphs remain stable. Preserve the existing global
+path; exceptionally strong final fingerprints may instead require a visible,
+>=90% dark lower margin and no white PHASE prefix. No hit-count, state, CLEAR,
+ResultGate, capture-gap or timeout change. [Evidence and constraints](BRIGHT_RESULT_BAND_REPAIR.md).
+The owner's2026-10-04 continuation specifically permits #68 T3 N/A only after
+fresh independent review agrees retained real pixels and all relevant gates
+are sufficient. This is a #68-only exception to the default development rule;
+any specific native gap requires STOP before separately authorized gameplay.
+#15-5's failed T3 is not relabelled PASS; its FULL owner T3 remains required.
+
 ## A natural candidate miss is instrumented before detector semantics change
 
 Owner-authorized [#66](https://github.com/TullysAC6/ac6-winloss-tracker/issues/66),
