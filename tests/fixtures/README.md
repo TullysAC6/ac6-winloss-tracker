@@ -17,8 +17,9 @@ tests/fixtures/
     win/  lose/  draw/  clear/  phase/  negatives/  sequences/
   match_metadata/           reserved (#15)
     ranked_single/  ranked_team/  custom_single/  custom_team/
-  ranks/                    reserved
-    pre_s/  s_rank/  season_boundaries/
+  ranks/                    implemented for #15-6 self rank S only (docs/ISSUE15_6_SELF_RANK_CONTRACT.md)
+    s_rank/  negatives/     panel + same-frame header crop pairs
+    pre_s/  season_boundaries/   no support; the ranks schema refuses records
   season/                   reserved (#28, Revision 4 draft)
     pre_reset/  transition/  post_reset/  multi_season/
   rating/                   reserved (#28)

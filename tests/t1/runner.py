@@ -24,15 +24,17 @@ from pathlib import Path
 from . import compare, report as reporting
 from .corpus import CorpusError, load_corpus
 from .process import WorkerJob
+from .ranks_schema import CONTEXT_SUFFIX
 from .strict_json import MetadataError, loads_strict
 
 DEFAULT_CASE_TIMEOUT = 10.0
 DEFAULT_SUITE_TIMEOUT = 120.0
 JOB_EXIT_GRACE_SECONDS = 5.0
 REPLAYED_SOURCES = ("result_detector.py", "result_gate.py", "game_capture.py", "owned_worker.py",
-                    "detector_templates.json", "match_header.py")
+                    "detector_templates.json", "match_header.py", "self_rank.py")
 EXPECTED_PROBES = frozenset(("socket", "dns", "process", "write_outside_root", "denied_import", "native_window_dll"))
 WORKER_SCRIPT = Path(__file__).resolve().with_name("worker.py")
+FULL_ACTUAL_FAMILIES = ("match_metadata", "ranks")
 CREATE_NO_WINDOW = 0x08000000
 
 
@@ -120,6 +122,8 @@ def _live_data_roots():
 def _spec(case, corpus, repo_root, fixtures_root, forbidden_roots):
     if case.kind == "image":
         images = {case.id: case.record["input"]}
+        if "context" in case.record:
+            images[case.id + CONTEXT_SUFFIX] = case.record["context"]
         data = None
     else:
         data = case.record["input"]
@@ -233,7 +237,7 @@ def run_case(case, corpus, repo_root, fixtures_root, suite_root, index, timeout,
                 actual = result["actual"]
                 if case.kind == "image":
                     entry["failures"].extend(compare.compare_image(case.record, actual))
-                    entry["actual"] = (actual if case.record["family"] == "match_metadata"
+                    entry["actual"] = (actual if case.record["family"] in FULL_ACTUAL_FAMILIES
                                        else {"frame_class": actual.get("frame_class")})
                 else:
                     entry["failures"].extend(compare.compare_sequence(case.record, actual))

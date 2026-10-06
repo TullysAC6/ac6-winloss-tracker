@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-intro-opponent",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-intro-opponent-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 20779,
+    "sha256": "fd7d8a0dc4552a3a565f0b9f8bfc1f9a1977ee1a4ee9559ac84a620e6284b27c"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-intro-opponent-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 12181,
+    "sha256": "09d77dd4193d36cf2f68160a54d96928613865d476eafa337aab2058912329f5"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "match_intro",
+    "visible_text": "No header; intro scene at the panel position. The opponent's card elsewhere carries two small S badges, outside both crops.",
+    "self_identity": "Not a self-rank source: opponent rank context; card badges are never read."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "context"
+  },
+  "coverage": [
+    "rank.self_s.other_rank_context"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 255000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "abe9aeb28856ab6a57e95a0e75c1f2b0edf46fdb044a7dae6ce29210b3e7fc33",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

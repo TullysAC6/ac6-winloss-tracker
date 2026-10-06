@@ -1,10 +1,23 @@
 # Project state
 
-Last updated: 2026-10-03 JST
+Last updated: 2026-10-06 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
+
+## Current slice — #15-6 offline self rank S, 2026-10-06
+
+Owner [authorized](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6005202373)
+#15-6 in parallel with the owner's pending #15-5 T3; at most two unmerged generations (PR #65 and #15-6).
+The [evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6006194783)
+passed for one boundary: the player's own **S** from the RANK panel of the native English Ranked Single
+waiting screen, with the complete header as same-frame context only. [Contract](ISSUE15_6_SELF_RANK_CONTRACT.md).
+Dormant pure `self_rank.py`; 22 genuine rank records (10 positives from three sessions, 12 negatives) join
+the unchanged 61 T1 cases. Rating, pre-S, numberless S, Team/Custom, opponent rank, runtime callers and
+Season are unsupported. Resolve its PR / Issue #15 for gates, review, CI and merge. #15-6 Accepted
+PENDING, Released NO; PR #65 untouched; stable v1.2.0. STOP after #15-6. GitHub overrides older
+checkpoints below.
 
 ## Current product repair — bright-result-band WIN miss, 2026-10-03
 

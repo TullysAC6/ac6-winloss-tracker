@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-s-fresh-idle",
+  "family": "ranks",
+  "category": "s_rank",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-fresh-idle-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 29453,
+    "sha256": "4c9e6427a1bb78e7f325964184d3b428fcf43987db31606fec3c3a2f8e7b522b"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-fresh-idle-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 31272,
+    "sha256": "6643e129e54eebf79859bff7f9361cf4a3639f5561ca0a868d1db18153264a41"
+  },
+  "truth": {
+    "self_rank": "S",
+    "screen": "lobby_idle",
+    "visible_text": "Complete RANK MATCH: SINGLE header; lobby RANK panel with the RANK label and a red S badge with place number 05; same offset layout as val-s-one.",
+    "self_identity": "The screen owner's own Ranked Single waiting screen: their menu, NP and sortie AC are shown and MATCH INFO holds exactly one card with the RANK panel under it. Idle before matching starts (menu with help bar), so no opponent can exist. A later lobby of the same session as val-s-one. Fresh validation positive: visually verified and declared before it was first scored, after the glyph-stage correction."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": "S",
+    "status": "recognized",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": null
+  },
+  "coverage": [
+    "rank.self_s.positive"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "xJ86EUS510w",
+    "reference": "https://www.youtube.com/watch?v=xJ86EUS510w",
+    "timestamp_ms": 4860000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "d21fc540bffa91285e47231e7040977b510784961f3fb8408449a502672eeed4",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

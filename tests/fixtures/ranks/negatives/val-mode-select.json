@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-mode-select",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-mode-select-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 3656,
+    "sha256": "6e2bfb89465d654005b8f23bda52675e1cf3026c83b84933f7b21afcc7eecb95"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-mode-select-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 23984,
+    "sha256": "9311a40e82c1eb07d5359aaf0d4420f9b0c3e87d05af8e6e4ecd01ff03157d40"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "rank_mode_select",
+    "visible_text": "RANK MATCH header without a format; the Single/Team mode-select menu; no RANK panel.",
+    "self_identity": "Not a self-rank source: no rank display at all."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "context"
+  },
+  "coverage": [
+    "rank.self_s.wrong_screen"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "y86wDex-EQI",
+    "reference": "https://www.youtube.com/watch?v=y86wDex-EQI",
+    "timestamp_ms": 5575380,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "f0916855c7a735ec59e79ff4574247950b195e113db44586fe1b60bd0104e448",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

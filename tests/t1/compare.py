@@ -10,6 +10,9 @@ from __future__ import annotations
 
 from .schema import DETECTIONS
 
+from .ranks_schema import STAGE_OF_REASON  # noqa: E402
+
+SELF_RANK_FIELDS = frozenset(("self_rank", "status", "version", "source", "reason"))
 POLL_SECONDS = 0.75
 FRAME_SOURCE_CLOSES = 2  # the enable boundary and run()'s finally
 
@@ -54,6 +57,23 @@ def compare_image(record, actual):
             if not same_value(checks[key], actual.get(key)):
                 failures.append(failure("classify", key, checks[key], actual.get(key),
                                         "header output differs from visually reviewed truth"))
+        return failures
+    if checks.get("adapter") == "self_rank.v1":
+        # The recognizer reports self rank evidence and nothing else: no category,
+        # Rating, PLACE or opponent field may appear, and a missing key never passes.
+        if set(actual) != SELF_RANK_FIELDS:
+            failures.append(failure("classify", "fields", sorted(SELF_RANK_FIELDS), sorted(actual),
+                                    "self-rank output fields differ from the evidence contract"))
+        for key in ("self_rank", "status", "version", "source"):
+            if key not in actual or not same_value(checks[key], actual[key]):
+                failures.append(failure("classify", key, checks[key], actual.get(key),
+                                        "self-rank output differs from visually reviewed truth"))
+        # Where it abstained must match what the pixels show, so a panel-targeted
+        # negative cannot pass merely because the context gate rejected it.
+        reason = actual.get("reason")
+        if reason not in STAGE_OF_REASON or not same_value(checks["abstention"], STAGE_OF_REASON[reason]):
+            failures.append(failure("classify", "abstention", checks["abstention"], reason,
+                                    "the recognizer abstained at a different stage than the reviewed truth"))
         return failures
     got = actual.get("frame_class")
     if not same_value(checks["frame_class"], got):

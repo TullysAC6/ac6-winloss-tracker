@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-intro-opponent",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-intro-opponent-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 32723,
+    "sha256": "2e35c847425b743d9a9bffc2333b287067c841a7b5599a6174291d4f979177ca"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-intro-opponent-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 17353,
+    "sha256": "d9b5785ed415cbd9190b7b039e7a42419b7e4c545d550e43ea6670d0b3c9f9ff"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "match_intro",
+    "visible_text": "No header; the opponent's AC at the panel position. The opponent's intro card is elsewhere, outside both crops.",
+    "self_identity": "Not a self-rank source: opponent context; card badges are never read."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "context"
+  },
+  "coverage": [
+    "rank.self_s.other_rank_context"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "xJ86EUS510w",
+    "reference": "https://www.youtube.com/watch?v=xJ86EUS510w",
+    "timestamp_ms": 443000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "3ef1d484d4aa91b8bcf27bdd334ef8940b813fd0b544e80a8cf3c532ac01de78",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-garage-license",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-garage-license-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 19431,
+    "sha256": "3ff8616edaf8c6131b60243c3dff7ff3944167732f5abe804becb374c8e25860"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-garage-license-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 25987,
+    "sha256": "0b44ccf595d21456340fdb95ede2d89b3fea7d07c4accea032755aae88c0449a"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "garage_license",
+    "visible_text": "GARAGE header; the AC in the garage at the panel position. The story-mode mercenary license elsewhere shows ARENA RANK and HUNTER CLASS, outside both crops.",
+    "self_identity": "Not a self-rank source: story-mode ARENA RANK and HUNTER CLASS are ignored by owner instruction and are never PvP rank."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "context"
+  },
+  "coverage": [
+    "rank.self_s.other_rank_context"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 219000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "42ba136898e6c19a3f8ce7c0edb0322b9fee55fdcc5687cb4785a0d042c9c2ca",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

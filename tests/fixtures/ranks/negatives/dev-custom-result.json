@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-custom-result",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-custom-result-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 20087,
+    "sha256": "caba123880c61abaddf154bde8e27bd34c2290162c35c6cfae087e7183526660"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-custom-result-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 18664,
+    "sha256": "2ef1a1db4749679a26ab27332591caa4d25553aa30fd1b94b51b35a50e566613"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "custom_result",
+    "visible_text": "RESULT header of a custom match; the right edge of an in-game nameplate decoration at the panel position. Both members' small rank badges appear elsewhere.",
+    "self_identity": "Not a self-rank source: a custom result shows several members' ranks; only the Ranked waiting screen is a source."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "context"
+  },
+  "coverage": [
+    "rank.self_s.other_rank_context"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "WabYwwGakEQ",
+    "reference": "https://www.youtube.com/watch?v=WabYwwGakEQ",
+    "timestamp_ms": 8940000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "aafc2fe0cd267ad02299bb8e7c0916b2b3f07a76cde1d96ad0c039f9b7f38b3d",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame. The panel crop shows only the right edge of a generic in-game nameplate decoration.",
+    "corrections": []
+  }
+}
