@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-s-third-source-later",
+  "family": "ranks",
+  "category": "s_rank",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-third-source-later-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 26622,
+    "sha256": "4275633cb3241d5961097f028fc397419f971549e582c17b5c5a6678068eba18"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-third-source-later-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 34042,
+    "sha256": "d27854850f18000eed7259ee76ceb28191d563448919e8f3f8e63840bbbc2923"
+  },
+  "truth": {
+    "self_rank": "S",
+    "screen": "lobby_matching",
+    "visible_text": "Complete RANK MATCH: SINGLE header; lobby RANK panel with the RANK label and a red S badge with place number 01.",
+    "self_identity": "The screen owner's own Ranked Single waiting screen: their menu, NP and sortie AC are shown and MATCH INFO holds exactly one card with the RANK panel under it. Matching is in progress (matching status text and cancel prompt), so no opponent exists yet. A later lobby of the same session as val-s-third-source."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": "S",
+    "status": "recognized",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel"
+  },
+  "coverage": [
+    "rank.self_s.positive"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "y86wDex-EQI",
+    "reference": "https://www.youtube.com/watch?v=y86wDex-EQI",
+    "timestamp_ms": 5580000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "09cd1a02080f4a01fd84bf2dec8d06bdfe1c024fa6d0b46ec151066978854f47",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

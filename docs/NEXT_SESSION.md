@@ -1,5 +1,18 @@
 # Next session
 
+## Current owner scope — #15-6 offline self rank S, 2026-10-06
+
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS → Issue #15
+(the #15-6 authorization and evidence checkpoint) → current main/open PRs/CI →
+[#15-6 contract](ISSUE15_6_SELF_RANK_CONTRACT.md). GitHub overrides historical checkpoints below.
+
+#15-6 is the only new work: dormant self-rank-**S** recognition from the Ranked Single waiting-screen RANK
+panel, genuine fixtures and formal T1. Gate flow: T0 → full T1 → relevant T2 (T1 runner lifecycle) →
+fresh independent implementation and fixture-truth review → exact-head CI → reviewed T3 N/A → pinned
+merge → exact-main CI → bookkeeping → separate owner Acceptance. Resolve its PR for live state.
+PR #65 / #15-5 stays untouched and waits for the owner's FULL T3. STOP after #15-6; Rating, pre-S,
+numberless S, Team/Custom, opponent rank, runtime integration, #28-A and release are not authorized.
+
 ## Current owner scope — bright-result-band product repair, 2026-10-03
 
 Owner explicitly requested product repair after a newly evidenced natural WIN

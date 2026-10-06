@@ -330,6 +330,7 @@ class CorpusTests(unittest.TestCase):
         corpus = load_corpus(self.root)
         self.assertEqual(sum(r["family"] == "results" for r in corpus.images.values()), 28)
         self.assertEqual(sum(r["family"] == "match_metadata" for r in corpus.images.values()), 11)
+        self.assertEqual(sum(r["family"] == "ranks" for r in corpus.images.values()), 21)
         self.assertGreaterEqual(len(corpus.sequences), 12)
         self.assertEqual([case.id for case in corpus.cases], sorted(case.id for case in corpus.cases))
         self.assertEqual(corpus.summary()["families"]["results"], "implemented")
@@ -347,7 +348,8 @@ class CorpusTests(unittest.TestCase):
         self.assertEqual(carriage_returns, [], "fixture metadata was not checked out with LF")
 
     def test_a_record_in_a_reserved_family_fails_instead_of_skipping(self):
-        target = self.root / "ranks" / "pre_s" / "a4.json"
+        # ranks is implemented for #15-6 self rank S only; rating stays reserved.
+        target = self.root / "rating" / "pre_s" / "a4.json"
         target.write_text(IMAGE_RECORD.read_text(encoding="utf-8"), encoding="utf-8")
         self.assertCorpusError("reserved and has no replay adapter")
 
@@ -389,6 +391,7 @@ class CorpusTests(unittest.TestCase):
         self.assertCorpusError("<family>/<category>")
         shutil.rmtree(self.root / "results")
         shutil.rmtree(self.root / "match_metadata")
+        shutil.rmtree(self.root / "ranks")
         for image in self.root.glob("*.ppm"):
             image.unlink()
         self.assertCorpusError("empty")

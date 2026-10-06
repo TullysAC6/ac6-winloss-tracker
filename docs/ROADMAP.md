@@ -23,6 +23,14 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
+## Current slice — #15-6 offline self rank S, 2026-10-06
+
+#15-6 adds dormant self-rank-**S** recognition from the Ranked Single waiting-screen RANK panel, with genuine
+fixtures in formal T1; [contract](ISSUE15_6_SELF_RANK_CONTRACT.md). Status: **ACCEPTANCE PENDING** once
+merged; resolve its PR / Issue #15. PR #65 (#15-5) is unchanged and awaits FULL owner T3. Rating, pre-S,
+Team/Custom, opponent rank, runtime integration and Season remain unauthorized. STOP after #15-6.
+Sections below are historical where they conflict with GitHub.
+
 ## Current checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
@@ -436,7 +444,7 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | #15-0 optional enrichment storage foundation (`enrichment.db`) | **ACCEPTED — UNRELEASED** | PR #50 exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Dormant: ordinary startup does not open/create/migrate/clean the sidecar. `history.db` remains authoritative; match-bound bindings are parent-checked and missing parents are logically invisible. T3 N/A |
 | `match_type` — ranked / custom / unknown | **ACCEPTED + MERGED — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). No recognizer or runtime caller is added in this slice |
 | `match_format` — single / team / unknown | **ACCEPTED + MERGED — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). Mixed known/unknown values are valid; absence remains unknown |
-| `self_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Canonical rank token or unknown, any format; see [ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md). The #15-2 PR and Issue #6 own the live review/merge/acceptance evidence. No recognizer or runtime caller |
+| `self_rank` | **IMPLEMENTED (dormant #15-2 persistence; #15-6 offline S recognizer)** | Canonical rank token or unknown, any format; see [ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md). #15-6 recognizes only the player's own S from the Ranked Single waiting-screen RANK panel ([contract](ISSUE15_6_SELF_RANK_CONTRACT.md)); pre-S and every other rank stay unknown. The slice PRs and Issue #6 own the live review/merge/acceptance evidence. No runtime caller |
 | `opponent_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Explicit Single only; TEAM/unknown carries none, and it is never resurrected. Team opponent ranks remain deferred |
 | `metadata_recognition_status` / `metadata_recognition_version` | **IMPLEMENTED (dormant #15-2 persistence only)** | `NULL` (no recorded evidence) / `recognized` / `failed`; the version names interpretation semantics, not the app release. The whole snapshot is revisioned (compare-and-set) |
 | Match / Rating observation timestamps usable for retrospective Season assignment | PLANNED | Saving the authoritative result or Rating observation does not wait for Season resolution |

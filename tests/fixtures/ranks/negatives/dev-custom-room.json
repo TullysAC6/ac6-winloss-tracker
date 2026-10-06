@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-custom-room",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-custom-room-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 22880,
+    "sha256": "269acf1c883c89aabfec2a7c234063d933f401ef85cb62e6865253a886072381"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-custom-room-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 26584,
+    "sha256": "d91f234e722f9cb61bb4f1311fe8bfa022b02dfc62ba4862df697a4c058d8ec7"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "custom_room",
+    "visible_text": "CUSTOM MATCH header; room settings rows at the panel position. The member list elsewhere shows every member's name and small rank badges.",
+    "self_identity": "Not a self-rank source: a custom room shows several members' ranks, including opponents'; only the Ranked waiting screen is a source."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel"
+  },
+  "coverage": [
+    "rank.self_s.other_rank_context"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "WabYwwGakEQ",
+    "reference": "https://www.youtube.com/watch?v=WabYwwGakEQ",
+    "timestamp_ms": 4180000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "d272a112ec92d84d143b2f6a26eadfff75b1c928132f405efe05cb7beeb25e02",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

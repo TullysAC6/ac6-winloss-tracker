@@ -865,3 +865,24 @@ abstentions), correction discipline and exact missing-fixture plan.
 This is an engineering subset within the existing owner authorization; it does
 not change product scope, persistence ownership, A vs A4 precision, the pre-S/S
 boundary, Season ownership or owner Acceptance. STOP after #15-4.
+
+## #15-6 reads self rank S only from the Ranked Single waiting-screen RANK panel
+
+On 2026-10-06 the owner authorized #15-6 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6005202373));
+the [evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6006194783)
+passed before code. The only self-rank source is the RANK panel of the native English Ranked Single
+waiting screen. It is the player's own because the idle or matching lobby has no opponent yet, the panel
+never changes through match found, and the lobby card is the one paired with the player's own sortie AC
+and HUD in the intro, while the opponent appears only on a different card.
+
+Rejected as self-rank sources: card badges (two per card, meaning not established, values differ by date), opponent intro cards,
+custom match rooms and results (every member's rank, owner note 2026-10-06), the story-mode ARENA RANK and
+HUNTER CLASS (owner instruction: always ignore), PLACE, RATING, timing, adjacency and Analyzer metadata.
+
+The complete header, judged by the accepted #15-4 decoder on the same frame, is a necessary context gate
+only: it is the one evidenced way to exclude Team lobbies, custom rooms and other screens, and never rank
+evidence. The glyph is matched by red-channel correlation, because absolute colour thresholds failed across
+sources' tone curves (first validation run retained); the lit presentation is enforced by the header and
+label stages instead. Only the top-100 numbered S is evidenced, so a numberless S abstains.
+[Contract](ISSUE15_6_SELF_RANK_CONTRACT.md). This changes no persistence ownership, A vs A4 precision, pre-S/S
+boundary, Season ownership or owner Acceptance. STOP after #15-6.

@@ -31,6 +31,11 @@
     "contract.processing_time": "The post-result cooldown is measured from processing time, not from capture time.",
     "metadata.header.positive": "Complete native English Ranked Single lobby header is recognized directly.",
     "metadata.header.unknown": "Genuine unrelated assembly, garage, loading, sortie and combat crops abstain.",
-    "metadata.header.partial": "A genuinely truncated header crop abstains on both category fields."
+    "metadata.header.partial": "A genuinely truncated header crop abstains on both category fields.",
+    "rank.self_s.positive": "A fully lit Ranked Single waiting screen shows the player's own top-100 S badge in the lobby RANK panel and is recognized as self rank S.",
+    "rank.self_s.lobby_transition": "Dimmed match-start and cross-faded lobbies abstain although an S badge is still visible.",
+    "rank.self_s.other_rank_context": "Opponent intro cards, custom match rooms and results, and the story-mode garage license abstain.",
+    "rank.self_s.wrong_screen": "The system menu and the Ranked mode-select screen abstain.",
+    "rank.self_s.partial": "A genuinely truncated RANK panel crop abstains."
   }
 }

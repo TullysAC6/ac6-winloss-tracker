@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-s-one",
+  "family": "ranks",
+  "category": "s_rank",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-one-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 29254,
+    "sha256": "805d013e1b7d9ee5cccde2dc5908061525b9377dfffe9081bafc3dad0011ad97"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-one-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 31284,
+    "sha256": "9f0a44f5905d1ce45b3598a8b2d7a19eb64d8aa4b6c7f0629dae9ee56e85cd24"
+  },
+  "truth": {
+    "self_rank": "S",
+    "screen": "lobby_matching",
+    "visible_text": "Complete RANK MATCH: SINGLE header; lobby RANK panel with the RANK label and a red S badge with place number 08; the layout is rendered about 2 px right and 1-2 px lower than the dev source.",
+    "self_identity": "The screen owner's own Ranked Single waiting screen: their menu, NP and sortie AC are shown and MATCH INFO holds exactly one card with the RANK panel under it. Matching is in progress (matching status text and cancel prompt), so no opponent exists yet. Same session (dense sampling): the panel never changes through match found; in the intro the lobby card is UNIT BETA beside the AC identical to SORTIE AC INFO, the combat HUD AP equals the lobby AC SPEC AP, and the opponent is UNIT ALPHA on a different card."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": "S",
+    "status": "recognized",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel"
+  },
+  "coverage": [
+    "rank.self_s.positive"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "xJ86EUS510w",
+    "reference": "https://www.youtube.com/watch?v=xJ86EUS510w",
+    "timestamp_ms": 414000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "a4f6064f09a06e0236543e6832825f68b9f24b100925526e17d2b5d2690eb191",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

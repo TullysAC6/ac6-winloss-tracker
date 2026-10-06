@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-truncated-badge",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-truncated-badge-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 98,
+    "bytes": 17314,
+    "sha256": "3fd15def89d77ac5389035b8016520e38383d999b3d8b263cd375a8f30c9d3a6"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-truncated-badge-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 33205,
+    "sha256": "3d2a806247df834e466ec9fdaaac99b9dd02880edb36a168cd4635a81912df7c"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "lobby_truncated_crop",
+    "visible_text": "Complete header; the panel crop is genuinely truncated through the S badge (rows 432-530 only).",
+    "self_identity": "The badge is the player's, but a truncated crop is unsupported geometry; abstention is expected."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel"
+  },
+  "coverage": [
+    "rank.self_s.partial"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 225250,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      530
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "423bd3721eee6d375c3276ad7f5df30a47484b6f5cbcfc0aa7255211b90fcfbf",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

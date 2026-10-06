@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-crossfade",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-crossfade-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 24386,
+    "sha256": "ee91fde11db394a6bcdc536df2f507452ae3dbb33c7b343d9d164835ba014e4f"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-crossfade-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 29935,
+    "sha256": "2698993a70c3f21e74aebf566191396eff9ed433094debd40843f520132f1b17"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "lobby_crossfade",
+    "visible_text": "Header and an S badge with place number 05 visible but cross-faded with another menu's text during a screen transition.",
+    "self_identity": "The badge is the player's, but a cross-faded transition is not a supported presentation; abstention is expected."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel"
+  },
+  "coverage": [
+    "rank.self_s.lobby_transition"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "xJ86EUS510w",
+    "reference": "https://www.youtube.com/watch?v=xJ86EUS510w",
+    "timestamp_ms": 2346950,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "fa6a18efd0b2f894a206114a6a10bd40259e62d2862cd0cdcf7008851b7d819f",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

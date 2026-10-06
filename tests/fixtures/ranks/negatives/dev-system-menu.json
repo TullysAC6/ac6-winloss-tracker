@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-system-menu",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-system-menu-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 16116,
+    "sha256": "8f19432707f3a1e279e4d602c902bd8b80e1732e94174e932514e7e769262328"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-system-menu-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 21972,
+    "sha256": "1c4b38f370f5b52314d1d41b5ddac47f392e5bcf1ce6c896fedee7715f4c143e"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "system_menu",
+    "visible_text": "SYSTEM header; network settings rows at the panel position; no RANK panel.",
+    "self_identity": "Not a self-rank source: no rank display at all."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel"
+  },
+  "coverage": [
+    "rank.self_s.wrong_screen"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 223000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "a348257747ff2042046db9d6b7707d60cc94155652ee13aa845b6eb02d10951b",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

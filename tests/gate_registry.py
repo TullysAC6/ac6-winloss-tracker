@@ -68,6 +68,7 @@ PLAYER_OVERLAY_PURE = ("PlayerMetricsTests", "PlayerRenderTests", "LayoutAndSafe
 # pre-#14 tests/run_all_tests.py used; T2 runs the launcher first, as CI did.
 ENTRIES = (
     Entry("tests/test_match_header.py", T0, "offline header abstention, strict fixture schema and dormant boundary"),
+    Entry("tests/test_self_rank.py", T0, "#15-6 self rank S abstention, strict rank fixture schema and dormant boundary"),
     Entry("tests/test_rank_rating_observations.py", T0, "independent observations, deletion generation, v4 migration and associations"),
     Entry("tests/test_observation_rollback.py", T2, "isolated v4 observation lifecycle through exact v3/public-unaware deletion and re-upgrade"),
     Entry("tests/test_enrichment_store.py", T0, "dormant sidecar format, validation and atomic storage"),
