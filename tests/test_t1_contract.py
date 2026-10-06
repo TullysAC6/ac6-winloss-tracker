@@ -330,7 +330,7 @@ class CorpusTests(unittest.TestCase):
         corpus = load_corpus(self.root)
         self.assertEqual(sum(r["family"] == "results" for r in corpus.images.values()), 28)
         self.assertEqual(sum(r["family"] == "match_metadata" for r in corpus.images.values()), 11)
-        self.assertEqual(sum(r["family"] == "ranks" for r in corpus.images.values()), 21)
+        self.assertEqual(sum(r["family"] == "ranks" for r in corpus.images.values()), 22)
         self.assertGreaterEqual(len(corpus.sequences), 12)
         self.assertEqual([case.id for case in corpus.cases], sorted(case.id for case in corpus.cases))
         self.assertEqual(corpus.summary()["families"]["results"], "implemented")

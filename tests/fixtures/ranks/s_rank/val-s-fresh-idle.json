@@ -32,7 +32,8 @@
     "self_rank": "S",
     "status": "recognized",
     "version": "self-rank-s-lobby.v1",
-    "source": "direct_lobby_rank_panel"
+    "source": "direct_lobby_rank_panel",
+    "abstention": null
   },
   "coverage": [
     "rank.self_s.positive"

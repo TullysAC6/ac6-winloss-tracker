@@ -33,9 +33,9 @@ S_BOX = (50, 106, 30, 115)       # the S glyph on its badge background
 DIGIT_BOX = (106, 140, 30, 115)  # the place-number row: presence only, never read
 WINDOW = 3                       # bounded badge-frame registration, in pixels
 
-# Fixed values; scores are not probabilities. The glyph stage was corrected after
-# the first validation run (see docs/ISSUE15_6_SELF_RANK_CONTRACT.md); its constant
-# was not changed.
+# Fixed values; scores are not probabilities. After the first validation run the
+# glyph statistic changed from an ink-mask F1 to red-channel correlation; 0.95 now
+# applies to that new statistic (docs/ISSUE15_6_SELF_RANK_CONTRACT.md).
 MIN_FRAME_CONTRAST = 120.0
 MAX_FRAME_INNER = 40.0
 MIN_LABEL = 0.90
@@ -185,3 +185,4 @@ def recognize_self_rank(header_roi, panel_roi):
 _S_RED = _decompress(_S_RED_PACKED).reshape(_box_shape(S_BOX))
 _LABEL = np.unpackbits(_decompress(_LABEL_PACKED))[:np.prod(_box_shape(LABEL_BOX))].reshape(
     _box_shape(LABEL_BOX)).astype(bool)
+_LABEL.flags.writeable = False

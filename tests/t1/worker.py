@@ -148,7 +148,8 @@ def main(argv):
                     return np.frombuffer(image.bgra, dtype=np.uint8).reshape(image.height, image.width, 4)
 
                 panel = images[spec["case_id"]]
-                header = images[spec["case_id"] + "#context"]
+                from t1.ranks_schema import CONTEXT_SUFFIX
+                header = images[spec["case_id"] + CONTEXT_SUFFIX]
                 actual = dataclasses.asdict(self_rank.recognize_self_rank(pixels(header), pixels(panel)))
             else:
                 actual = classify_image(result_detector, templates_path, images[spec["case_id"]])

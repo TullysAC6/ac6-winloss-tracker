@@ -1,31 +1,31 @@
 {
   "schema_version": 1,
-  "id": "ranks.val-intro-opponent",
+  "id": "ranks.dev-crossfade-system",
   "family": "ranks",
   "category": "negatives",
   "input": {
     "kind": "roi",
-    "path": "ranks/negatives/val-intro-opponent-panel.png",
+    "path": "ranks/negatives/dev-crossfade-system-panel.png",
     "format": "png",
     "width": 142,
     "height": 168,
-    "bytes": 32723,
-    "sha256": "2e35c847425b743d9a9bffc2333b287067c841a7b5599a6174291d4f979177ca"
+    "bytes": 29591,
+    "sha256": "009ee533699755ac33abdae8d2dbb000e00cee204a837e01f8ab651063afc2d0"
   },
   "context": {
     "kind": "roi",
-    "path": "ranks/negatives/val-intro-opponent-header.png",
+    "path": "ranks/negatives/dev-crossfade-system-header.png",
     "format": "png",
     "width": 480,
     "height": 60,
-    "bytes": 17353,
-    "sha256": "d9b5785ed415cbd9190b7b039e7a42419b7e4c545d550e43ea6670d0b3c9f9ff"
+    "bytes": 33314,
+    "sha256": "8c8e27ff48b9a1e06f7522f3ec37bf707cb4b458b4cf8706654e045bc8559e9e"
   },
   "truth": {
     "self_rank": "unknown",
-    "screen": "match_intro",
-    "visible_text": "No header; the opponent's AC at the panel position. The opponent's intro card is elsewhere, outside both crops.",
-    "self_identity": "Not a self-rank source: opponent context; card badges are never read."
+    "screen": "lobby_crossfade_lit_header",
+    "visible_text": "Complete lit RANK MATCH: SINGLE header, but the lobby is visibly cross-fading into the SYSTEM screen: its settings rows and menu are overlaid on the lobby and the RANK panel interior is washed by the blend; an S badge with place number 14 is still visible.",
+    "self_identity": "The badge is the player's, but a lobby blended with another screen's content is not a clean RANK panel; abstention at a panel stage is expected. Post-hoc addition after independent review: the last lit-header frame before the SYSTEM screen, chosen by that objective rule and labelled from the visible overlay."
   },
   "checks": {
     "adapter": "self_rank.v1",
@@ -33,16 +33,16 @@
     "status": "failed",
     "version": "self-rank-s-lobby.v1",
     "source": "direct_lobby_rank_panel",
-    "abstention": "context"
+    "abstention": "panel"
   },
   "coverage": [
-    "rank.self_s.other_rank_context"
+    "rank.self_s.panel_stage"
   ],
   "provenance": {
     "source_type": "original_video_frame",
-    "video_id": "xJ86EUS510w",
-    "reference": "https://www.youtube.com/watch?v=xJ86EUS510w",
-    "timestamp_ms": 443000,
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 222233,
     "source_dimensions": [
       1920,
       1080
@@ -59,8 +59,8 @@
       560,
       100
     ],
-    "source_frame_sha256": "3ef1d484d4aa91b8bcf27bdd334ef8940b813fd0b544e80a8cf3c532ac01de78",
-    "split": "validation",
+    "source_frame_sha256": "ccded3c82a343cd8452b830c1b33d11509d38fab7c9064e1aec10facde2800d6",
+    "split": "dev",
     "synthetic": false,
     "template_source": false
   },

@@ -9,9 +9,19 @@ SOURCE = "direct_lobby_rank_panel"
 TEMPLATE_ID = "ranks.dev-s-matching"
 PANEL_CROP = [600, 432, 742, 600]
 HEADER_CROP = [80, 40, 560, 100]
+CONTEXT_SUFFIX = "#context"  # the worker's image key for a record's same-frame header crop
 POSITIVE_SCREENS = ("lobby_idle", "lobby_matching")
-NEGATIVE_SCREENS = ("lobby_dimmed_start", "lobby_crossfade", "lobby_truncated_crop", "system_menu",
-                    "garage_license", "match_intro", "custom_room", "custom_result", "rank_mode_select")
+NEGATIVE_SCREENS = ("lobby_dimmed_start", "lobby_crossfade", "lobby_crossfade_lit_header", "lobby_truncated_crop",
+                    "system_menu", "garage_license", "match_intro", "custom_room", "custom_result",
+                    "rank_mode_select")
+# Where a negative must abstain, declared from what the pixels show: a crop of the
+# wrong geometry (input), no complete lit header (context), or a complete lit header
+# over a panel that is not a clean RANK panel (panel).
+STAGES = ("input", "context", "panel")
+STAGE_OF_REASON = {"invalid_geometry_or_format": "input", "nonopaque_evidence": "input",
+                   "unsupported_context": "context", "badge_frame_absent": "panel",
+                   "rank_label_absent": "panel", "s_glyph_absent": "panel", "place_number_absent": "panel",
+                   "self_rank_s": None}
 _IMAGE_KEYS = ("kind", "path", "format", "width", "height", "bytes", "sha256")
 
 
@@ -46,8 +56,8 @@ def validate(source, record, category, known_tags):
         s._fail(source, "panel and header crops must be named as one pair")
     s._int(source, panel["width"], 1, PANEL_CROP[2] - PANEL_CROP[0])
     s._int(source, panel["height"], 1, PANEL_CROP[3] - PANEL_CROP[1])
-    if (header["width"], header["height"]) != (480, 60):
-        s._fail(source, "the context crop is the complete native header ROI")
+    s._int(source, header["width"], 480, 480)
+    s._int(source, header["height"], 60, 60)
 
     truth = s._object(source + ".truth", record["truth"], ("self_rank", "screen", "visible_text", "self_identity"))
     s._enum(source + ".truth.self_rank", truth["self_rank"], ("S",) if positive else ("unknown",))
@@ -57,12 +67,21 @@ def validate(source, record, category, known_tags):
     if positive and (panel["width"], panel["height"]) != (PANEL_CROP[2] - PANEL_CROP[0], PANEL_CROP[3] - PANEL_CROP[1]):
         s._fail(source, "a positive requires the complete native RANK panel crop")
 
-    checks = s._object(source + ".checks", record["checks"], ("adapter", "self_rank", "status", "version", "source"))
+    checks = s._object(source + ".checks", record["checks"],
+                       ("adapter", "self_rank", "status", "version", "source", "abstention"))
     for key, expected in (("adapter", ADAPTER), ("self_rank", "S" if positive else None),
                           ("status", "recognized" if positive else "failed"),
                           ("version", VERSION), ("source", SOURCE)):
         if checks[key] != expected or type(checks[key]) is not type(expected):
             s._fail(source + ".checks." + key, f"must be {expected!r}")
+    if positive:
+        if checks["abstention"] is not None:
+            s._fail(source + ".checks.abstention", "a positive does not abstain")
+    else:
+        s._enum(source + ".checks.abstention", checks["abstention"], STAGES)
+        required = {"lobby_truncated_crop": "input", "lobby_crossfade_lit_header": "panel"}.get(truth["screen"], "context")
+        if checks["abstention"] != required:
+            s._fail(source + ".checks.abstention", f"{truth['screen']} abstains at the {required} stage")
     s.validate_coverage_tags(source, record["coverage"], known_tags)
 
     prov = s._object(source + ".provenance", record["provenance"],

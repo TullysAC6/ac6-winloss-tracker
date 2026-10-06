@@ -225,6 +225,8 @@ class FixtureContractTests(unittest.TestCase):
             lambda r: r["context"].update(path="ranks/s_rank/dev-s-idle-header.png"),
             lambda r: r.update(category="negatives"), lambda r: r.update(id="metadata.dev-s-matching"),
             lambda r: r["review"].update(corrections=[{}]),
+            lambda r: r["context"].update(width=480.0), lambda r: r["context"].update(height=60.0),
+            lambda r: r["checks"].update(abstention="panel"), lambda r: r["checks"].pop("abstention"),
         ]
         self.validate(copy.deepcopy(self.record))
         for index, change in enumerate(mutations):
@@ -238,14 +240,16 @@ class FixtureContractTests(unittest.TestCase):
         for change in (lambda r: r["truth"].update(self_rank="S"), lambda r: r["checks"].update(self_rank="S"),
                        lambda r: r["checks"].update(status="recognized"),
                        lambda r: r["provenance"].update(template_source=True),
-                       lambda r: r["truth"].update(screen="lobby_matching")):
+                       lambda r: r["truth"].update(screen="lobby_matching"),
+                       lambda r: r["checks"].update(abstention=None), lambda r: r["checks"].update(abstention="panel"),
+                       lambda r: r["checks"].update(abstention="header")):
             record = copy.deepcopy(self.negative)
             change(record)
             with self.assertRaises(MetadataError):
                 self.validate(record)
 
     def test_comparator_requires_exact_fields_and_values(self):
-        actual = {key: value for key, value in self.record["checks"].items() if key != "adapter"}
+        actual = {key: value for key, value in self.record["checks"].items() if key not in ("adapter", "abstention")}
         actual["reason"] = "self_rank_s"
         self.assertEqual(compare.compare_image(self.record, actual), [])
         for key in ("self_rank", "status", "version", "source"):
@@ -259,6 +263,13 @@ class FixtureContractTests(unittest.TestCase):
         negative_actual = {"self_rank": None, "status": "failed", "version": s.VERSION, "source": s.SOURCE,
                            "reason": "unsupported_context"}
         self.assertEqual(compare.compare_image(self.negative, negative_actual), [])
+        # The abstention stage must match the reviewed truth, and a positive never abstains.
+        for reason in ("badge_frame_absent", "invalid_geometry_or_format", "unknown_reason", None):
+            self.assertTrue(compare.compare_image(self.negative, dict(negative_actual, reason=reason)))
+        panel_record = json.loads((RANKS / "negatives" / "dev-crossfade-system.json").read_text(encoding="utf-8"))
+        self.assertEqual(compare.compare_image(panel_record, dict(negative_actual, reason="badge_frame_absent")), [])
+        self.assertTrue(compare.compare_image(panel_record, negative_actual))
+        self.assertTrue(compare.compare_image(self.record, dict(actual, reason="badge_frame_absent")))
         self.assertTrue(compare.compare_image(self.negative, {k: v for k, v in negative_actual.items()
                                                               if k != "self_rank"}))
 
@@ -289,7 +300,7 @@ class CorpusTests(unittest.TestCase):
     def test_committed_rank_corpus_is_bounded_and_split_by_video(self):
         corpus = load_corpus(self.root)
         ranks = [r for r in corpus.images.values() if r["family"] == "ranks"]
-        self.assertEqual(len(ranks), 21)
+        self.assertEqual(len(ranks), 22)
         self.assertEqual(sum(r["category"] == "s_rank" for r in ranks), 10)
         videos = {}
         for record in corpus.images.values():

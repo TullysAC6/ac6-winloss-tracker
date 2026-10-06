@@ -883,6 +883,6 @@ The complete header, judged by the accepted #15-4 decoder on the same frame, is 
 only: it is the one evidenced way to exclude Team lobbies, custom rooms and other screens, and never rank
 evidence. The glyph is matched by red-channel correlation, because absolute colour thresholds failed across
 sources' tone curves (first validation run retained); the lit presentation is enforced by the header and
-label stages instead. Only the top-100 numbered S is evidenced, so a numberless S abstains.
+label stages instead. Lit-header transitions are not guaranteed to abstain, but every lit-header frame in the evidence shows the player's own S. Only the top-100 numbered S is evidenced; a numberless S is expected, not verified, to abstain.
 [Contract](ISSUE15_6_SELF_RANK_CONTRACT.md). This changes no persistence ownership, A vs A4 precision, pre-S/S
 boundary, Season ownership or owner Acceptance. STOP after #15-6.

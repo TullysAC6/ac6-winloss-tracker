@@ -24,6 +24,7 @@ from pathlib import Path
 from . import compare, report as reporting
 from .corpus import CorpusError, load_corpus
 from .process import WorkerJob
+from .ranks_schema import CONTEXT_SUFFIX
 from .strict_json import MetadataError, loads_strict
 
 DEFAULT_CASE_TIMEOUT = 10.0
@@ -33,7 +34,6 @@ REPLAYED_SOURCES = ("result_detector.py", "result_gate.py", "game_capture.py", "
                     "detector_templates.json", "match_header.py", "self_rank.py")
 EXPECTED_PROBES = frozenset(("socket", "dns", "process", "write_outside_root", "denied_import", "native_window_dll"))
 WORKER_SCRIPT = Path(__file__).resolve().with_name("worker.py")
-CONTEXT_SUFFIX = "#context"  # the worker's key for a record's same-frame context crop
 FULL_ACTUAL_FAMILIES = ("match_metadata", "ranks")
 CREATE_NO_WINDOW = 0x08000000
 

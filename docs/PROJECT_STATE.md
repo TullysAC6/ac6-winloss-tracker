@@ -13,7 +13,7 @@ Owner [authorized](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#is
 The [evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6006194783)
 passed for one boundary: the player's own **S** from the RANK panel of the native English Ranked Single
 waiting screen, with the complete header as same-frame context only. [Contract](ISSUE15_6_SELF_RANK_CONTRACT.md).
-Dormant pure `self_rank.py`; 21 genuine rank records (10 positives from three sessions, 11 negatives) join
+Dormant pure `self_rank.py`; 22 genuine rank records (10 positives from three sessions, 12 negatives) join
 the unchanged 61 T1 cases. Rating, pre-S, numberless S, Team/Custom, opponent rank, runtime callers and
 Season are unsupported. Resolve its PR / Issue #15 for gates, review, CI and merge. #15-6 Accepted
 PENDING, Released NO; PR #65 untouched; stable v1.2.0. STOP after #15-6. GitHub overrides older
