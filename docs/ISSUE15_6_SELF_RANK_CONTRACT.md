@@ -116,7 +116,8 @@ during truth verification, before the registration window was fixed. Ten positiv
 
 The independent reviewer scanned `aRnh`, `xJ86` and `y86w` end to end at 2 Hz. Every sample whose header
 the gate recognized was a Ranked Single lobby showing the screen owner's S. No other screen passed the gate,
-and no genuine lit-header panel in any source shows anything but the player's S badge. Header-lit samples:
+and in that 2 Hz sampling plus targeted dense checks (not every frame) no genuine lit-header panel shows
+anything but the player's S badge. Header-lit samples:
 
 | Source | Recognized S | Abstained |
 |---|---|---|
@@ -173,7 +174,7 @@ reproduces them from that asset. Constructed glyph probes on the dev crop:
 |---|---|
 | Mirrored S | 0.819 |
 | S shifted 4 rows | 0.711 |
-| S stroke pixels replaced by the box's background median | 0.358 |
+| S stroke pixels (`R ≥ 110` and `R − max(G,B) ≥ 90`) replaced by the box's background median | 0.358 |
 | Flat box | 0 |
 
 Numberless S (outside the ranking top 100, per owner note) is unevidenced. It is expected to abstain at
@@ -187,7 +188,8 @@ carry-forward or sequence decoding.
 - **Pre-S lobby badges** (A, A1–A4, UNRANKED): none at the panel. Rejection is shown only by constructed
   probes, never measured on genuine full-size pre-S badges.
 - **Non-S content behind a lit header:** none in any source, so panel-stage discrimination on genuine pixels
-  rests on one dev cross-fade; there is no validation instance.
+  rests on one dev cross-fade, and it exercises only the frame stage (`badge_frame_absent`). The label, glyph
+  and digit stages are covered by T0 constructed probes only; there is no validation instance.
 - **Numberless S:** none. Its layout (for example a re-centred S) is unknown.
 - **Layout breadth:** two native geometries and three tone curves only; no other resolution, locale or overlay.
 - **Custom rooms:** genuine member lists with every member's rank exist, but are never a self-rank source.
