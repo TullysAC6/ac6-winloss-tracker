@@ -23,13 +23,30 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
-## Current slice — #15-6 offline self rank S, 2026-10-06
+## Current priority — #73 Result Accuracy Hardening, 2026-10-07
 
-#15-6 adds dormant self-rank-**S** recognition from the Ranked Single waiting-screen RANK panel, with genuine
-fixtures in formal T1; [contract](ISSUE15_6_SELF_RANK_CONTRACT.md). Status: **ACCEPTANCE PENDING** once
-merged; resolve its PR / Issue #15. PR #65 (#15-5) is unchanged and awaits FULL owner T3. Rating, pre-S,
-Team/Custom, opponent rank, runtime integration and Season remain unauthorized. STOP after #15-6.
-Sections below are historical where they conflict with GitHub.
+The owner considers current result-detection accuracy unacceptable. The roadmap is temporarily
+re-prioritized:
+
+```text
+✓ #15-6 technical merge/verification
+→ #73 Result Accuracy Hardening
+→ repeat/close #15-5 FULL owner T3
+→ #70-A / #70-B Network Telemetry
+→ #28-A
+→ UI-2
+```
+
+#15-6 is **MERGED + TECHNICALLY VERIFIED, RELEASED NO**, but the owner does **not** accept its
+S-only implementation as the final general self-rank recognition architecture. It remains a
+genuine-fixture-backed **numbered/top-100 S presentation prototype**. General self-rank recognition
+is [#74](https://github.com/TullysAC6/ac6-winloss-tracker/issues/74): separate rank class from
+PLACE/top-100 position, obtain genuine pre-S and numberless-S evidence, and design one coherent
+rank-panel architecture before production runtime use.
+
+#73 owns current implementation priority; #72 is its first known open defect. PR #65 remains
+OPEN/DRAFT and its T3 is paused. Sections below are historical where they conflict with this
+priority.
 
 ## Current checkpoint — #59 resumed, 2026-10-01
 
