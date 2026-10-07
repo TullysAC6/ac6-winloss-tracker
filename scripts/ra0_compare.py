@@ -23,14 +23,19 @@ def state_replay(polls,classes,processing_ms):
         now=100+p['at_ms']/1000.;process=now+processing_ms/1000.
         if p['capture']['discontinuity'] or p['capture']['identity_changed']:
             raise ValueError('this controlled replay supports continuous adopted video polls only')
+        activity=p['gameplay_activity'] if cls in (rd.CLEAR,rd.NON_CLEAR) else False
         result=state.observe(cls,rd.CONFIRM_HITS,rd.CLEAR_HITS_REQUIRED,rd.COOLDOWN_SECONDS,now=now,
-                             gameplay_activity=p['gameplay_activity'] if cls in (rd.CLEAR,rd.NON_CLEAR) else False)
+                             gameplay_activity=activity)
         calls=[]
         if result in ('win','loss'):
             accepted=gate.try_accept(5.,now=process)
             if accepted:state.external_mutation(now=process)
             calls=[dict(result=result,source='auto',accepted=accepted)]
-        out.append(dict(p,frame_class=cls,state=state.snapshot(),detections=[result] if result else [],gate_calls=calls))
+        # Detector health/diagnostics are not replayed by this intervention.
+        # Do not copy baseline-derived fields into a new result trace.
+        row={k:p[k] for k in ('id','at_ms','poll_t','source_frame','motion_score','capture')}
+        out.append(dict(row,frame_class=cls,state=state.snapshot(),detections=[result] if result else [],gate_calls=calls,
+                        gameplay_activity=activity,cached_gameplay_activity=p['gameplay_activity']))
     return out
 
 def main():
@@ -80,7 +85,9 @@ def main():
             result['phases'].append(phase)
             dest=outroot/tag;dest.mkdir(exist_ok=True)
             with (dest/f'poc-replay{i}.jsonl').open('w',encoding='utf-8') as f:
-                f.write(json.dumps(header)+'\n')
+                trace_header={k:v for k,v in header.items() if k!='flush_reasons'}
+                trace_header.update(experiment='controlled_state_intervention',prototype_version=PARAMETERS['version'])
+                f.write(json.dumps(trace_header)+'\n')
                 for p in changed:f.write(json.dumps(p)+'\n')
             print(tag,i,'control PASS',phase['current']['outcomes'],'->',phase['poc']['outcomes'],'FP',len(phase['poc']['false_positives']),'changed',len(interesting),flush=True)
             del arr

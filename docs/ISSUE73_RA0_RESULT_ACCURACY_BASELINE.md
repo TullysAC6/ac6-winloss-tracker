@@ -494,6 +494,9 @@ Frame comparison evaluates every adopted poll. Event comparison calls unchanged 
 `ResultStateMachine.observe` and `ResultGate`, preserving capture timestamps, 80 ms processing delay,
 two-hit confirmation, cooldown, CLEAR/re-arm and the cached capture/motion/gameplay-activity inputs.
 The control reproduced **every baseline state snapshot, detection and gate call on all 24 source-phases**.
+Generated traces explicitly label the controlled intervention and emit its own state/gate outputs; inherited
+baseline health/diagnostic outputs are omitted. Schema cleanup was followed by regenerating all 24 traces from
+their frozen class sequences and asserting exact equality of every class/state/detection/gate/evaluation.
 This isolates the classifier intervention. It is **not an integrated ResultDetector.run forecast**: activity
 inputs are held fixed, and native capture, jitter, identity/gap handling and persistence are not re-evaluated.
 The separate PHASE counterexample does run the full unchanged T1 detector loop with a substituted classifier.
@@ -597,7 +600,8 @@ Source comparisons have an explicit 30-minute deadline per source and use no cap
 Only our invalid v1 comparison processes were stopped, by their exact command ownership. Steam and Claude
 were left running. No downloader, video conversion worker, Tracker, OBS or AC6 was started. Full-frame checks
 owned each ffmpeg invocation, bounded it to 60 s and waited for completion. Temporary truth/audit and T1 roots
-were removed; final process residue is checked before publication. Diagnostics add no product process/thread,
+were removed; final process residue checks found no owned Python/ffmpeg/test process or owned temporary root.
+About 8 GiB RAM remained available. Diagnostics add no product process/thread,
 dependency, fixture edit, DB/schema/migration, release or tag action.
 
 GitHub was checked in the requested order. Main remains `039d3bc1…`, exact-main CI 37568479507 SUCCESS
