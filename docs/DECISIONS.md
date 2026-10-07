@@ -886,3 +886,30 @@ sources' tone curves (first validation run retained); the lit presentation is en
 the absolute frame, label and digit stages instead. Lit-header transitions are not guaranteed to abstain, but every lit-header frame in the evidence shows the player's own S. Only the top-100 numbered S is evidenced; a numberless S is expected, not verified, to abstain.
 [Contract](ISSUE15_6_SELF_RANK_CONTRACT.md). This changes no persistence ownership, A vs A4 precision, pre-S/S
 boundary, Season ownership or owner Acceptance. STOP after #15-6.
+
+
+## #15-6 is evidence for numbered S, not the final general self-rank architecture
+
+On 2026-10-07 the owner reviewed the merged #15-6 design and explicitly **withheld product
+acceptance of it as the final general self-rank recognizer**.
+
+The original narrow evidence decision remains valid: genuine verified RANK-panel evidence existed
+for the player's own S in the numbered/top-100 presentation, so #15-6 correctly abstained outside
+that boundary instead of inventing unsupported truth. Its genuine fixtures, self-owned RANK-panel
+proof and positive-only prototype remain useful engineering assets.
+
+What is **not** adopted is the implication that generic `self_rank = S` should require PLACE/top-100
+digits or that future ranks should be implemented as an expanding set of unrelated one-off
+predicates. Rank identity and PLACE/position are separate concepts.
+
+General self-rank recognition is owned by
+[#74](https://github.com/TullysAC6/ac6-winloss-tracker/issues/74). Before production use it must:
+- separate rank class from PLACE/top-100 position;
+- retain the §64 pre-S/S Rating semantic discontinuity without making basic rank identity S-only;
+- obtain genuine pre-S and numberless-S panel evidence before claiming support;
+- determine Ranked Team behavior from genuine evidence;
+- compare a coherent shared rank-token architecture against bespoke per-rank predicates;
+- keep unsupported presentations UNKNOWN.
+
+#15-6 remains merged and technically verified, but general-architecture Owner Acceptance is
+WITHHELD and it is not a basis for activating generic self-rank runtime.

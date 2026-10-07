@@ -1,17 +1,25 @@
 # Next session
 
-## Current owner scope — #15-6 offline self rank S, 2026-10-06
+## Current owner scope — #73 Result Accuracy Hardening, 2026-10-07
 
-Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS → Issue #15
-(the #15-6 authorization and evidence checkpoint) → current main/open PRs/CI →
-[#15-6 contract](ISSUE15_6_SELF_RANK_CONTRACT.md). GitHub overrides historical checkpoints below.
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS →
+Issue #73 → Issue #72 → current main/open PRs/CI.
 
-#15-6 is the only new work: dormant self-rank-**S** recognition from the Ranked Single waiting-screen RANK
-panel, genuine fixtures and formal T1. Gate flow: T0 → full T1 → relevant T2 (T1 runner lifecycle) →
-fresh independent implementation and fixture-truth review → exact-head CI → reviewed T3 N/A → pinned
-merge → exact-main CI → bookkeeping → separate owner Acceptance. Resolve its PR for live state.
-PR #65 / #15-5 stays untouched and waits for the owner's FULL T3. STOP after #15-6; Rating, pre-S,
-numberless S, Team/Custom, opponent rank, runtime integration, #28-A and release are not authorized.
+Owner priority is now **WIN / LOSS / DRAW reliability**. Start with #73 RA-0 evidence inventory /
+benchmark freeze; do not begin with another threshold patch. Ground-truth result events in recorded
+video must be discovered independently of the production detector before replay, so a detector that
+emits no candidate can still be measured as a miss.
+
+PR #65 / #15-5 remains OPEN/DRAFT and its FULL owner T3 is paused until #73 is accepted.
+
+#15-6 is already merged and exact-main green, but the owner explicitly withholds acceptance of it
+as the final general self-rank architecture. Treat its code/fixtures as a bounded
+**numbered/top-100 S prototype/evidence asset**. General self-rank recognition is Issue #74:
+rank identity must be separable from PLACE/top-100 position; pre-S, numberless S and Ranked Team
+support require genuine evidence and a coherent architecture before runtime use.
+
+Do not start #70, #28-A, UI work, or general Rank runtime while #73 is the active priority unless
+the owner explicitly changes the order.
 
 ## Current owner scope — bright-result-band product repair, 2026-10-03
 
