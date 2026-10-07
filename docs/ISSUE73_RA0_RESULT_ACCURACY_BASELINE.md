@@ -1,12 +1,29 @@
 # Issue #73 RA-0 — result-accuracy baseline (evidence inventory and benchmark freeze)
 
+## Executive summary — completed offline comparison, 2026-10-08 JST
+
+The adopted Pass-A inventory contains **142 independently discovered result events**, including **107 events
+from four completely covered standard-typeface sources**. At four correlated sampling phases, current main misses
+**17/428 standard event-phases**: 12 DRAW, three WINs lost jointly to bright-band rejection/confirmation resets,
+and two results blocked by the previous match's re-arm lock. It accepts no false result in the audited footage.
+The separate Korean-typeface source misses 80/80 event-phases. The partial broadcast window passes 60/60.
+
+A foreground WIN/LOSS prototype reduces standard WIN/LOSS misses **5/416 → 2/416**, recovers the three IXV8
+WIN misses and the retained #72 faded LOSS, and preserves validation WIN/LOSS **136/136**. However, it mistakes
+the canonical synthetic white-prefix PHASE control for WIN; two such polls cause an **accepted false WIN** in
+the real T1 detector loop. **Reject this frozen prototype as an RA-1 candidate.** The glyph signal is useful,
+but the complete phrase/context must still exclude PHASE. DRAW and re-arm remain separate repairs.
+
+This continues Claude's existing branch and report. **No production code or expected fixture truth changed.**
+RA-0 is analysis, not product acceptance. A fresh independent review is recorded in §12 when completed.
+
 Status: **RA-0 evidence package. No product change.** RA-1 has not started and needs separate owner
 authorization. RA-0 completion is not result-accuracy acceptance.
 
 | item | value |
 |---|---|
 | measured code | exact `main` `039d3bc1eb3116e27326099ee585cd2186531eb7` (exact-main CI run 37568479507 SUCCESS, attempt 1) |
-| branch | `claude/issue-73-ra0-result-accuracy`; repository diff = this report + `docs/issue73-ra0/ground-truth/*.json` only |
+| branch | existing `claude/issue-73-ra0-result-accuracy`; adopted head `98f8a0f`; added report/metadata plus isolated offline scripts |
 | production code replayed | `result_detector.py`, `result_gate.py`, `game_capture.py`, `detector_templates.json` byte-identical to `039d3bc1` (LF-normalized SHA-256 `cfa0d73f…`, `1532e07c…`, `72ca522b…`, `02a00968…`); classifier fingerprint `486066cb0f3376ba…` |
 | semantics changed | none: no threshold, state machine, `CONFIRM_HITS`, polling, ResultGate, CLEAR/re-arm, persistence or #72 change |
 
@@ -57,6 +74,25 @@ Not reproduced by video replay:
 - persistence (T1 does not replay storage; T0/T2 own it);
 - the original game-render pixels: the video was re-encoded by the streamer and by YouTube (H.264 4:2:0).
 
+### 1.3 Extraction defect, invalidation and handoff verification
+
+The first extractor requested a 75-row production ROI directly from an ffmpeg YUV420 crop. ffmpeg rounded
+the height to 74 rows. Reading those bytes as 75-row frames misaligned pixels, source-frame indices and polls;
+the initial VP-01 miss conclusion was false. **Every pre-fix output and conclusion is invalid.**
+
+The adopted extractor decodes an even-aligned margin and slices the exact ROI in NumPy, refusing a partial
+trailing frame. The six final source directories were regenerated with this corrected extractor. Their 24
+phase metadata files all contain the margin crop; array dimensions, complete poll/time/source-index mapping,
+and replay header geometry agree. At handoff, **48 exact full-frame decode spot checks** (two per final phase)
+matched the extracted ROI bit-for-bit. This is a spot check across all phases, not an exhaustive comparison
+of every decoded pixel. VP-01 is Correct on all four final phases.
+
+No stale pre-fix output was found in the final source directories. `vP-test` is a corrected, partial tool-validation
+subset and is explicitly excluded from every aggregate. No glob over arbitrary caches supplies the denominator:
+only the six named final sources and their frozen truth files are used. All 24 stored evaluations were independently
+recomputed from their replay JSONL and matched; all six Pass-A generators reproduced the unchanged files byte-for-byte.
+Exact hashes, per-phase geometry and checks: [handoff-verification.json](issue73-ra0/handoff-verification.json).
+
 ### 1.2 Scoring (per event, per phase)
 
 Matching window: `[banner_first − 3 s, banner_last + 10 s]`. Events in these sources are minutes apart, so windows
@@ -85,6 +121,10 @@ never overlap.
 Current-main formal T1: **83/83 PASS, 0 failed, 0 skipped** (50 result-family cases). Corpus `35f3ba4b4e9543f0`;
 source SHA-256 as in the status table. The canonical corpus is thin for LOSS (2 ROIs) and DRAW (3 ROIs from one
 non-native source, see §4.3).
+
+Handoff rerun: **83/83 PASS, 0 failed, 0 skipped, 48.53 s**, Python 3.13.15 / MSS 10.2.0, branch
+head `7f6e7fa4fc5173b2830da7cc5ee8f88bc323229b`; all measured production sources/fixtures are unchanged
+from the exact RA-0 base. This is the canonical production gate, not a claim that the foreground prototype passes T1.
 
 ### 2.2 Retained natural evidence (#66 / #68 / #72), owner-attested truth
 
@@ -299,7 +339,7 @@ Over the 281 banner-window polls with a coloured mask:
 | LOSS | ≈ .22 (.24–.42) | max .67 (≥ .82) | up to .86 |
 
 The Korean client renders the English words in a narrower plain typeface. The templates and geometry encode the
-Japanese/English-client typeface. Whether other client locales are in product scope is an **owner decision**.
+Japanese/English-client typeface in this evidence. Whether other client locales are in product scope is an **owner decision**.
 
 ### 4.7 Failure-layer breakdown
 
@@ -320,9 +360,18 @@ classifier, and the consecutive-exact confirmation resets. They differ only in w
 interrupting frame (global band darkness vs. text-mask colour/opacity).
 
 The YouTube replay shows the class is common, not anecdotal:
-- 35 of 488 replayed event-phases contain such a reset;
+- 35 of 488 replayed standard + broadcast event-phases contain a reset in the audit window
+  `[first visible − 1 s, last visible + 1 s]`; the 80 Korean phases are separate and have no candidates;
 - 32 were rescued only because the 2.5–3.5 s banner left time for two more consecutive hits;
 - 3 were lost.
+
+**Arithmetic:** 33 NON_CLEAR reset occurrences occur in 33 event-phases; four CLEAR reset occurrences occur
+in three event-phases. IX-01 phase 0 contains both classes, and IX-12 phase 3 contains two CLEAR resets.
+Thus the union is **33 + 3 − 1 = 35 event-phases**, while the occurrence count is **33 + 4 = 37**.
+Only 33 NON_CLEAR + two CLEAR occurrences fall strictly within the frozen bounds. The CLEAR at IX-01
+224.100 s is beyond the conservative Pass-A endpoint but still visibly shows YOU WIN on direct pixel inspection;
+IX-12 2152.8125 s is after the banner has disappeared. Truth bounds remain frozen; these boundary facts do not
+silently redefine them. The audit-window reset count is not a claim of 37 text-visible failures.
 
 The repaired #68 sub-case did not remove the class (IXV8). A #72 colour-mask relaxation alone would not address
 bright-band frames or full troughs. The evidence therefore indicates a **brittle consecutive-exact-final
@@ -368,7 +417,8 @@ DRAW, re-arm and locale are separate classifier/state items, not temporal-confir
 - **Tooling**: Pass A/B tools are kept outside the repository (§9). Whether to version them for RA-1 is an owner
   decision.
 
-Proposed **dev/validation split** for any later work, by source with no frames of one animation on both sides:
+The foreground PoC **dev/validation split** was committed before its parameters, by source with no frames
+of one animation on both sides ([foreground-split.json](issue73-ra0/foreground-split.json), commit `7f6e7fa`):
 - dev: vP + IXV8;
 - validation: LT25 + fAph;
 - stress: AYng;
@@ -377,8 +427,10 @@ Proposed **dev/validation split** for any later work, by source with no frames o
 
 ## 8. Proposed RA-1 boundary (not started)
 
-1. **RA-1 scope is the failure class, not one pixel presentation.** Repair "a genuine banner frame interrupts
-   consecutive confirmation". Done means:
+1. **RA-1A candidate boundary: WIN/LOSS foreground identity and result-animation continuity assessment.**
+   Repair visible faded/bright text while preserving complete PHASE/negative discrimination. A blank pulse
+   trough must remain blank at the classifier; decide separately from evidence whether temporal continuity
+   needs a bounded redesign. The frozen PoC is rejected (§10), not adopted. Done would require:
    - N5 (#72) counts exactly one LOSS;
    - the 3 lost IXV8 event-phases (IX-01 ph0, IX-12 ph2/ph3) count exactly one WIN;
    - the 32 rescued near-misses still count exactly one result;
@@ -386,12 +438,11 @@ Proposed **dev/validation split** for any later work, by source with no frames o
    - zero duplicates;
    - unchanged T1.
 
-   The parked local #72 candidate `a439259` (classifier route that recognises faded YOU LOSE text; awaiting the required Astra review) should be measured
-   against this benchmark before it advances. RA-0 did not run it.
-2. **Separate items needing owner prioritisation:**
-   - (a) DRAW template / native geometry, plus negatives for combat smoke;
-   - (b) re-arm lock starvation;
-   - (c) Korean (other-locale) typeface scope.
+   The parked local #72 candidate `a439259` is preserved and was not run, reset, rebased or otherwise used.
+2. **Separate coherent boundaries, names provisional:**
+   - RA-1B: CLEAR / post-result-lock re-arm, with duplicate/undo/still-visible-result controls;
+   - RA-1C: DRAW geometry/recognition redesign, including the smoke near-FP, not a lower score gate alone;
+   - locale/typeface scope remains an owner decision, separate from the standard-typeface repairs.
 3. RA-1 changes production semantics, so it requires T0/T1/T2, a fresh independent review, exact-head CI and RA-4
    field acceptance per #73.
 
@@ -418,3 +469,145 @@ Retained locally:
 - per-source poll arrays, replay JSONL, evaluations, timelines, lock audits and margin/reset scans;
 - retained-bundle replays;
 - the T1 report.
+
+## 10. Frozen foreground WIN/LOSS PoC
+
+### 10.1 Model, split and limits
+
+`scripts/ra0_foreground.py` is an offline NumPy diagnostic. It uses two chroma masks per class (unchanged
+shipped lit mask and a dim mask), normalized 32×8 glyph shape, separate YOU/suffix shape checks, expected
+ROI position/geometry, local glyph contrast and a margin over the PHASE template. It does not classify
+by coloured-pixel count alone and has no global result-band/lower-margin darkness gate. DRAW is excluded.
+Templates are the shipped production templates; no broadcast pixels create templates.
+
+Source assignments were frozen at `7f6e7fa`, before parameters. V1 (`2002b73`) was invalid due to Codex's
+int16 weighted-luminance overflow and was stopped. V2 (`c63d7ce`) fixed it; development inspection showed
+the dim mask included background chroma in bright IXV8. V3 (`5c93919`) added the shipped lit mask as a
+second view. **Only vP/IXV8 were used for this development. V3 was frozen before LT25/fAph/yB/AYng evaluation
+and was never tuned afterward**, including after discovering the PHASE failure. Earlier versions remain
+separate local outputs and are excluded from final metrics. This rework was from Codex's approach, not Claude's.
+
+Validation is held out from **PoC parameter selection**, not blind to the existing production-baseline report.
+LT25 is a clean standard-typeface validation-only source. yB and AYng remain separate holdout/stress groups.
+
+Frame comparison evaluates every adopted poll. Event comparison calls unchanged production
+`ResultStateMachine.observe` and `ResultGate`, preserving capture timestamps, 80 ms processing delay,
+two-hit confirmation, cooldown, CLEAR/re-arm and the cached capture/motion/gameplay-activity inputs.
+The control reproduced **every baseline state snapshot, detection and gate call on all 24 source-phases**.
+This isolates the classifier intervention. It is **not an integrated ResultDetector.run forecast**: activity
+inputs are held fixed, and native capture, jitter, identity/gap handling and persistence are not re-evaluated.
+The separate PHASE counterexample does run the full unchanged T1 detector loop with a substituted classifier.
+
+### 10.2 Event results: standard sources only
+
+| Metric | Current | Text-focused PoC v3 |
+|---|---:|---:|
+| Standard WIN correct | 280/284 | 283/284 |
+| Standard LOSS correct | 131/132 | 131/132 |
+| WIN misses | 4 | 1 |
+| LOSS misses | 1 | 1 |
+| Wrong class / duplicate | 0 / 0 | 0 / 0 |
+| Accepted false positives in natural standard footage | 0 | 0 |
+| Dangerous armed one-hit near-FP in standard footage | 1 DRAW | 1 DRAW (unchanged) |
+| #68 retained WIN | pass, one WIN | pass, one WIN |
+| #72 retained LOSS | fail, zero LOSS | pass, one LOSS |
+| IXV8 previously missed WIN event-phases recovered | 0/3 | 3/3 |
+| Validation WIN/LOSS correct (LT25 + fAph) | 136/136 | 136/136 |
+| Canonical white-prefix PHASE: false final classification | 0 | 1 |
+| Separate repeated-prefix synthetic stress: accepted false WIN | 0 | **1** |
+
+The retained #72 trial is separate from the 416 natural standard WIN/LOSS event-phases. The two remaining
+natural WIN/LOSS misses are VP-26 phase 2 (LOSS) and VP-39 phase 3 (WIN), both prior-match re-arm locks.
+Including unchanged DRAW gives 411/428 → 414/428; do not present that as a WIN/LOSS accuracy denominator.
+28 canonical result still images retain all nine WIN/LOSS positives, but the synthetic PHASE control fails
+(the three DRAW images are outside PoC scope). Canonical production T1 remains 83/83 PASS.
+
+### 10.3 Frame evidence and temporal distinction
+
+| Frame signal measure | Current | PoC v3 |
+|---|---:|---:|
+| Matching final signal in frozen standard WIN/LOSS intervals | 1089/1240 polls | 1118/1240 polls |
+| Matching final signal in validation WIN/LOSS intervals | 354/415 polls | 362/415 polls |
+| WIN/LOSS final signal outside standard scoring windows | 0/101327 polls | 0/101327 polls |
+
+These are **signal-coverage counts within event intervals**, not frame-label accuracy: frozen event bounds
+include genuinely blank pulse troughs. They do not assume text is visible at every poll. A post-evaluation
+pixel inspection of disagreements confirmed 13 dim vP WIN frames and two dim LT25 LOSS frames are visibly
+legible (e.g. VP-09 1572.020, LT-02 ph2 367.275, LT-03 ph3 717.7425), and PoC recognizes them. The retained
+#72 181194.696 frame visibly contains faded YOU LOSE and changes NON_CLEAR → FINAL_LOSS.
+This selected sample demonstrates mechanisms; it is not a separately sampled validation accuracy estimate.
+
+For IX-01 ph0, the exact sequence is WIN 221.610 → **blank NON_CLEAR 222.440** → WIN 223.270 →
+**visible bright WIN 224.100, current CLEAR / PoC WIN**. PoC leaves the blank frame unrecognized and
+confirms on the last two visible frames. IX-12 ph2/ph3 bright frames at 2150.945/2151.1525 also recover.
+The post-banner IX-12 2152.8125 frame stays non-final. vP 260.620 is a visibly blank trough and remains non-final.
+Improved visible-text classification is therefore distinct from granting classifier identity to a blank trough.
+
+### 10.4 Holdout and broadcast remain separate
+
+| Korean/typeface holdout (yB) | Current | PoC v3 |
+|---|---:|---:|
+| WIN correct | 0/48 | 0/48 |
+| LOSS correct | 0/32 | 0/32 |
+| Accepted FP / near-FP | 0 / 0 | 0 / 0 |
+| Matching final signal in banner intervals | 0/240 | 0/240 |
+
+| AYng broadcast stress, **0–4630 s only** | Current | PoC v3 |
+|---|---:|---:|
+| WIN correct | 36/36 | 36/36 |
+| LOSS correct | 24/24 | 24/24 |
+| Accepted FP / near-FP | 0 / 0 | 0 / 0 |
+| Matching final signal in banner intervals | 162/188 | 164/188 |
+| Final WIN/LOSS signal outside scoring windows | 0/21189 | 0/21189 |
+
+No result ROI is overlay-occluded in this evidence. AYng tests rescaling and a broadcast layout, not arbitrary
+chat/logo occlusion through the glyphs. Covered footage contains combat, explosions/smoke, notices including
+ENEMY DESTROYED, PHASE, garage/assembly, menu/loading and unrelated coloured graphics. There are no
+separate exhaustive per-category denominators, and an unseen overlay intersecting the ROI remains untested.
+
+### 10.5 Precision failure and decision
+
+The existing synthetic `phase_white_prefix_synthetic.ppm` contains white prefix blocks before the coloured
+YOU WIN suffix. The coloured glyph shape itself matches a final. V3 ignores the neutral prefix and therefore
+classifies FINAL_WIN. An isolated diagnostic sequence of three canonical CLEARs followed by **two copies of
+that existing PHASE negative** passes zero results under current main, but accepts **one false WIN** under v3
+through `tests/t1/replay.py:run_sequence`. This is explicitly synthetic adverse evidence, not a natural-video event.
+It is sufficient to fail the precision-first decision rule despite zero observed natural-video false positives.
+
+**Reject v3 as an RA-1 candidate.** Do not tune it on the now-seen validation/stress sources to hide this failure.
+The positive conclusion is narrower: foreground identity can recognize visible faded/bright standard glyphs
+without the global darkness gate, while blank troughs remain blank. A future separately authorized design
+must identify the complete result phrase/context, retain PHASE discrimination, and undergo a new independent
+validation protocol. Existing evidence supports evaluating classifier identity and continuity together; it does
+not authorize arbitrary temporal gaps, global gate removal, locale expansion or RA-1 implementation.
+
+## 11. Reproduction, hygiene and ownership at handoff
+
+Machine-readable comparison: [foreground-comparison.json](issue73-ra0/foreground-comparison.json).
+Final local output: `issue73-ra0-evidence/foreground-v3/` in the workspace parent; source arrays/videos:
+`<user>/ac6-ra0-video-sources/`. Neither directory is added to Git. In the adopted worktree:
+
+```powershell
+# Existing verification Python 3.13 environment; NumPy is offline-tooling-only.
+python -B scripts/ra0_compare.py <polls-root> <existing-evidence-root> <output-root> vP IXV8 LT25 fAph yB AYng
+```
+
+The existing evidence root supplies the adopted `ra0_evaluate.py` scorer, hash `6217af0b…932c` (§9).
+Source comparisons have an explicit 30-minute deadline per source and use no capture/network/persistence.
+Only our invalid v1 comparison processes were stopped, by their exact command ownership. Steam and Claude
+were left running. No downloader, video conversion worker, Tracker, OBS or AC6 was started. Full-frame checks
+owned each ffmpeg invocation, bounded it to 60 s and waited for completion. Temporary truth/audit and T1 roots
+were removed; final process residue is checked before publication. Diagnostics add no product process/thread,
+dependency, fixture edit, DB/schema/migration, release or tag action.
+
+GitHub was checked in the requested order. Main remains `039d3bc1…`, exact-main CI 37568479507 SUCCESS
+attempt 1, stable v1.2.0; #73/#72 OPEN, #68/#66 CLOSED. PR #65 is the only pre-existing open PR,
+OPEN/DRAFT at `889d9e18…`; no #65 branch or worktree was modified. The existing #73 worktree was clean at
+adoption and was reused without reset/rebase/new generation. Maximum two generations is maintained when
+the RA-0 draft PR is opened. Issue #6's old body contains historical checkpoints; current main/CI, newer
+owner comments and current priority sections supersede them. No conflict requires a product-scope change.
+
+## 12. Independent review
+
+Pending fresh-context review of the completed report/PoC and underlying local evidence. No RA-0 completion,
+owner Acceptance, merge or RA-1 start is inferred from the automated results above.
