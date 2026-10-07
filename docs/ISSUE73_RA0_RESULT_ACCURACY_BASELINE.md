@@ -227,7 +227,7 @@ Precision is "0 false positives in the audited footage", not a rate claim.
 
 **Precision margin.** In C–E there is no FINAL frame outside an event window. There is one wrong-class armed hit:
 - vP phase 1, t = 1284.217 s, 2.8 s before the VP-07 WIN: a single `FINAL_DRAW` from **combat explosion smoke**.
-- Its DRAW grid score was 0.75, exactly at the gate; draw cluster span .25, y-span .50, band dark .76.
+- Its DRAW grid score was **0.7528075**, only **0.0028075 above the 0.75 gate**; draw cluster span .25, y-span .50, band dark .76.
 - One more such poll would have confirmed a **false DRAW**, which also installs the post-result lock and could swallow
   the genuine WIN 3 s later.
 
@@ -396,7 +396,7 @@ DRAW, re-arm and locale are separate classifier/state items, not temporal-confir
 | tolerate one non-final frame between hits (B/C) | two spurious hits bridged by a gap: combat smoke DRAW (grid .75 at 1284 s), PHASE `YOU WIN/LOSE` sub-banners, red/cyan HUD bursts | 151,258 non-event polls with 0 FINAL frames outside events, except the DRAW hit near VP-07 |
 | relax band darkness (#68 class) | bright PHASE banners, garage cyan bodies, menu text on light panels | 10 T1 negatives; PHASE polls vP 771, LT25 236, fAph 309, IXV8 455, AYng 283, yB 269 |
 | widen the LOSS colour mask (#72 candidate) | red damage/glitch overlays (FA-04 red stripes), red HUD, orange explosions | fAph red-glitch LOSS background; #72 adverse sweeps |
-| recalibrate the DRAW template to centred native geometry | white combat smoke/explosions, white notices (ENEMY DESTROYED, TIME UP); a false DRAW also locks the next result | the near-FP at 1284 s is already at the gate; T1 false-DRAW combat negatives |
+| recalibrate the DRAW template to centred native geometry | white combat smoke/explosions, white notices (ENEMY DESTROYED, TIME UP); a false DRAW also locks the next result | the near-FP at 1284 s is just above the gate; T1 false-DRAW combat negatives |
 | ease re-arm (cumulative CLEAR or activity release) | double count of one result screen, carry-over after undo, re-count when returning to a still-visible result | T1 undo/no-recount/rearm sequences; the original reason for strict mode |
 | support another locale typeface | other glyph sets and other on-screen text | yB only (one source) |
 
@@ -613,5 +613,20 @@ owner comments and current priority sections supersede them. No conflict require
 
 ## 12. Independent review
 
-Pending fresh-context review of the completed report/PoC and underlying local evidence. No RA-0 completion,
-owner Acceptance, merge or RA-1 start is inferred from the automated results above.
+Fresh-context **GPT-6 Astra / High: GO for RA-0 evidence/report**, reviewed candidate
+`1dea649b957a5006c5fa1f5f17e3e44b406d1038` plus corrected trace-schema candidate
+`d76ab541e986244989c43a0025521ac42a627abc`. Critical / High / Medium (P2): **0 / 0 / 0**.
+
+The reviewer independently recomputed all 24 raw JSONL phases, confirmed all six byte-identical truth
+regenerations and source/comparison hashes, reproduced all baseline state/detection/gate snapshots, and
+checked six additional full-frame decodes including the smoke and bright-WIN frames. Visual inspection
+distinguished blank troughs from the visible faded #72 glyphs. The schema correction was independently
+reverified on all 24 final traces. Two Low issues were resolved: copied baseline health/diagnostic fields
+in PoC traces, and rounding the smoke DRAW score as exactly equal to its threshold (actual margin +0.0028075).
+The latter is a report-only numeric correction; measured outputs and classifier parameters did not change.
+
+Review limits: the original full Pass-A visual sweep was not exhaustively repeated; its historical independence
+cannot be reconstructed solely from frozen JSON. Owner/human annotation spot review remains open. YouTube,
+partial AYng, source/typeface diversity, cached upstream activity and unmeasured persistence/native capture
+remain the stated limits. **GO accepts the RA-0 analysis package, not the rejected PoC or product accuracy.**
+Owner Acceptance, merge and RA-1 execution are still separate decisions. STOP after the #73 checkpoint and draft PR.
