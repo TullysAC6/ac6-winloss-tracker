@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "purpose": "Offline WIN/LOSS foreground PoC only; frozen before prototype parameters or evaluation",
+  "base": "039d3bc1eb3116e27326099ee585cd2186531eb7",
+  "development": ["vP-M8cPgMtE", "IXV8Y_t6U34"],
+  "validation_only": ["LT25joZOjhU", "fAphPer-yas"],
+  "typeface_holdout": ["yB_Hcy45v5c"],
+  "broadcast_stress": ["AYngtoqhwKs"],
+  "retained_regressions": ["98e926fab4854857a914e0e1c692e540", "bb8ce355ed3142a2873fc67656d70558", "b3f1faf5bc2d43c996412777d39fa50a"],
+  "limitations": "Existing production baseline and failure report were already seen. Sources are held out from PoC parameter selection, not from all prior investigation. No source will be reassigned after evaluation. DRAW is excluded from this PoC."
+}
