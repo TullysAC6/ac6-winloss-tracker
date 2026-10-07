@@ -6,18 +6,25 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current slice — #15-6 offline self rank S, 2026-10-06
+## Current priority — #73 Result Accuracy Hardening, 2026-10-07
 
-Owner [authorized](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6005202373)
-#15-6 in parallel with the owner's pending #15-5 T3; at most two unmerged generations (PR #65 and #15-6).
-The [evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6006194783)
-passed for one boundary: the player's own **S** from the RANK panel of the native English Ranked Single
-waiting screen, with the complete header as same-frame context only. [Contract](ISSUE15_6_SELF_RANK_CONTRACT.md).
-Dormant pure `self_rank.py`; 22 genuine rank records (10 positives from three sessions, 12 negatives) join
-the unchanged 61 T1 cases. Rating, pre-S, numberless S, Team/Custom, opponent rank, runtime callers and
-Season are unsupported. Resolve its PR / Issue #15 for gates, review, CI and merge. #15-6 Accepted
-PENDING, Released NO; PR #65 untouched; stable v1.2.0. STOP after #15-6. GitHub overrides older
-checkpoints below.
+Owner considers current WIN / LOSS / DRAW reliability unacceptable and has adopted
+[#73](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73) as the next priority phase.
+#72 is the first known open defect under that umbrella. #15-5 / PR #65 remains OPEN/DRAFT and its
+FULL owner T3 is paused until #73 is accepted.
+
+#15-6 merged as `7e83c834c97bc30096cc050faa2dd6e9df6ee00e` after review GO, T3 N/A and
+exact-head CI success; exact-main CI 37467698421 also succeeded attempt 1. The owner does **not**
+accept #15-6 as the final general self-rank recognition architecture. Its supported durable meaning
+is the evidence-backed **numbered/top-100 S presentation prototype** and its genuine fixtures.
+General self-rank recognition is deferred to
+[#74](https://github.com/TullysAC6/ac6-winloss-tracker/issues/74), which must separate rank identity
+from PLACE/top-100 position and require genuine pre-S / numberless-S evidence before claiming those
+presentations. #15-6 remains Merged YES / technically verified YES / Released NO; general-architecture
+Owner Acceptance is WITHHELD.
+
+Current order: #73 → repeat/close #15-5 T3 → #70 Network Telemetry phases → later roadmap work.
+GitHub issues/PRs override older checkpoints below.
 
 ## Current product repair — bright-result-band WIN miss, 2026-10-03
 
