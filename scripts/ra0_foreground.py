@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import numpy as np
 
-PARAMETERS = dict(version=1, min_channel=45, win_chroma=15, loss_rg=15,
+PARAMETERS = dict(version=2, min_channel=45, win_chroma=15, loss_rg=15,
                   loss_rb=20, grid=.90, word_grid=.85, phase_margin=.05,
                   min_contrast=8, min_coverage=.008)
 
@@ -32,7 +32,8 @@ class Foreground:
 
     def classify(self,bgr):
         p=PARAMETERS
-        b,g,r=np.moveaxis(bgr.astype(np.int16),-1,0)
+        # Weighted luminance reaches 65280; int16 overflows even on ordinary glyphs.
+        b,g,r=np.moveaxis(bgr.astype(np.int32),-1,0)
         masks={'WIN':(g>p['min_channel'])&(b>p['min_channel'])&(g-r>p['win_chroma'])&(b-r>p['win_chroma'])&(abs(g-b)<70),
                'LOSS':(r>p['min_channel'])&(r-g>p['loss_rg'])&(r-b>p['loss_rb'])&(g>15)}
         gray=(29*b+150*g+77*r)/256.
@@ -54,12 +55,12 @@ class Foreground:
                    cosine(features[:,half:].ravel(),final[:,half:].ravel())]
             # Measure geometry from only the expected central glyph area, while
             # the full-ROI fingerprint still penalizes unrelated coloured text.
-            central=mask[:,int(.27*w):int(.73*w)]
+            central=mask[int(.20*h):int(.80*h),int(.27*w):int(.73*w)]
             yy,xx=np.where(central)
             span=(xx.max()-xx.min()+1)/w if len(xx) else 0
             yspan=(yy.max()-yy.min()+1)/h if len(yy) else 0
             cx=(xx.mean()+int(.27*w))/w if len(xx) else 0
-            cy=yy.mean()/h if len(yy) else 0
+            cy=(yy.mean()+int(.20*h))/h if len(yy) else 0
             area=np.zeros_like(mask);area[int(.20*h):int(.80*h),int(.27*w):int(.73*w)]=True
             fg=gray[mask&area];background=gray[(~mask)&area]
             contrast=float(np.median(fg)-np.median(background)) if len(fg) and len(background) else 0
