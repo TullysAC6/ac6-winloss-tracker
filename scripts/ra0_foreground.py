@@ -8,9 +8,9 @@ import json
 from pathlib import Path
 import numpy as np
 
-PARAMETERS = dict(version=2, min_channel=45, win_chroma=15, loss_rg=15,
+PARAMETERS = dict(version=3, min_channel=45, win_chroma=15, loss_rg=15,
                   loss_rb=20, grid=.90, word_grid=.85, phase_margin=.05,
-                  min_contrast=8, min_coverage=.008)
+                  min_contrast=8, min_coverage=.008, lit_mask='unchanged shipped WIN/LOSS chroma mask')
 
 def cosine(a,b):
     norm=float(np.linalg.norm(a)*np.linalg.norm(b))
@@ -34,16 +34,19 @@ class Foreground:
         p=PARAMETERS
         # Weighted luminance reaches 65280; int16 overflows even on ordinary glyphs.
         b,g,r=np.moveaxis(bgr.astype(np.int32),-1,0)
-        masks={'WIN':(g>p['min_channel'])&(b>p['min_channel'])&(g-r>p['win_chroma'])&(b-r>p['win_chroma'])&(abs(g-b)<70),
-               'LOSS':(r>p['min_channel'])&(r-g>p['loss_rg'])&(r-b>p['loss_rb'])&(g>15)}
+        masks={'WIN_lit':(g>120)&(b>120)&(g-r>25)&(b-r>20)&(abs(g-b)<70),
+               'LOSS_lit':(r>130)&(r-g>35)&(r-b>45)&(g>50),
+               'WIN_dim':(g>p['min_channel'])&(b>p['min_channel'])&(g-r>p['win_chroma'])&(b-r>p['win_chroma'])&(abs(g-b)<70),
+               'LOSS_dim':(r>p['min_channel'])&(r-g>p['loss_rg'])&(r-b>p['loss_rb'])&(g>15)}
         gray=(29*b+150*g+77*r)/256.
         scores={};accepted=[]
         h,w=b.shape
-        for label,mask in masks.items():
+        for key,mask in masks.items():
+            label=key.split('_')[0]
             # Empty/very faint troughs are rejected, never carried forward here.
             ys,xs=np.where(mask)
             if len(xs)<h*w*p['min_coverage']:
-                scores[label]={'accepted':False,'reason':'insufficient_foreground'};continue
+                scores[key]={'accepted':False,'reason':'insufficient_foreground'};continue
             features=grid(mask,self.gx,self.gy)
             final=self.templates['final_'+label.lower()]
             phase=self.templates['phase_'+label.lower()]
@@ -67,7 +70,7 @@ class Foreground:
             ok=(shape>=p['grid'] and min(words)>=p['word_grid'] and shape>=phase_score+p['phase_margin']
                 and .22<=span<=.42 and .35<=yspan<=.75 and .38<=cx<=.62 and .32<=cy<=.68
                 and contrast>=p['min_contrast'])
-            scores[label]=dict(accepted=bool(ok),grid=shape,phase_grid=phase_score,word_grids=words,
+            scores[key]=dict(accepted=bool(ok),grid=shape,phase_grid=phase_score,word_grids=words,
                                span=span,yspan=yspan,center=[cx,cy],contrast=contrast,coverage=len(xs)/(h*w))
-            if ok:accepted.append(label)
+            if ok and label not in accepted:accepted.append(label)
         return ('FINAL_'+accepted[0] if len(accepted)==1 else None),scores
