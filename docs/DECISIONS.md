@@ -1,5 +1,55 @@
 # Decisions
 
+## Adopt six-part development policy and dependency-based roadmap
+
+**Owner decision, 2026-10-13 JST:**
+[Issue #6 comment6136934115](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115).
+The owner fully adopted the six-part proposal to reduce repeated investigation/helper rework and
+deliver reliable user value earlier. Related Issue checkpoints already record it; this docs PR
+does not repost or renegotiate those decisions.
+
+1. **Three evidence lanes inside #73:** A is #72's genuine faint/pulsing LOSS, B the five inherited
+   synthetic accepted-FP constructions, C temporal/capture/CLEAR/re-arm/duplicate/stale boundaries.
+   Lane research improvement with no new regression is distinct from full product Acceptance:
+   audited WIN/LOSS recall >=99%, accepted FP=0, wrong class=0, duplicate=0, DRAW non-interference,
+   applicable gates, independent review, native owner T3 and performance all remain required.
+2. **Small pre-registered research:** verify surviving discriminating information, vary one
+   representation component with temporal/ResultGate/capture unchanged, and use decisive positives
+   and mandatory adverse controls early. Protect validation/holdout, freeze before assessment,
+   and stop at the declared NO-GO. Repeated same-class failure calls for representation reassessment.
+   Case B RETIRED and Banner PoC RESEARCH NO-GO are retained evidence, not restartable candidates.
+3. **Reusable verification contracts:** prefer existing T1/T2 components; strict UTF-8/schema,
+   source/fixture SHA and independent truth/provenance, empty-versus-missing output, immutable logs,
+   owned bounded runtime/cleanup, and product/environment/helper error classification. Correct and
+   rerun only affected paths inside a future expressly pre-authorized envelope. Historical helper
+   P2/environment findings are not reopened without new evidence; no retroactive worktree permission.
+4. **Dependency-based delivery:** #73 reliability → existing authorized `RANK MATCH: SINGLE`
+   assisted #15-5 FULL T3 → reliability release decision → basic existing-data Analytics and minimum
+   UI-2 History/Statistics. #70-A is an independent bounded feasibility decision; #70-B and generic
+   Rank do not gate basic trends. #28-A gates season-specific claims only; unresolved Season does
+   not block ordinary time-based WIN/LOSS analysis. General Rank/#74, rating/#28-B and opponent/#17
+   analytics follow actual evidence dependencies. #16 owns data; #25 owns presentation.
+5. **Measured performance:** reuse #37's `tools/Start-RC-Performance-Capture.ps1` where appropriate;
+   pair Tracker OFF / accepted main / candidate under matched machine/game/display/settings.
+   Record AC6 frametime p95/p99, CPU/RAM, capture freshness/gaps and cleanup, separating offline
+   classifier speed from loop/game cost. Derive budgets from measurements, not invented numbers.
+   Report sample sizes/conditions, provenance and unknowns; opponent acquisition needs eligible
+   denominator, coverage and selection-bias reporting, not accuracy only on acquired records.
+6. **Live coordination / small releases:** PROJECT_STATE's compact current section owns main/CI,
+   candidate/owner, lane/FAIL/NM and next approval state. Keep Implemented/Gates/Reviewed/T3/
+   Accepted/Merged/Released distinct and link historical evidence. Plan a small reliability release
+   after #73 and required acceptance, auditing all exact-main unreleased contents, dependencies,
+   installer/update/rollback and release gates before publication; do not wait for every enrichment.
+
+This supersedes the older strict #70-B → #28-A → whole UI-2 sequence and broad rank/opponent
+prerequisites for basic analytics **for future approvals only**. MASTER_REQUIREMENTS' blanket
+Season-to-UI-2 dependency is narrowed to season-specific functionality; Season/Rank truth rules
+and the DRAW amendment below are unchanged. Historical implementation/acceptance records remain
+verbatim. See [current order](ROADMAP.md#adopted-development-order--2026-10-13).
+
+Policy/roadmap adoption is not authorization for a product slice, measurement, T3, merge or release.
+This PR changes no code/tests/fixtures/CI; no acceptance state is upgraded by documentation.
+
 ## DRAW recognition is optional; WIN/LOSS non-interference is mandatory
 
 **Owner decision, 2026-10-13 JST:**
