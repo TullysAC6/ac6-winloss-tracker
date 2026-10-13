@@ -1,6 +1,41 @@
 # Next session
 
-## Current owner scope — WIN/LOSS accuracy and #72, 2026-10-13
+## Current scope — adopted roadmap docs alignment, 2026-10-13
+
+Read Issue #6 / [owner adoption6136934115](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115)
+→ MASTER_REQUIREMENTS → [PROJECT_STATE live checkpoint](PROJECT_STATE.md#live-checkpoint--adopted-roadmap-2026-10-13)
+→ this file → ROADMAP → DECISIONS → Issue #73/#72/#16/#37/#70 → exact main/open PRs/CI.
+Check ownership, process references and <=2 active unmerged generations before creating a branch.
+PROJECT_STATE holds live SHA/CI/candidate/owner/gate state; older checkpoints below are history.
+
+This task aligns docs only. Complete document/link/diff checks, fresh Astra / High review,
+necessary docs corrections and exact-head CI, then STOP for owner merge authorization.
+Do not start #72 product work, #70-A, Analytics/UI-2, performance measurement, T3 or release.
+Preserve PR #65 and other sessions. PR #77 DRAW requirements and original test truth remain intact.
+
+The [adopted development order](ROADMAP.md#adopted-development-order--2026-10-13) separates #73
+lanes A (#72 real LOSS), B (five accepted-FP adverse constructions), C (temporal/capture/CLEAR/
+re-arm/duplicate/stale). A lane's research GO is not full #73 Acceptance. Keep zero accepted FP,
+wrong class and duplicate, recall >=99%, DRAW non-interference and native/gate/review/performance
+requirements. Case B stays RETIRED and Banner PoC RESEARCH NO-GO.
+
+For a later separately authorized bounded experiment: predeclare the single component, unchanged
+controls, development/validation/holdout split, early positive/adverse NO-GO and STOP conditions.
+Use #72/#68/clear WIN/LOSS and inherited negatives early; freeze before held-out assessment.
+Reuse existing T1/T2 and small strict helper contracts; rerun affected paths only. Preserve original
+logs, source hashes/truth, empty-versus-missing output and product/environment/helper distinctions.
+Repeated same-class failure requires architectural reassessment, not another predicate or a
+renamed restart. This policy does not authorize edits to a currently owned helper/worktree.
+
+Future approvals prioritize #73 → existing authorized SINGLE-only #15-5 FULL T3 → reliability
+release decision → basic reliable WIN/LOSS Analytics + minimum UI-2 History/Statistics.
+#70-A is an independent bounded feasibility GO/NO-GO, not a prerequisite to that basic increment.
+Generic Rank/#70-B/opponent capture must not block basic time-based trends; #28-A applies only to
+season-specific claims. Rank/Rating and opponent analytics wait for their actual evidence/data.
+Reuse #37's existing capture tool for paired OFF/accepted/candidate evidence after separate approval;
+no numerical budgets or runtime performance claims are invented from offline timing.
+
+## Historical requirement scope — WIN/LOSS accuracy and #72, 2026-10-13
 
 Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS →
 Issue #73 / [owner decision6135964654](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654)

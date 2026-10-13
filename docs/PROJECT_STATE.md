@@ -6,7 +6,34 @@ Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; cano
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current owner scope — WIN/LOSS accuracy and #72, 2026-10-13
+## Live checkpoint — adopted roadmap, 2026-10-13
+
+Update this compact section after verifying GitHub; older sections are dated audit history, not
+live scope. [Owner-adopted six-part plan](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115)
+and [current development order](ROADMAP.md#adopted-development-order--2026-10-13) govern future approvals.
+
+| Dimension | Verified state / next decision |
+|---|---|
+| Main / CI | Verification anchor `1869f9d576bce06786a94435c18e5c569df8ba93` (docs-only PR #77); [exact-main CI 38336338466](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/38336338466) SUCCESS, attempt 1. Recheck exact current main/CI at each session; a later docs merge changes the repository SHA, not product behavior |
+| Stable | v1.2.0; no reliability release authorized by this plan |
+| Active product candidate / owner | PR #65 OPEN/DRAFT, `889d9e18a917fd183e0788495a86d542203040de`, GitHub head `codex/issue15-5-runtime-20261002`; existing local branch/worktree `codex/issue15-5-main-sync-20261003` / `ac6-wt-issue15-5-main-sync` retained for its existing session; no ownership transfer or edit authorized here |
+| Current work / owner | Codex Sol 6.1: separate `codex/adopted-roadmap-docs-20261013` / `ac6-wt-roadmap-adoption-docs-20261013`, documentation alignment only. Pin candidate SHA, review and CI in its PR; no #72/#70/Analytics product candidate started |
+| #73 A | #72 OPEN/reopened, genuine faded/pulsing LOSS unresolved. Feature-loss hypothesis needs exact-main evidence verification before a separately authorized repair |
+| #73 B | Five inherited synthetic accepted-FP constructions unresolved; retained mandatory adverse controls, not excluded from full Acceptance |
+| #73 C | Temporal/capture/CLEAR/re-arm, duplicate/stale and persistence boundaries separately tracked; no blanket gap, lock or capture change authorized |
+| Known FAIL / NOT_MEASURABLE | #72 natural miss; five synthetic accepted FP; prior #15-5 FULL owner T3 FAIL/paused. Offline evidence does not verify native #68/#72 live-capture conditions; preserve source-specific NM and failed traces |
+| #73 lifecycle | Implemented: baseline only, hardening incomplete; Gates: incomplete; Reviewed: historical slice reviews only; T3: full #73 acceptance not done; Accepted: NO; Merged: baseline/selected earlier slices only; Released: no accepted #73 hardening release |
+| #15-5 lifecycle | Implemented: experimental candidate; Gates/Reviewed: historical evidence requiring affected revalidation; T3: FAIL/paused; Accepted: NO; Merged: NO; Released: NO |
+| Retired assets | Case B RETIRED; Banner PoC RESEARCH NO-GO. Research evidence/refs preserved; neither product Accepted/Merged/Released, no restart |
+| Next owner decision | After this docs PR, separate merge authorization; next engineering scope is one bounded #72 investigation/repair. #15-5 T3, #37 native measurement, reliability release, Analytics/UI-2 and #70-A each require their applicable separate authorization |
+| Generations | At preflight, PR #65 alone (1/2); this independent docs candidate occupies the second slot (2/2). Recheck active refs/worktrees before any subsequent branch |
+
+Lane research GO means the owned defect improves on frozen evidence with no new regression; it
+does not accept #73. Full #73 still requires audited WIN/LOSS recall >=99%, accepted FP=0,
+wrong class=0, duplicate=0, DRAW non-interference, all applicable gates, independent review,
+native owner T3 and performance evidence. A/B/C progress never relabels another lane's FAIL as PASS.
+
+## Historical requirement amendment — WIN/LOSS accuracy and #72, 2026-10-13
 
 [Owner decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654):
 #73 prioritizes WIN/LOSS precision and recall, with [#72](https://github.com/TullysAC6/ac6-winloss-tracker/issues/72)'s
