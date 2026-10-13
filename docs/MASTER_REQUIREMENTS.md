@@ -1926,7 +1926,8 @@ These are cross-cutting; they are not a third feature track competing with the t
    each following its own data. #16 owns the data; UI-3A/UI-3B own the rendering
 7. UI-4 Tray / Launcher modernization, last, and only if its lifecycle safety can be demonstrated
 
-The full interleaved order is recorded under **Sequencing** in `docs/ROADMAP.md`.
+The full interleaved order is recorded under
+[Adopted development order — 2026-10-13](ROADMAP.md#adopted-development-order--2026-10-13).
 
 The roadmap may implement prerequisite foundations before the visible feature that depends on them.
 
@@ -2320,7 +2321,8 @@ Status: **ADOPTED (process).** Tracked as
 [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) for UI-4.
 
 The UI phases interleave with the feature phases rather than running as a block. The authoritative
-interleaved order lives in `docs/ROADMAP.md` under **Sequencing**. Two dependencies in it are
+interleaved order lives in
+[ROADMAP's adopted development order](ROADMAP.md#adopted-development-order--2026-10-13). Two dependencies in it are
 requirements, not scheduling preferences:
 
 - **UI-2 uses reliable existing history and settled match-data contracts (§10, #15).** Only its
