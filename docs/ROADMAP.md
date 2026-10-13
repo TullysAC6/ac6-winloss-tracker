@@ -23,7 +23,23 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
-## Current priority — #73 Result Accuracy Hardening, 2026-10-07
+## Current priority amendment — WIN/LOSS accuracy and #72, 2026-10-13
+
+[Owner decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654)
+changes the forward-looking DRAW requirement, not implementation history. Under
+[MASTER_REQUIREMENTS §9](MASTER_REQUIREMENTS.md#9-win--lose--draw), WIN/LOSS must be correctly counted
+exactly once. DRAW recognition/display/persistence is optional, but DRAW must not be mistaken for
+WIN/LOSS, change counts/streaks/win rate, or impede WIN/LOSS detection/counting before or after it.
+Duplicate/stale results and incorrect ResultGate behavior remain prohibited.
+
+#73 WIN/LOSS precision/recall remains before #15-5 T3; the next defect is #72's retained natural
+pulsing/faded LOSS. Cancel DRAW coordinate/template repair and DRAW recognition-rate work.
+Existing DRAW functionality is retained. Case B remains RETIRED; Banner PoC remains RESEARCH NO-GO,
+both NOT ACCEPTED / NOT MERGED / NOT RELEASED. PR #65 is OPEN/DRAFT/untouched, its T3 paused.
+This docs-only amendment authorizes no product repair, new recognition research, T3 or release.
+The Phase 1 DRAW row below records existing implementation, not a mandatory future recognition target.
+
+## Historical priority — #73 Result Accuracy Hardening, 2026-10-07
 
 The owner considers current result-detection accuracy unacceptable. The roadmap is temporarily
 re-prioritized:
@@ -368,7 +384,7 @@ shipped application feature.
 |---|---|---|
 | WIN auto-detection | DONE | RANK MATCH: SINGLE only |
 | LOSE auto-detection | DONE | |
-| DRAW | DONE | Detected as `FINAL_DRAW` and reported as `last_result=draw`. **Deliberately not counted** — WIN / LOSE / streak are left unchanged. `history.db` and the analytics module accept `draw` rows, but none are ever written today |
+| DRAW | DONE (existing implementation) | Detected as `FINAL_DRAW` and reported as `last_result=draw`. **Deliberately not counted** — WIN / LOSE / streak are left unchanged. `history.db` and the analytics module accept `draw` rows, but none are ever written today. Forward-looking recognition/display/persistence is **optional** under §9; non-interference remains mandatory. Existing functionality is retained |
 | Manual WIN / LOSE entry | DEFERRED | No user-facing manual result entry exists. Only manual **undo** (`stats_undo.bat`, `control.py undo`) and **session reset** (dashboard button, `stats_reset.bat`, `control.py reset`). `record_result(..., "manual")` is an internal API used by tests, not a user feature |
 | CLEAR / re-arm | DONE | |
 | ResultGate | DONE | One cooldown gate shared by automatic and manual sources |
@@ -466,7 +482,7 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | `metadata_recognition_status` / `metadata_recognition_version` | **IMPLEMENTED (dormant #15-2 persistence only)** | `NULL` (no recorded evidence) / `recognized` / `failed`; the version names interpretation semantics, not the app release. The whole snapshot is revisioned (compare-and-set) |
 | Match / Rating observation timestamps usable for retrospective Season assignment | PLANNED | Saving the authoritative result or Rating observation does not wait for Season resolution |
 | Unresolved Season metadata | PLANNED | `season_id = unresolved` is valid; later reconciliation changes only derived Season metadata |
-| TEAM recorded through the normal result path | PLANNED | WIN/LOSE/DRAW, match history and win-rate stats. **Supersedes the previous "SINGLE only" scope decision** — see [DECISIONS.md](DECISIONS.md) |
+| TEAM recorded through the normal result path | PLANNED | WIN/LOSE, match history and win-rate stats; DRAW recognition/display/persistence is optional under §9 and never changes WIN/LOSE statistics. **Supersedes the previous "SINGLE only" scope decision** — see [DECISIONS.md](DECISIONS.md) |
 | Match-history row shows mode / format / ranks | PLANNED | `RANKED · SINGLE`, `自分 A / 相手 S`. Unknown shown honestly |
 | Win-rate breakdown by Ranked / Custom / Single / Team | PLANNED | Top-level UI may stay Overall / Single / Team, with the detail elsewhere |
 | `相手機体: TEAMのため対象外` distinct from `未取得` | PLANNED | |
@@ -564,7 +580,7 @@ loadout today.
 
 | Item | Status | Notes |
 |---|---|---|
-| Single only, after the result is finalised | PLANNED | WIN / LOSE / DRAW all valid |
+| Single only, after the result is finalised | PLANNED | WIN / LOSE and a recognized DRAW are valid; DRAW recognition is optional under §9 |
 | Capture only the required frame(s), recognise, normalise, save to that match, exit | PLANNED | |
 | Partial recognition stored, not discarded | PLANNED | |
 | Manual correction | PLANNED | Updates the current value; no unbounded edit log |
