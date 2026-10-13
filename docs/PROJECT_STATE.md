@@ -1,12 +1,28 @@
 # Project state
 
-Last updated: 2026-10-06 JST
+Last updated: 2026-10-13 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current priority — #73 Result Accuracy Hardening, 2026-10-07
+## Current owner scope — WIN/LOSS accuracy and #72, 2026-10-13
+
+[Owner decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654):
+#73 prioritizes WIN/LOSS precision and recall, with [#72](https://github.com/TullysAC6/ac6-winloss-tracker/issues/72)'s
+retained natural pulsing/faded LOSS miss as the next defect. DRAW recognition, display and persistence
+are optional; DRAW must not alter WIN/LOSS counts, streaks or win rate, be mistaken for WIN/LOSS,
+or interfere with detection/counting before or after it. Duplicate/stale results and ResultGate safety
+remain mandatory. [MASTER_REQUIREMENTS §9](MASTER_REQUIREMENTS.md#9-win--lose--draw) is the contract.
+
+DRAW coordinate/template repair and recognition-rate improvement are cancelled. Existing DRAW
+implementation and frozen test truth remain unchanged; this is a requirement amendment, not
+implementation or accuracy Acceptance. Case B remains **RETIRED** and Banner PoC **RESEARCH NO-GO**;
+neither is accepted, merged or released. PR #65 remains OPEN/DRAFT and untouched; its FULL owner
+#15-5 T3 remains paused until #73 is accepted. This docs-only alignment does not start #72 product
+repair, new recognition research, T3 or release. Historical checkpoints below remain historical evidence.
+
+## Historical priority — #73 Result Accuracy Hardening, 2026-10-07
 
 Owner considers current WIN / LOSS / DRAW reliability unacceptable and has adopted
 [#73](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73) as the next priority phase.

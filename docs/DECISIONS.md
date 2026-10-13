@@ -1,5 +1,32 @@
 # Decisions
 
+## DRAW recognition is optional; WIN/LOSS non-interference is mandatory
+
+**Owner decision, 2026-10-13 JST:**
+[Issue #73 comment6135964654](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654).
+The owner prioritizes correct WIN/LOSS counting and the retained natural LOSS miss in #72,
+and no longer requires automatic DRAW recognition, display or persistence. DRAW recognition-rate
+improvement and the proposed coordinate/template repair are cancelled.
+
+Previously §9 required DRAW detection/reporting and separate display; the older TEAM wording also
+included DRAW in required result handling. These forward-looking obligations are superseded by
+[MASTER_REQUIREMENTS §9](MASTER_REQUIREMENTS.md#9-win--lose--draw). The older wording below is
+retained as history, not a requirement to restart DRAW recognition work.
+
+WIN and LOSS must each be correctly counted exactly once. DRAW must not be misclassified or
+persisted as WIN/LOSS, change counts/streaks/win rate or its denominator, or impair WIN/LOSS
+detection/counting before or after it. It must not leave stale/armed/locked state that causes a
+later miss. Duplicate/stale results and incorrect ResultGate behavior remain prohibited.
+The formula `WIN / (WIN + LOSE) * 100` is unchanged.
+
+This is a requirement-only amendment: retain existing DRAW functionality, production semantics,
+database rows, frozen truth and historical acceptance evidence. Existing tests asserting DRAW
+recognition remain unchanged; a future expectation change requires its own reviewed alignment
+proposal. Use existing frozen evidence for non-interference/false-positive checks; dedicated live
+DRAW reproduction is not required. No product, classifier, ResultGate/CLEAR/re-arm or persistence
+change is authorized here. Case B remains RETIRED; Banner PoC remains RESEARCH NO-GO; PR #65
+is untouched. This decision neither accepts #73 nor starts #72 product repair, research, T3 or release.
+
 ## Recover a verified bright-band final using independent spatial evidence
 
 2026-10-03 owner-authorized product repair follows the diagnostic-first decision
@@ -115,6 +142,9 @@ Why: the whole point of the tool is a correct win/loss count. Everything else is
 
 ## Win-rate definition
 
+2026-10-13 scope amendment: the reporting obligation in the older decision below is now optional
+under §9; the formula, exclusion from the denominator and historical implementation remain unchanged.
+
 **Decision: `win rate = WIN / (WIN + LOSE) * 100`. DRAW is reported but excluded from the denominator.**
 
 This is what `server.status_payload` and `HistoryStore.lifetime_summary` already do. Every new statistic reuses it. Changing it would silently rewrite every historical number the user has seen.
@@ -132,6 +162,10 @@ This is what `server.status_payload` and `HistoryStore.lifetime_summary` already
 ---
 
 ## Supported game modes
+
+2026-10-13 DRAW scope amendment: the older inclusion of DRAW below is no longer a recognition,
+display or persistence requirement. WIN/LOSE still follow the normal result path; DRAW is optional
+under §9 and never contributes to WIN/LOSE statistics. The modes and their historical status are unchanged.
 
 **Decision (current, Revision 2): TEAM and CUSTOM MATCH are in scope as recorded matches. Opponent-build capture for TEAM is not.**
 

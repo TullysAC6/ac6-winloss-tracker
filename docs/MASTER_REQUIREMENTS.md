@@ -11,6 +11,10 @@ Scope: AC6 Win/Loss Tracker / AC6tool
 | **Revision 3** | **2026-09-12** | Runtime isolation / app-local Python environment (§56); UI/UX design identity and the Player/Broadcast overlay split (§57–§63); self-build linkage promoted from a sketch to a recorded requirement with its own issue (§52); seasonal rank / rating progression, including the A/S discontinuity rule (§64) |
 | **Revision 4** | **2026-09-13** | Season catalog / manifest, manual-first synchronization, retrospective assignment, transition handling, and multi-season reconciliation (§65) |
 
+Owner amendment, 2026-10-13: [DRAW recognition is optional; WIN/LOSS non-interference is mandatory](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654).
+This explicitly supersedes the earlier mandatory DRAW recognition/reporting intent; §9 defines the current contract.
+It does not change existing implementation, historical acceptance evidence or fixture truth.
+
 Revision 4 **adds to** Revisions 2 and 3. Nothing in an earlier revision is silently deleted or
 rewritten. Where a later revision changes a status or sequencing rule, the earlier statement and
 the reason for the change stay visible.
@@ -54,7 +58,7 @@ The Tracker must remain, in this order:
 6. Recoverable
 7. Extensible through optional features
 
-The authoritative WIN / LOSE / DRAW handling must never be weakened to make secondary features work.
+Authoritative WIN / LOSE handling and DRAW non-interference (§9) must never be weakened to make secondary features work.
 
 A missing optional enrichment record is acceptable.
 
@@ -297,11 +301,32 @@ Optional failures must not alter:
 
 # 9. WIN / LOSE / DRAW
 
-Current intended behavior:
+Current owner requirement, amended 2026-10-13:
+[Issue #73 decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654).
 
-- WIN: counted
-- LOSE: counted
-- DRAW: detected/reported but excluded from WIN/LOSE count and win-rate denominator unless a future explicit product decision changes this
+Mandatory:
+
+- Each genuine WIN and LOSE is correctly counted exactly once.
+- DRAW must not be misclassified or persisted as WIN/LOSE.
+- DRAW must not change WIN/LOSE counts, winning streaks or win rate, including its denominator.
+- DRAW must not impair WIN/LOSE detection or counting before or after it. The next genuine WIN/LOSE
+  must still be detected and counted; DRAW must not leave stale, armed or locked state that causes a miss.
+- Duplicate or stale results and incorrect ResultGate behavior remain prohibited.
+
+Optional:
+
+- Automatic DRAW recognition, display and persistence.
+
+DRAW recognition-rate improvement is not a current development goal. No dedicated live DRAW
+reproduction is required; use existing frozen evidence to check false-positive safety and adjacent WIN/LOSE non-interference.
+For #73 acceptance, the exactly-one-result requirement applies to genuine WIN/LOSE;
+DRAW coverage requires no WIN/LOSE mutation and non-interference. The linked owner decision
+supersedes older DRAW-required acceptance wording without relabelling historical gate results.
+
+This requirement change does not authorize removing existing DRAW functionality or changing
+the classifier, ResultGate, CLEAR/re-arm, persistence or historical rows. Existing benign DRAW
+behavior is retained. Old tests that require DRAW recognition remain unchanged until a separately
+reviewed requirement/test-alignment change; do not relabel frozen truth or erase prior evidence.
 
 Win-rate definition:
 
@@ -309,7 +334,7 @@ Win-rate definition:
 WIN / (WIN + LOSE) * 100
 ```
 
-DRAW is displayed separately.
+When DRAW is displayed, it is separate from WIN/LOSE; displaying it is optional.
 
 Do not silently change the historical win-rate definition.
 
@@ -370,10 +395,13 @@ TEAM is **not ignored as a match**.
 TEAM should continue to use the normal result path as far as the existing result visuals permit:
 
 ```text
-WIN / LOSE / DRAW
+WIN / LOSE
 → ResultGate
 → history
 ```
+
+DRAW recognition/display/persistence is optional under §9, including for TEAM.
+Existing DRAW handling remains; it must not alter WIN/LOSE statistics or block a later result.
 
 The additional requirement is to identify and record that the match was `TEAM`.
 
@@ -386,7 +414,7 @@ TEAM must not introduce a separate result-counting architecture unless real-game
 Initial TEAM support:
 
 - Detect/record `TEAM`
-- Record WIN/LOSE/DRAW as usual
+- Record WIN/LOSE through the normal result path; DRAW recognition/display/persistence is optional under §9
 - Include TEAM in match history
 - Include TEAM in win-rate statistics
 - Record self rank if reliably available
@@ -509,7 +537,8 @@ A future minimum-sample rule (for rankings/highlights) is allowed.
 
 Opponent recognition must remain completely optional.
 
-It applies after WIN / LOSE / DRAW handling has completed.
+It applies after WIN / LOSE handling has completed. A recognized DRAW may also be used;
+the optional DRAW behavior follows §9 and is not a prerequisite for WIN/LOSE enrichment.
 
 Recognition failure, timeout, cancellation, or partial recognition must never affect the saved result.
 
@@ -1038,7 +1067,7 @@ before it is written down. `tests/test_readme_bootstrap_hash.py` now enforces it
 ## Phase 8B — Live Opponent Build Recognition
 - Single only
 - post-result
-- WIN / LOSE / DRAW all valid
+- WIN / LOSE and a recognized DRAW are valid; DRAW recognition remains optional under §9
 - full build acquisition
 - partial recognition
 - manual correction
@@ -1293,7 +1322,8 @@ Potential checks include:
 
 - WIN
 - LOSE
-- DRAW
+- DRAW false-positive safety and WIN/LOSE non-interference (§9), using existing frozen evidence;
+  no dedicated live DRAW reproduction or recognition-rate improvement is required
 - Ranked / Custom
 - Single / Team
 - rank metadata

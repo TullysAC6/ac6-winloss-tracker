@@ -1,6 +1,29 @@
 # Next session
 
-## Current owner scope — #73 Result Accuracy Hardening, 2026-10-07
+## Current owner scope — WIN/LOSS accuracy and #72, 2026-10-13
+
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS →
+Issue #73 / [owner decision6135964654](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654)
+→ Issue #72 → current main/open PRs/CI; verify local worktrees and the two-generation limit.
+
+The next defect priority is #72's retained natural faded/pulsing LOSS, within #73 WIN/LOSS
+precision/recall hardening. [§9](MASTER_REQUIREMENTS.md#9-win--lose--draw) requires WIN/LOSS exactly
+once, no duplicate/stale result or incorrect ResultGate behavior, and DRAW false-positive safety
+with no WIN/LOSS counter, streak, win-rate or before/after detection interference.
+Automatic DRAW recognition, display and persistence are optional. Do not improve DRAW recognition
+rates, resume the cancelled coordinate repair, remove existing DRAW behavior or request dedicated live DRAW reproduction.
+
+Existing DRAW-positive fixture/test expectations describe the unchanged implementation, not a new
+acceptance requirement. Any future relaxation needs a separate reviewed requirement/test-alignment
+proposal retaining truth/provenance and historical evidence; retain mandatory no-WIN/LOSS-mutation
+and adjacent-result controls. No tests or fixtures are changed by this docs PR.
+
+Case B is RETIRED; Banner PoC is RESEARCH NO-GO. Preserve their evidence without restarting them.
+PR #65 remains OPEN/DRAFT/untouched, FULL #15-5 owner T3 paused. Docs review/CI is not #73 Acceptance.
+Stop after this docs-only PR's checks, independent review and exact-head CI; merge needs separate
+owner authorization. Do not start #72 implementation, recognition research, T3 or release here.
+
+## Historical owner scope — #73 Result Accuracy Hardening, 2026-10-07
 
 Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS →
 Issue #73 → Issue #72 → current main/open PRs/CI.
