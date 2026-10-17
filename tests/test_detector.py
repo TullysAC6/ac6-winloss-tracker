@@ -354,13 +354,14 @@ for width, height in ((1, 1), (2, 2), (4, 1)):
 win_raw, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_win_01.ppm")
 
 
-def phrase_sized_box(colour):
+def phrase_sized_box(colour, odd_column_colour=None):
     painted = bytearray(win_raw)
     for y in range(height):
         for x in range(width):
             inside = 0.35 <= x / width <= 0.65 and 0.25 <= y / height <= 0.75
+            fill = odd_column_colour if odd_column_colour and x % 2 else colour
             j = (y * width + x) * 4
-            painted[j:j+3] = bytes(colour if inside else (30, 30, 30))
+            painted[j:j+3] = bytes(fill if inside else (30, 30, 30))
     return bytes(painted)
 
 
@@ -433,6 +434,21 @@ for name, (pixels, _) in false_finals.items():
 assert accepted_results((win_raw, width, height)) == ["win"]
 assert accepted_results(read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")) == ["loss"]
 print("Lane B synthetic false finals: 0 accepted; genuine WIN/LOSS controls accepted once.")
+
+# The phrase checks only veto an unambiguous final. A phrase-sized box striped
+# cyan/orange column by column qualifies for WIN and LOSS at once, which main
+# leaves non-final. Its cyan half alone fails phrase identity, so checking each
+# side independently would have resolved the ambiguity into an accepted LOSS.
+two_colour_stripes = phrase_sized_box((210, 210, 35), (40, 90, 230))
+assert hashlib.sha256(two_colour_stripes).hexdigest() == \
+    "626951345f07be76ef936b51e87828e320272b5e7a9b4d70cd00e102dcc31645"
+got, debug = classifier.classify_bgra(two_colour_stripes, width, height)
+assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (got, debug)
+assert debug["win_ok"] and debug["loss_ok"], debug
+assert debug["win_stroke_runs"] is None and debug["loss_stroke_runs"] is None, debug
+assert debug["win_final_grid_score"] < debug["win_cross_grid_score"], debug
+assert accepted_results((two_colour_stripes, width, height)) == []
+print("Lane B ambiguity: a frame qualifying for both WIN and LOSS stays non-final.")
 
 if failed:
     print("\nFAILED")

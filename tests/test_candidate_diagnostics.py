@@ -28,7 +28,7 @@ BASE_CORE_DIGESTS = {
     # Owner-authorized #73 Lane B repair (phrase identity and stroke runs)
     # again advances ONLY the classifier and pins its stroke-run helper.
     '_median_ink_runs': '51e30cc664f37676c9a13af4300ced6da6922e78ed2146c62b7f1d8c61783803',
-    'ResultClassifier.classify_bgra': 'f4fe054ac72deac214f079910adeb1068506d00ad52e7ee2a11c46701aedf16c',
+    'ResultClassifier.classify_bgra': 'a3cdd9a5c1789e54269a9ab39c001c7086ae32eeb45e517c93b04d5499154726',
     'ResultStateMachine': '93eb802002513bdeecea900f1ff7633b01151ef0f3ee57962172843a9aaf7122',
     'ResultDetector.run': 'f88eee3619d97bb14684a7edd9880b0a62a4c0efe0f8d1a8cd350835211f0eae',
 }

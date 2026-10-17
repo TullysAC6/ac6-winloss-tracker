@@ -934,7 +934,9 @@ class ResultClassifier:
         # A final-like substring with a white PHASE prefix cannot recover.
         # Phrase identity: the glyph fingerprint must match its own final
         # phrase better than the other one, and the coloured region must be
-        # made of separate strokes (checked last, only for a tentative final).
+        # made of separate strokes. These checks only veto an unambiguous
+        # tentative final; when both colours qualify, the frame stays
+        # non-final exactly as before and the checks never pick a side.
         # DRAW/PHASE classification and the CLEAR fallback remain unchanged.
         win_ok = (
             (result_band_like or (
@@ -948,13 +950,7 @@ class ResultClassifier:
             and win_final_score >= 0.78
             and win_final_grid_score >= 0.82
             and win_final_grid_score >= win_phase_grid_score + 0.12
-            and win_final_grid_score > win_cross_grid_score
         )
-        if win_ok:
-            debug["win_stroke_runs"] = _median_ink_runs(
-                win_mask, width, height, win_cluster, win_y_cluster, self.bx, self.by
-            )
-            win_ok = debug["win_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
         loss_ok = (
             (result_band_like or (
                 recovery_band_like and not phase_prefix_shape and not prefix_contrast_like
@@ -967,13 +963,21 @@ class ResultClassifier:
             and loss_final_score >= 0.78
             and loss_final_grid_score >= 0.82
             and loss_final_grid_score >= loss_phase_grid_score + 0.12
-            and loss_final_grid_score > loss_cross_grid_score
         )
-        if loss_ok:
-            debug["loss_stroke_runs"] = _median_ink_runs(
-                loss_mask, width, height, loss_cluster, loss_y_cluster, self.bx, self.by
-            )
-            loss_ok = debug["loss_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
+        if win_ok and not loss_ok:
+            win_ok = win_final_grid_score > win_cross_grid_score
+            if win_ok:
+                debug["win_stroke_runs"] = _median_ink_runs(
+                    win_mask, width, height, win_cluster, win_y_cluster, self.bx, self.by
+                )
+                win_ok = debug["win_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
+        elif loss_ok and not win_ok:
+            loss_ok = loss_final_grid_score > loss_cross_grid_score
+            if loss_ok:
+                debug["loss_stroke_runs"] = _median_ink_runs(
+                    loss_mask, width, height, loss_cluster, loss_y_cluster, self.bx, self.by
+                )
+                loss_ok = debug["loss_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
         debug["win_ok"] = win_ok
         debug["loss_ok"] = loss_ok
 
