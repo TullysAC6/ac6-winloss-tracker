@@ -101,6 +101,8 @@ class CandidateEvidenceTests(unittest.TestCase):
     def test_core_ast_and_public_constants_match_approved_baseline(self):
         self.assertEqual(core_digests((ROOT / 'result_detector.py').read_text()), BASE_CORE_DIGESTS)
         self.assertEqual((rd.POLL_SECONDS, rd.CONFIRM_HITS, rd.CLEAR_HITS_REQUIRED, rd.COOLDOWN_SECONDS), (.75, 2, 3, 5.0))
+        # The AST digest pins the name, not the value, of the Lane B stroke floor.
+        self.assertEqual(rd.MIN_PHRASE_STROKE_RUNS, 4)
     def test_bounded_long_normal_sequence_and_input_ownership(self):
         sink = Mock()
         evidence, _, _ = sequence([rd.CLEAR] * 10000, sink)
