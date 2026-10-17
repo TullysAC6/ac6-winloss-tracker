@@ -29,6 +29,9 @@ POLL_SECONDS = 0.75
 CONFIRM_HITS = 2
 CLEAR_HITS_REQUIRED = 3
 COOLDOWN_SECONDS = 5.0
+# YOU WIN / YOU LOSE have 6-7 glyphs, so a typical row of the coloured phrase
+# crosses many separate strokes. A filled region of the same size has one run.
+MIN_PHRASE_STROKE_RUNS = 4
 # Diagnostics only: bound how often an unchanged capture failure is logged.
 CAPTURE_GAP_LOG_SECONDS = 30.0
 # DwmGetWindowAttribute: a window DWM does not composite cannot cover anything.
@@ -269,6 +272,33 @@ def _center_cluster(values, threshold=0.010, max_gap=2):
         "coverage": sum(vals) / n,
         "density": sum(vals) / max(1, len(vals)),
     }
+
+
+def _median_ink_runs(mask, width, height, x_cluster, y_cluster, bx, by):
+    """Median count of separate ink runs per inked row of the phrase box.
+
+    The box is the one the geometry gates already accept: the colour mask's
+    x cluster (bx bins) by its y cluster (by bins). Occupancy profiles and
+    grids pool strokes into cell fractions, so a filled region of phrase size
+    still correlates with the templates; separate runs per row are what text
+    has and a filled region lacks.
+    """
+    if x_cluster["start"] < 0 or y_cluster["start"] < 0:
+        return 0
+    x_edges = _bin_edges(width, bx)
+    y_edges = _bin_edges(height, by)
+    x0, x1 = x_edges[x_cluster["start"]][0], x_edges[x_cluster["end"]][1]
+    y0, y1 = y_edges[y_cluster["start"]][0], y_edges[y_cluster["end"]][1]
+    runs = []
+    for y in range(y0, y1):
+        row = mask[y * width + x0:y * width + x1]
+        if row.count(1):
+            runs.append(row.count(b"\x00\x01") + (1 if row[0] else 0))
+    if not runs:
+        return 0
+    runs.sort()
+    middle = len(runs) // 2
+    return runs[middle] if len(runs) % 2 else (runs[middle - 1] + runs[middle]) / 2
 
 
 def _leading_text_contrast(raw, width, height, x0, x1):
@@ -661,6 +691,15 @@ class ResultClassifier:
         loss_phase_grid_score = _cosine(
             loss_grid, self.grid_templates["phase_loss"]
         )
+        # The same colour mask scored against the other final phrase. A final
+        # must be identified as its own phrase, not merely resemble it: YOU WIN
+        # glyphs in LOSS colours match final WIN better than final LOSS.
+        win_cross_grid_score = _cosine(
+            win_grid, self.grid_templates["final_loss"]
+        )
+        loss_cross_grid_score = _cosine(
+            loss_grid, self.grid_templates["final_win"]
+        )
         draw_grid_score = _cosine(draw_grid, self.draw_grid_template)
 
         # Real AC6 result banners are drawn on a dark translucent strip.
@@ -843,6 +882,10 @@ class ResultClassifier:
             "win_phase_grid_score": win_phase_grid_score,
             "loss_final_grid_score": loss_final_grid_score,
             "loss_phase_grid_score": loss_phase_grid_score,
+            "win_cross_grid_score": win_cross_grid_score,
+            "loss_cross_grid_score": loss_cross_grid_score,
+            "win_stroke_runs": None,
+            "loss_stroke_runs": None,
             "result_band_like": result_band_like,
             "lower_dark_ratio": lower_dark_ratio,
             "lower_mean_gray": lower_mean_gray,
@@ -889,6 +932,11 @@ class ResultClassifier:
         # If arena lighting defeats the global band check, recovery requires
         # a much stronger glyph match AND a >=90% dark, visible lower margin.
         # A final-like substring with a white PHASE prefix cannot recover.
+        # Phrase identity: the glyph fingerprint must match its own final
+        # phrase better than the other one, and the coloured region must be
+        # made of separate strokes. These checks only veto an unambiguous
+        # tentative final; when both colours qualify, the frame stays
+        # non-final exactly as before and the checks never pick a side.
         # DRAW/PHASE classification and the CLEAR fallback remain unchanged.
         win_ok = (
             (result_band_like or (
@@ -916,6 +964,20 @@ class ResultClassifier:
             and loss_final_grid_score >= 0.82
             and loss_final_grid_score >= loss_phase_grid_score + 0.12
         )
+        if win_ok and not loss_ok:
+            win_ok = win_final_grid_score > win_cross_grid_score
+            if win_ok:
+                debug["win_stroke_runs"] = _median_ink_runs(
+                    win_mask, width, height, win_cluster, win_y_cluster, self.bx, self.by
+                )
+                win_ok = debug["win_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
+        elif loss_ok and not win_ok:
+            loss_ok = loss_final_grid_score > loss_cross_grid_score
+            if loss_ok:
+                debug["loss_stroke_runs"] = _median_ink_runs(
+                    loss_mask, width, height, loss_cluster, loss_y_cluster, self.bx, self.by
+                )
+                loss_ok = debug["loss_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
         debug["win_ok"] = win_ok
         debug["loss_ok"] = loss_ok
 

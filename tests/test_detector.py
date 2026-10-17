@@ -8,6 +8,7 @@ the T1 check that replaced it, and tests/test_t1_legacy_coverage.py keeps that
 mapping honest. What stays here is what T1 metadata cannot express: frames that
 are generated or transformed in code.
 """
+import hashlib
 import json
 import sys
 import tempfile
@@ -17,14 +18,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from result_detector import (
+    CLEAR_HITS_REQUIRED,
+    CONFIRM_HITS,
+    COOLDOWN_SECONDS,
     FINAL_WIN,
     FINAL_LOSS,
     FINAL_DRAW,
+    MIN_PHRASE_STROKE_RUNS,
     NON_CLEAR,
     PHASE,
     ResultClassifier,
+    ResultStateMachine,
     TemplateError,
 )
+from result_gate import ResultGate
 
 
 def read_ppm(path):
@@ -339,6 +346,129 @@ assert got == FINAL_LOSS, (got, debug)
 for width, height in ((1, 1), (2, 2), (4, 1)):
     got, _ = classifier.classify_bgra(bytes((220, 220, 40, 255))*(width*height), width, height)
     assert got not in (FINAL_WIN, FINAL_LOSS)
+
+# #73 Lane B: inherited synthetic false finals built from the canonical WIN ROI.
+# Main accepted all three (WIN, LOSS, LOSS): a filled box of phrase size and
+# YOU WIN glyphs repainted in LOSS colours both clear the coarse 1-D/2-D gates.
+# The constructions and their pixel hashes are the ones recorded for #73.
+win_raw, width, height = read_ppm(Path(__file__).parent / "fixtures" / "final_win_01.ppm")
+
+
+def phrase_sized_box(colour, odd_column_colour=None):
+    painted = bytearray(win_raw)
+    for y in range(height):
+        for x in range(width):
+            inside = 0.35 <= x / width <= 0.65 and 0.25 <= y / height <= 0.75
+            fill = odd_column_colour if odd_column_colour and x % 2 else colour
+            j = (y * width + x) * 4
+            painted[j:j+3] = bytes(fill if inside else (30, 30, 30))
+    return bytes(painted)
+
+
+def win_glyphs_in_loss_colour():
+    painted = bytearray(win_raw)
+    for j in range(0, len(painted), 4):
+        b, g, r = painted[j:j+3]
+        if min(b, g) - r > 25:
+            painted[j:j+3] = bytes((45, 105, 225))
+    return bytes(painted)
+
+
+false_finals = {
+    "solid_cyan_box": (phrase_sized_box((210, 210, 35)),
+                       "2787e4cf10bf28d796a95a7798ce0246fc7f3d4b3617a53b8879cb416f9bf73d"),
+    "solid_orange_box": (phrase_sized_box((40, 90, 230)),
+                         "967013b13430b91371734ffc4614e6ff5a0d3065184c153cf01afdf6af2527fc"),
+    "win_glyphs_in_loss_colour": (win_glyphs_in_loss_colour(),
+                                  "2c1e5941ec74483578990cb4b64ce42c9c142bab1883942e120c04fd9bfa74c9"),
+}
+for name, (pixels, digest) in false_finals.items():
+    assert hashlib.sha256(pixels).hexdigest() == digest, name
+    got, debug = classifier.classify_bgra(pixels, width, height)
+    assert got not in (FINAL_WIN, FINAL_LOSS, FINAL_DRAW), (name, got, debug)
+    assert debug["result_band_like"], (name, debug)
+
+# Each is rejected by the condition that names its defect. The cyan box and the
+# repainted glyphs match the other final phrase better than their own colour's
+# phrase; the orange box resembles YOU LOSE but is a single run per row.
+_, debug = classifier.classify_bgra(false_finals["solid_cyan_box"][0], width, height)
+assert debug["win_final_grid_score"] < debug["win_cross_grid_score"], debug
+_, debug = classifier.classify_bgra(false_finals["win_glyphs_in_loss_colour"][0], width, height)
+assert debug["loss_final_grid_score"] < debug["loss_cross_grid_score"], debug
+_, debug = classifier.classify_bgra(false_finals["solid_orange_box"][0], width, height)
+assert debug["loss_final_grid_score"] > debug["loss_cross_grid_score"], debug
+assert debug["loss_stroke_runs"] == 1, debug
+
+# Genuine canonical finals keep a wide margin on both conditions.
+for name, expected, key in (("final_win_01.ppm", FINAL_WIN, "win"), ("final_win_02.ppm", FINAL_WIN, "win"),
+                            ("final_win_03.ppm", FINAL_WIN, "win"), ("final_loss_01.ppm", FINAL_LOSS, "loss"),
+                            ("final_loss_02.ppm", FINAL_LOSS, "loss")):
+    pixels, w, h = read_ppm(Path(__file__).parent / "fixtures" / name)
+    got, debug = classifier.classify_bgra(pixels, w, h)
+    assert got == expected, (name, got, debug)
+    assert debug[f"{key}_final_grid_score"] >= debug[f"{key}_cross_grid_score"] + 0.10, (name, debug)
+    assert debug[f"{key}_stroke_runs"] >= 2 * MIN_PHRASE_STROKE_RUNS, (name, debug)
+
+# Through the classifier, the temporal state machine and the shared ResultGate:
+# three CLEAR polls arm the detector, then four identical adverse polls. The
+# genuine WIN/LOSS controls show the same loop does accept a real final once.
+normal = read_ppm(Path(__file__).parent / "fixtures" / "normal_01.ppm")
+
+
+def accepted_results(frame, polls=4):
+    state, gate, accepted = ResultStateMachine(), ResultGate(), []
+    for i, (pixels, w, h) in enumerate([normal] * 3 + [frame] * polls):
+        now = 100.0 + 0.75 * i
+        frame_state, _ = classifier.classify_bgra(pixels, w, h)
+        result = state.observe(frame_state, CONFIRM_HITS, CLEAR_HITS_REQUIRED, COOLDOWN_SECONDS, now=now)
+        if result in ("win", "loss") and gate.try_accept(COOLDOWN_SECONDS, now=now):
+            accepted.append(result)
+            state.external_mutation(now)
+        if i == 2:
+            assert state.armed, "three CLEAR polls must arm the detector"
+    return accepted
+
+
+for name, (pixels, _) in false_finals.items():
+    assert accepted_results((pixels, width, height)) == [], name
+assert accepted_results((win_raw, width, height)) == ["win"]
+assert accepted_results(read_ppm(Path(__file__).parent / "fixtures" / "final_loss_01.ppm")) == ["loss"]
+print("Lane B synthetic false finals: 0 accepted; genuine WIN/LOSS controls accepted once.")
+
+# The phrase checks only veto an unambiguous final. Each frame below qualifies
+# for WIN and LOSS at once, which main leaves NON_CLEAR. One side alone fails
+# phrase identity, so checking each side independently would have resolved the
+# ambiguity into an accepted result of the other colour.
+def win_glyphs_in_two_colour_columns():
+    # YOU WIN glyphs widened by one column each side, then striped by column:
+    # WIN cyan on even columns, the LOSS-coloured repaint on odd columns.
+    glyph = [min(win_raw[j], win_raw[j+1]) - win_raw[j+2] > 25 for j in range(0, len(win_raw), 4)]
+    painted = bytearray(win_raw)
+    for y in range(height):
+        for x in range(width):
+            if any(glyph[y * width + xx] for xx in range(max(0, x - 1), min(width, x + 2))):
+                j = (y * width + x) * 4
+                painted[j:j+3] = bytes((210, 210, 35) if x % 2 == 0 else (45, 105, 225))
+    return bytes(painted)
+
+
+ambiguous_frames = (
+    # A phrase-sized box: its cyan half would fail identity, leaving a LOSS.
+    (phrase_sized_box((210, 210, 35), (40, 90, 230)),
+     "626951345f07be76ef936b51e87828e320272b5e7a9b4d70cd00e102dcc31645", "win"),
+    # Real WIN glyphs: their orange half would fail identity, leaving a WIN.
+    (win_glyphs_in_two_colour_columns(),
+     "014045232404bda9b6e6da2dd491abe60748d26d3107a547e12d68780621eae3", "loss"),
+)
+for pixels, digest, vetoed in ambiguous_frames:
+    assert hashlib.sha256(pixels).hexdigest() == digest
+    got, debug = classifier.classify_bgra(pixels, width, height)
+    assert got == NON_CLEAR, (got, debug)
+    assert debug["win_ok"] and debug["loss_ok"], debug
+    assert debug["win_stroke_runs"] is None and debug["loss_stroke_runs"] is None, debug
+    assert debug[f"{vetoed}_final_grid_score"] < debug[f"{vetoed}_cross_grid_score"], debug
+    assert accepted_results((pixels, width, height)) == [], digest
+print("Lane B ambiguity: frames qualifying for both WIN and LOSS stay non-final.")
 
 if failed:
     print("\nFAILED")
