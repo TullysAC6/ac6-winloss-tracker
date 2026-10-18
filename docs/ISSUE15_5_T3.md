@@ -1,8 +1,11 @@
 # #15-5 owner real-game T3
 
-Run only after the implementation PR's reviewed exact head has green CI. Keep that
-head/worktree unchanged during T3. No merge or owner Acceptance is implied.
-Use an isolated data root; these steps do not copy or alter your usual history.
+Run only on an exact head that has: an independent review GO for its latest sync
+diff, full T0, formal T1, affected T2 (environment NM recorded, not PASS), detector
+equivalence with main (classifier, state machine, ResultGate and templates identical;
+ResultDetector.run differing only by the reviewed #15-5 hooks) and green exact-head
+CI. Keep that head/worktree unchanged during T3. No merge or owner Acceptance is
+implied. Use an isolated data root; these steps do not copy or alter your usual history.
 
 ## Two stages: T3-A and T3-B
 
@@ -21,14 +24,17 @@ splits this procedure into two stages that use the same steps below.
   | F4 Write and snapshot | Phase B status and snapshot lookup |
   | F5 No inheritance | Phase C |
   | F6 Cancel / OFF | Cancel/OFF and cleanup |
-  | F7 Lifecycle and cleanup | Launcher/UI start, normal Exit, residue checks |
+  | F7 Lifecycle and cleanup | Launcher/UI start, duplicate-launch refusal, PID/Job/lock ownership, normal Exit, residue checks |
   | F8 Performance observations | CPU/memory/responsiveness notes |
 
   A T3-A record is never FULL T3 PASS, #15-5 Acceptance, merge or release.
 - **T3-B — FULL #15-5 T3 including WIN/LOSS reliability.** Only after #73 Acceptance
   (unless a separate owner decision changes this). PASS needs F1-F8 PASS on the exact
   head **and** every natural WIN/LOSS counted exactly once, with no miss, wrong class,
-  duplicate or stale result. There is no exemption for main-origin anomalies.
+  duplicate or stale result. There is no exemption for main-origin anomalies. In T3-B,
+  F8 PASS means the owner reports no stutter or degraded game responsiveness. T3-B
+  STOPs and FAILs on any WIN/LOSS anomaly, any feature FAIL, any process, ownership or
+  cleanup failure, owner-reported performance degradation, or an evidence gap.
 
 ## Historical failures and stop rule
 
@@ -48,13 +54,24 @@ result), preserve the isolated root and diagnostics/candidate-bundles/*.zip, the
 replay the bundle offline on the current main and on the exact candidate:
 
 - **T3-B:** the anomaly is a T3-B FAIL. STOP T3/gameplay.
-- **T3-A:** the anomaly keeps its original FAIL in the report. Only if the replay is
-  identical on main and on the candidate, and the classifier, state machine,
-  ResultGate and templates are identical to main, attribute it to #73 with that
-  evidence (bundle hash, both replay outputs, digests); T3-A may then continue for
-  the #15-5 features. If the cause cannot be determined (no bundle, divergent replay,
-  missing evidence), STOP. If the Phase B acquired match is the one affected, F3/F4
-  are NOT REACHED for this attempt; a new Phase B attempt needs the owner's explicit
+- **T3-A:** the anomaly keeps its original FAIL in the report. Attribute it to #73,
+  with the evidence (bundle hash, both replay outputs, digests), only if all hold:
+  - both replays (`scripts/replay_candidate_bundle.py` on main and on the exact
+    candidate) reproduce the recorded runtime decisions and states;
+  - the classifier, state machine, ResultGate and templates are identical to main,
+    and ResultDetector.run differs only by the reviewed #15-5 hooks.
+
+  T3-A may then continue for the #15-5 features. If the cause cannot be determined
+  (no bundle, divergent or non-reproducing replay, missing evidence), STOP. The
+  replay covers only the classifier and state machine, so an anomaly whose evidence
+  lies in ResultGate or persistence (for example a duplicate saved row) cannot be
+  attributed this way: STOP.
+- **T3-A, Phase B acquired match affected** (its result missed, wrong, duplicate or
+  stale): never run `metadata-confirm` for it. A missed result leaves the pending
+  acquisition live until it expires, and the next accepted result would consume it.
+  Run `metadata-cancel` (or `metadata-off`) and check `metadata-status` shows no
+  pending or confirmation before any further play. F3, F4 and F5 are NOT REACHED for
+  this attempt; any new Phase B attempt or Phase C play needs the owner's explicit
   instruction.
 - Any #15-5-caused defect is a FAIL of that feature: STOP and preserve evidence.
 
@@ -260,4 +277,5 @@ outcomes. Candidate-loss bundle means preserve/hold and offline review; it is no
 automatically a missed result. No game input/focus manipulation, continuous screen
 capture/OCR, high-rate polling, automatic retries or repair is allowed. Native
 minimize/focus gaps still revoke evidence. Preparation does not claim T3 PASS.
-STOP after this sync; await owner instruction to start the full real-machine T3.
+STOP after this sync. T3-A starts only on the owner's separate A3 instruction; T3-B
+(FULL real-machine T3) only after #73 Acceptance.

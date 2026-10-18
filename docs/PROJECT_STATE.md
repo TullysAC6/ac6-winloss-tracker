@@ -15,10 +15,14 @@ worktrees are untouched. Exact main `acc7798337c07e1701776931510ac9c90607b078` i
 PR65 head `889d9e18a917fd183e0788495a86d542203040de` by ordinary merge with both parents kept.
 Classifier, ResultStateMachine, ResultGate and templates stay identical to main; ResultDetector.run
 differs only by the reviewed #15-5 hooks. PR #79 is not included. [T3 procedure](ISSUE15_5_T3.md)
-defines T3-A/T3-B. Full T0, formal T1, affected T2, exact-head CI and a mandatory independent
-sync-diff review precede any A3 decision. Historical #15-5 T3 FAILs (capture_gap, 10-03 WIN miss,
-10-06 LOSS miss) remain FAIL. PR65 OPEN/DRAFT; Merged NO, Accepted PENDING, Released NO. No T3-A
-(A3 needs separate owner authorization), T3-B, merge, release or #72 change.
+defines T3-A/T3-B. Full T0, formal T1, affected T2 (environment NM recorded, not PASS), exact-head
+CI and a mandatory independent sync-diff review precede any A3 decision. Historical #15-5 T3 FAILs
+(capture_gap, 10-03 WIN miss, 10-06 LOSS miss) remain FAIL. PR65 OPEN/DRAFT; Merged NO, Accepted
+PENDING, Released NO. No T3-A (A3 needs separate owner authorization), T3-B, merge, release or #72
+change. On this branch, this checkpoint supersedes the live-checkpoint rows below for the active
+product candidate/owner, current work/owner, #15-5 lifecycle and generations: PR #65's exact head
+is the synced merge on `codex/issue15-5-runtime-20261002`, worked from `ac6-wt-issue15-5-a2-sync-20261018`;
+generations are PR #65 plus draft PR #79 (2/2).
 
 ## Live checkpoint — adopted roadmap, 2026-10-13
 

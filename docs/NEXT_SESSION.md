@@ -9,8 +9,9 @@ Keep the classifier, ResultStateMachine, ResultGate and templates identical to m
 reviewed #15-5 hooks unchanged; do not include PR #79. [ISSUE15_5_T3.md](ISSUE15_5_T3.md) defines
 T3-A (per-feature #15-5 verification, allowed before #73 Acceptance; a known main-origin WIN/LOSS
 anomaly keeps its FAIL and is attributed to #73 with evidence, otherwise STOP) and T3-B (FULL T3,
-no main-origin exemption, after #73 Acceptance). Run full T0, formal T1, affected T2, exact-head CI
-and the mandatory independent sync-diff review; apply fixes and rerun affected gates. STOP after A2:
+no main-origin exemption, after #73 Acceptance). Run full T0, formal T1, affected T2 (environment NM
+recorded, not PASS), exact-head CI and the mandatory independent sync-diff review; apply fixes and
+rerun affected gates. STOP after A2:
 T3-A starts only on a separate owner A3 instruction; no T3-B, merge, release, #73 Acceptance or #72.
 
 ## Historical scope — adopted roadmap docs alignment, 2026-10-13
