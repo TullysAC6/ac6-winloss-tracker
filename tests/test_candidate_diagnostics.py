@@ -25,7 +25,10 @@ BASE_CORE_DIGESTS = {
     # Owner-authorized bright-result-band repair advances ONLY the classifier
     # baseline and pins its new prefix helper. State/run remain pinned to the
     # original #66 exact base.
-    'ResultClassifier.classify_bgra': 'c5c2bacd01d9e940bb0706474cbcd6c7d73211e3be32acc27bd465538647bdfe',
+    # Owner-authorized #73 Lane B repair (phrase identity and stroke runs)
+    # again advances ONLY the classifier and pins its stroke-run helper.
+    '_median_ink_runs': '51e30cc664f37676c9a13af4300ced6da6922e78ed2146c62b7f1d8c61783803',
+    'ResultClassifier.classify_bgra': 'df2e5d00fa4de8a0785dbf37dfc728167ac917c2dc15cc478ce7e54278a35661',
     'ResultStateMachine': '93eb802002513bdeecea900f1ff7633b01151ef0f3ee57962172843a9aaf7122',
     'ResultDetector.run': 'f88eee3619d97bb14684a7edd9880b0a62a4c0efe0f8d1a8cd350835211f0eae',
 }
@@ -79,7 +82,8 @@ def core_digests(source):
             return self.generic_visit(node)
     output = {}
     for cls in tree.body:
-        if isinstance(cls, ast.FunctionDef) and cls.name in ('_leading_text_contrast', '_leading_level_shape'):
+        if isinstance(cls, ast.FunctionDef) and cls.name in ('_leading_text_contrast', '_leading_level_shape',
+                                                             '_median_ink_runs'):
             output[cls.name] = hashlib.sha256(ast.dump(cls, include_attributes=False).encode()).hexdigest()
         if not isinstance(cls, ast.ClassDef): continue
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef)]
@@ -97,6 +101,8 @@ class CandidateEvidenceTests(unittest.TestCase):
     def test_core_ast_and_public_constants_match_approved_baseline(self):
         self.assertEqual(core_digests((ROOT / 'result_detector.py').read_text()), BASE_CORE_DIGESTS)
         self.assertEqual((rd.POLL_SECONDS, rd.CONFIRM_HITS, rd.CLEAR_HITS_REQUIRED, rd.COOLDOWN_SECONDS), (.75, 2, 3, 5.0))
+        # The AST digest pins the name, not the value, of the Lane B stroke floor.
+        self.assertEqual(rd.MIN_PHRASE_STROKE_RUNS, 4)
     def test_bounded_long_normal_sequence_and_input_ownership(self):
         sink = Mock()
         evidence, _, _ = sequence([rd.CLEAR] * 10000, sink)
