@@ -23,6 +23,121 @@ Status vocabulary:
 
 `ACCEPTANCE PENDING` is not a synonym for done. It is the state that hides release risk, so it is called out separately everywhere.
 
+## Adopted development order — 2026-10-13
+
+[Owner adoption6136934115](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115)
+is the current sequencing authority, superseding conflicting older order lists below for future
+approvals. [PROJECT_STATE live checkpoint](PROJECT_STATE.md#live-checkpoint--adopted-roadmap-2026-10-13)
+holds exact main/CI, active candidates/owners, known FAIL/NM and next approval. Historical records
+remain evidence. Adoption schedules no automatic product implementation, T3, merge or release.
+
+### #73 lanes and unchanged full Acceptance
+
+| Lane | Owned problem / existing evidence | Research versus product completion |
+|---|---|---|
+| A | #72 OPEN/reopened: genuine faded/pulsing LOSS; retained native ROI/reset sequence | Verify surviving phrase/feature information and feature-loss hypothesis before a scoped fix; docs-only PR #77 did not fix it |
+| B | Five inherited synthetic accepted false-positive constructions | Mandatory precision controls; inherited failures stay visible and still block full accepted FP=0 |
+| C | Temporal/capture/freshness/CLEAR/re-arm, duplicate/stale, match and persistence boundaries | Independently assess stage/boundary failures; no unrelated lock/capture relaxation inside an A classifier experiment |
+
+A lane's research GO is improvement of its owned defect on frozen evidence with no new regression;
+it is not #73 Acceptance. Full #73 retains audited WIN/LOSS recall >=99%, accepted FP=0, wrong
+class=0, duplicate=0, DRAW non-interference, all applicable gates, independent review, native owner
+T3 and performance. A/B/C are evidence lanes within #73, not duplicative new EPICs.
+
+### Research and verification efficiency
+
+Pre-register a bounded experiment: test whether discriminating information survives first; vary
+one representation component with temporal/ResultGate/capture fixed; use #72/#68, clear genuine
+WIN/LOSS and the five inherited adverse constructions as early mandatory positive/negative controls.
+Only a surviving isolated candidate proceeds to frozen source-separated full replay and, with
+separate authorization, native T3. Freeze parameters before validation/holdout assessment; protect
+reserved sources and truth. Repeated same-class failure requires architectural reassessment, not
+another exception. Case B remains RETIRED and Banner PoC RESEARCH NO-GO; no renamed restart.
+
+Reuse existing T1/T2 components and rerun affected gates rather than unrelated full suites. Keep
+strict UTF-8/schema/source SHA/truth/provenance, empty-versus-missing output, immutable failure logs,
+product/environment/helper classification, and bounded owned process/port/lock cleanup contracts.
+Future expressly pre-authorized helper corrections may proceed within that envelope; adoption is
+not retroactive permission to mutate another session's helper or worktree.
+
+### Delivery order and real dependencies
+
+1. **#73 trustworthy WIN/LOSS**, with the minimum relevant #37 performance evidence under separate
+   scope approval and full native/precision/duplicate/re-arm acceptance.
+2. **#15-5 FULL synchronized T3/completion**, after #73 Acceptance, confined to its already authorized
+   `RANK MATCH: SINGLE` assisted-confirmation flow. PR #65 stays OPEN/DRAFT/untouched here; its earlier
+   FAIL is preserved. Custom/Team/general Rank/Rating are not delivered by this scope.
+3. **Small reliability-release decision** after required acceptance: audit exact-main unreleased
+   features/dependencies, installer/update/rollback, T3 and release verification. Being merged or CI
+   green is not acceptance/publication; owner release authorization remains separate.
+4. **Basic existing-data Analytics + minimum UI-2 History/Statistics**: reliable WIN/LOSS daily/
+   weekly/session/rolling trends, period sample counts, provenance and honest unknowns. #16 owns
+   computation; #25 owns presentation. Generic Rank/#74, #70-B network data and opponent capture
+   must not block this rank-independent increment. #28-A gates only season-attributed aggregation,
+   Season selection/refresh/assignment surfaces; unresolved Season does not block ordinary time-based
+   trends. Keep seasonal unknown/transition semantics; do not fabricate classifications or causality.
+5. **#70-A independent bounded GO/NO-GO feasibility**, operationally separate from basic Analytics.
+   Assess Steam P2P observable meaning/API availability, admin/WinDivert/driver ownership,
+   anti-cheat/network safety, privacy/load/cleanup. Preserve #70 no raw IP/packet persistence and
+   optional-feature failure isolation. NO-GO is an acceptable conclusion; #70-B/-C require later
+   approval and must not hold basic Analytics/UI-2 hostage.
+6. **Rank/Rating, Network implementation and Opponent Analytics** follow actual dependencies:
+   #74 general rank needs genuine pre-S, numberless-S and PLACE separation; #28-B rating progression
+   needs reliable recognition, appropriate pre-S/S scales and resolved #28-A Season attribution.
+   #70-B/-C follow #70-A GO and their own gates. #17/Phase8 acquisition and coverage/selection-bias
+   evidence precede matchup analysis/advanced UI-3 and #16-B; manual backfill is not an analytics gate.
+
+### Performance and safe release planning
+
+Prioritize reuse of #37's existing `tools/Start-RC-Performance-Capture.ps1`, not a new framework.
+Pair Tracker OFF / accepted main / candidate on the same machine with equivalent AC6 scene,
+window/resolution/settings; record AC6 frametime p95/p99, CPU/RAM, capture freshness/gaps and
+bounded shutdown/cleanup. Separate classifier-only timing, effective poll cadence and game cost.
+Derive budgets from measured paired data/variance; no measurement or numerical target is introduced
+by this docs PR. #37 stays PLANNED until separately authorized, and feature acceptance stays with
+the feature. Later releases may be smaller accepted increments; planning does not permit publishing.
+
+## DRAW requirement amendment — WIN/LOSS accuracy and #72, 2026-10-13
+
+[Owner decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654)
+changes the forward-looking DRAW requirement, not implementation history. Under
+[MASTER_REQUIREMENTS §9](MASTER_REQUIREMENTS.md#9-win--lose--draw), WIN/LOSS must be correctly counted
+exactly once. DRAW recognition/display/persistence is optional, but DRAW must not be mistaken for
+WIN/LOSS, change counts/streaks/win rate, or impede WIN/LOSS detection/counting before or after it.
+Duplicate/stale results and incorrect ResultGate behavior remain prohibited.
+
+#73 WIN/LOSS precision/recall remains before #15-5 T3; the next defect is #72's retained natural
+pulsing/faded LOSS. Cancel DRAW coordinate/template repair and DRAW recognition-rate work.
+Existing DRAW functionality is retained. Case B remains RETIRED; Banner PoC remains RESEARCH NO-GO,
+both NOT ACCEPTED / NOT MERGED / NOT RELEASED. PR #65 is OPEN/DRAFT/untouched, its T3 paused.
+This docs-only amendment authorizes no product repair, new recognition research, T3 or release.
+The Phase 1 DRAW row below records existing implementation, not a mandatory future recognition target.
+
+## Historical priority — #73 Result Accuracy Hardening, 2026-10-07
+
+The owner considers current result-detection accuracy unacceptable. The roadmap is temporarily
+re-prioritized:
+
+```text
+✓ #15-6 technical merge/verification
+→ #73 Result Accuracy Hardening
+→ repeat/close #15-5 FULL owner T3
+→ #70-A / #70-B Network Telemetry
+→ #28-A
+→ UI-2
+```
+
+#15-6 is **MERGED + TECHNICALLY VERIFIED, RELEASED NO**, but the owner does **not** accept its
+S-only implementation as the final general self-rank recognition architecture. It remains a
+genuine-fixture-backed **numbered/top-100 S presentation prototype**. General self-rank recognition
+is [#74](https://github.com/TullysAC6/ac6-winloss-tracker/issues/74): separate rank class from
+PLACE/top-100 position, obtain genuine pre-S and numberless-S evidence, and design one coherent
+rank-panel architecture before production runtime use.
+
+#73 owns current implementation priority; #72 is its first known open defect. PR #65 remains
+OPEN/DRAFT and its T3 is paused. Sections below are historical where they conflict with this
+priority.
+
 ## Current checkpoint — #59 resumed, 2026-10-01
 
 #15-4 merged in [PR #63](https://github.com/TullysAC6/ac6-winloss-tracker/pull/63)
@@ -200,7 +315,7 @@ No phase number was reused for a different subject, and no item was dropped.
 
 Two independent tracks plus a cross-cutting one. This section records **relative priority within
 each track**; the single interleaved order the project actually follows is
-[Sequencing](#sequencing--dependency-order-corrected-2026-09-13) below, and that section wins on any
+[Adopted development order](#adopted-development-order--2026-10-13) above, and that section wins on any
 question of *when*.
 
 Phase D is not a feature, and it comes first because it changes how expensive every later phase is
@@ -235,8 +350,8 @@ Not a competitor to the two tracks above; it interleaves with them. Requirements
 1. Runtime isolation - app-local Python environment ([#24](https://github.com/TullysAC6/ac6-winloss-tracker/issues/24)): **ACCEPTED — UNRELEASED**, merged in PR #40
 2. UI-0 design specification ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25)) - **DESIGN SPEC APPROVED + MERGED** (docs-only PR #42, `be77844`)
 3. UI-1A Player Overlay polish - **ACCEPTED — UNRELEASED**, merged in PR #46 (`c2b00dc`); then UI-1B Broadcast Overlay polish - **ACCEPTED — UNRELEASED**, merged in PR #48 (`b64ce73`)
-4. #28-A Season Catalog / Assignment Foundation - after #15 and before UI-2
-5. UI-2 Dashboard / History / Settings shell - after #15 and #28-A, including manual Season refresh
+4. #28-A Season Catalog / Assignment Foundation - gates season-specific UI/analytics only
+5. Minimum UI-2 History/Statistics + basic WIN/LOSS trends - reliable existing data first; manual Season refresh follows #28-A
 6. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation - each following its own data
 7. UI-4 Tray / Launcher modernization ([#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26)), last
 
@@ -246,9 +361,9 @@ Prerequisite foundations may be implemented before the visible feature that depe
 
 ## Sequencing — dependency order, corrected 2026-09-13
 
-This is the **authoritative order**. The phase tables below describe *what* each item is; this
-section describes *when*. Where the two appear to disagree, this section wins and the table is
-corrected.
+**Historical sequencing, superseded for future approvals by the
+[2026-10-13 adopted order](#adopted-development-order--2026-10-13).** The dated completed records
+and previous order/reasons below are retained as history, not current prerequisites or scope.
 
 Completed: **v1.2.0 released**; **PR #13 merged**, which made Revision 3 canonical on `main`; and
 **PR #5 (#8 settings, #9 analytics) accepted and merged to `main`** on 2026-09-13, released in v1.2.0 on 2026-09-14;
@@ -330,7 +445,7 @@ Implementation
 | Standard PR handoff template | **ADOPTED (process)** | [`.github/pull_request_template.md`](../.github/pull_request_template.md). `Not changed` is mandatory |
 | T0–T3 acceptance gates | **ADOPTED (process)** | Recorded in [DECISIONS.md](DECISIONS.md). T0–T2 pass before the **PR goes to review**; the affected gates are re-run after review fixes; T3 last |
 | Optional feature-flag policy | **ADOPTED (process)** | Policy recorded. No flag is implemented yet |
-| Performance / security regression checks | PLANNED | Owned by **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37)** (OPEN, not started) since 2026-09-19. Baseline deltas (Tracker OFF / current accepted / + feature). No invented absolute targets. A capture script exists (`tools/Start-RC-Performance-Capture.ps1`). **Not delivered by PR #35**: the #14 design kept it out of T1. #14 is closed; this item no longer lives there |
+| Performance / security regression checks | PLANNED | Owned by **[#37](https://github.com/TullysAC6/ac6-winloss-tracker/issues/37)** (OPEN, not started) since 2026-09-19. Prioritize minimum #73 baseline under separate approval: paired Tracker OFF / accepted main / candidate, AC6 frametime p95/p99, CPU/RAM, capture freshness and cleanup. Reuse `tools/Start-RC-Performance-Capture.ps1`; derive budgets from measured deltas. **Not delivered by PR #35**: the #14 design kept it out of T1. #14 is closed; this item no longer lives there |
 
 `ADOPTED (process)` means the rule is in force for future work — a documentation state, not a
 shipped application feature.
@@ -343,7 +458,7 @@ shipped application feature.
 |---|---|---|
 | WIN auto-detection | DONE | RANK MATCH: SINGLE only |
 | LOSE auto-detection | DONE | |
-| DRAW | DONE | Detected as `FINAL_DRAW` and reported as `last_result=draw`. **Deliberately not counted** — WIN / LOSE / streak are left unchanged. `history.db` and the analytics module accept `draw` rows, but none are ever written today |
+| DRAW | DONE (existing implementation) | Detected as `FINAL_DRAW` and reported as `last_result=draw`. **Deliberately not counted** — WIN / LOSE / streak are left unchanged. `history.db` and the analytics module accept `draw` rows, but none are ever written today. Forward-looking recognition/display/persistence is **optional** under §9; non-interference remains mandatory. Existing functionality is retained |
 | Manual WIN / LOSE entry | DEFERRED | No user-facing manual result entry exists. Only manual **undo** (`stats_undo.bat`, `control.py undo`) and **session reset** (dashboard button, `stats_reset.bat`, `control.py reset`). `record_result(..., "manual")` is an internal API used by tests, not a user feature |
 | CLEAR / re-arm | DONE | |
 | ResultGate | DONE | One cooldown gate shared by automatic and manual sources |
@@ -436,12 +551,12 @@ The prerequisite for every category-aware statistic. Requirements: [MASTER_REQUI
 | #15-0 optional enrichment storage foundation (`enrichment.db`) | **ACCEPTED — UNRELEASED** | PR #50 exact head `1827212f4eafe85de62f7219c6f2072f448f1ce7`, merged as `59ecb1977444283fbf5ae464a6c4e11e9f0b3a06`. Dormant: ordinary startup does not open/create/migrate/clean the sidecar. `history.db` remains authoritative; match-bound bindings are parent-checked and missing parents are logically invisible. T3 N/A |
 | `match_type` — ranked / custom / unknown | **ACCEPTED + MERGED — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). No recognizer or runtime caller is added in this slice |
 | `match_format` — single / team / unknown | **ACCEPTED + MERGED — UNRELEASED (dormant #15-1 persistence only)** | PR #55, merged as `5d001a1862aef9c7544d503077c94de22453f7c1`; see [ISSUE15_1_METADATA_CONTRACT.md](ISSUE15_1_METADATA_CONTRACT.md). Mixed known/unknown values are valid; absence remains unknown |
-| `self_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Canonical rank token or unknown, any format; see [ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md). The #15-2 PR and Issue #6 own the live review/merge/acceptance evidence. No recognizer or runtime caller |
+| `self_rank` | **IMPLEMENTED (dormant #15-2 persistence; #15-6 offline S recognizer)** | Canonical rank token or unknown, any format; see [ISSUE15_2_RANK_EVIDENCE_CONTRACT.md](ISSUE15_2_RANK_EVIDENCE_CONTRACT.md). #15-6 recognizes only the player's own S from the Ranked Single waiting-screen RANK panel ([contract](ISSUE15_6_SELF_RANK_CONTRACT.md)); pre-S and every other rank stay unknown. The slice PRs and Issue #6 own the live review/merge/acceptance evidence. No runtime caller |
 | `opponent_rank` | **IMPLEMENTED (dormant #15-2 persistence only)** | Explicit Single only; TEAM/unknown carries none, and it is never resurrected. Team opponent ranks remain deferred |
 | `metadata_recognition_status` / `metadata_recognition_version` | **IMPLEMENTED (dormant #15-2 persistence only)** | `NULL` (no recorded evidence) / `recognized` / `failed`; the version names interpretation semantics, not the app release. The whole snapshot is revisioned (compare-and-set) |
 | Match / Rating observation timestamps usable for retrospective Season assignment | PLANNED | Saving the authoritative result or Rating observation does not wait for Season resolution |
 | Unresolved Season metadata | PLANNED | `season_id = unresolved` is valid; later reconciliation changes only derived Season metadata |
-| TEAM recorded through the normal result path | PLANNED | WIN/LOSE/DRAW, match history and win-rate stats. **Supersedes the previous "SINGLE only" scope decision** — see [DECISIONS.md](DECISIONS.md) |
+| TEAM recorded through the normal result path | PLANNED | WIN/LOSE, match history and win-rate stats; DRAW recognition/display/persistence is optional under §9 and never changes WIN/LOSE statistics. **Supersedes the previous "SINGLE only" scope decision** — see [DECISIONS.md](DECISIONS.md) |
 | Match-history row shows mode / format / ranks | PLANNED | `RANKED · SINGLE`, `自分 A / 相手 S`. Unknown shown honestly |
 | Win-rate breakdown by Ranked / Custom / Single / Team | PLANNED | Top-level UI may stay Overall / Single / Team, with the detail elsewhere |
 | `相手機体: TEAMのため対象外` distinct from `未取得` | PLANNED | |
@@ -471,12 +586,14 @@ failure never affects WIN/LOSE, ResultGate, streak or match persistence.
 
 Absorbs the former Phase 7 (daily / weekly / monthly series). Priority **HIGH**.
 
-[#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) is delivered in two slices:
-**#16-A / #28-B** is the core growth and seasonal rank/rating analytics data, scheduled after
-#15, #28-A and UI-2, then presented by UI-3A; **#16-B** is the advanced analytics (rank-relative depth, matchup and improved-matchup,
-session tendencies, Next Goal), scheduled after the opponent-statistics work and **before**
-[#18](https://github.com/TullysAC6/ac6-winloss-tracker/issues/18) — backfill is retroactive data
-entry and does not gate the analytics.
+[#16](https://github.com/TullysAC6/ac6-winloss-tracker/issues/16) is split by actual data dependencies
+under the [adopted order](#adopted-development-order--2026-10-13). Early **rank-independent basic
+trends** use reliable existing WIN/LOSS history and minimum UI-2 History/Statistics; #70-B, generic
+Rank and opponent acquisition are not prerequisites. **Seasonal rank/rating (#28-B)** follows
+reliable #74 recognition and resolved #28-A Season data. **Advanced #16-B** follows its own inputs:
+rank-relative depth needs reliable rank; matchup/improved matchup needs #17/Phase8, while basic
+session trends do not require opponent capture. Backfill [#18](https://github.com/TullysAC6/ac6-winloss-tracker/issues/18)
+does not gate analytics. All slices remain PLANNED and need separate authorization.
 
 **#16 owns the data; the charts are UI-3A / UI-3B, owned by
 [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25).**
@@ -539,7 +656,7 @@ loadout today.
 
 | Item | Status | Notes |
 |---|---|---|
-| Single only, after the result is finalised | PLANNED | WIN / LOSE / DRAW all valid |
+| Single only, after the result is finalised | PLANNED | WIN / LOSE and a recognized DRAW are valid; DRAW recognition is optional under §9 |
 | Capture only the required frame(s), recognise, normalise, save to that match, exit | PLANNED | |
 | Partial recognition stored, not discarded | PLANNED | |
 | Manual correction | PLANNED | Updates the current value; no unbounded edit log |
@@ -615,9 +732,10 @@ The division of labour that matters most here: **#16 owns the analytics and time
 [#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25) owns the actual chart
 rendering.** Neither implements the other's half.
 
-Order within this phase is set by [Sequencing](#sequencing--dependency-order-corrected-2026-09-13)
-above, not by the row order in the table. In particular **#15 lands before UI-2**, so the Dashboard
-and History shell is built once against a settled match-metadata contract instead of twice.
+Order within this phase is set by the [adopted order](#adopted-development-order--2026-10-13),
+not row order. Minimum UI-2/basic trends may use reliable existing history without waiting for
+generic Rank, #70-B or opponent acquisition; season-specific UI still requires #28-A. Preserve
+settled metadata contracts and honest unknowns rather than inventing missing enrichment.
 
 | Phase | Item | Status | Risk |
 |---|---|---|---|
@@ -626,7 +744,7 @@ and History shell is built once against a settled match-metadata contract instea
 | UI-1B | Broadcast / streaming Overlay polish — stream-safe typography, OBS safe area, scene composition, viewer-distance readability. Primary text keeps the current 24 px bold baseline unless real OBS evidence shows a readability problem (owner decision 2026-09-23, spec §20). Owner pre-authorization decisions of 2026-09-25 (spec §20, decision 8): BEST toggle default ON, existing wording and 22 px placement kept, the BEST toggle as the only new setting, reduced motion deferred. As merged: the Broadcast BEST toggle `broadcast_show_best_streak` in `preferences.json` v2, a static streak status, and safer narrow-source warning handling | **ACCEPTED — UNRELEASED** (PR #48, merged as `b64ce73`) | low |
 | Shared visibility settings | 連勝ステータスを表示 and 最高連勝を表示 each become one user preference shared by the Player and Broadcast overlays; the renderers may remain separate ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5843053161), [DECISIONS.md](DECISIONS.md#shared-visibility-settings-across-the-two-overlays)). Open questions: whether BEST returns to the Player Overlay, the shared defaults, and how `player_streak_status_enabled` / `broadcast_show_best_streak` migrate deterministically with one-generation rollback. **Not started; needs separate owner authorization** | BACKLOG | not classified |
 | Player personalization | Settings-based Player text size, panel size/density, opacity, position and reset to defaults, stored through `preferences.json` ([#25](https://github.com/TullysAC6/ac6-winloss-tracker/issues/25#issuecomment-5831075818)). Ranges, widgets and anchor model are decided when it is authorized | BACKLOG | not classified |
-| UI-2 | Dashboard / History / Settings shell — top navigation (`OVERVIEW / HISTORY / STATISTICS / SETTINGS`), WIN RATE as primary KPI, date-grouped history, plus `SEASON INFORMATION`, cached Season, last checked, and `[ シーズン情報を更新 ]`. No gameplay modal or focus stealing | PLANNED | medium |
+| UI-2 | Minimum History/Statistics shell and basic existing-data WIN/LOSS trends first; no generic Rank/#70-B prerequisite. Full Dashboard/History/Settings navigation remains planned; `SEASON INFORMATION`, cache/refresh and seasonal views follow #28-A. No gameplay modal or focus stealing | PLANNED | medium |
 | UI-3A | **Growth / Rank / Rating presentation.** Statistics page for the data from #16-A / #28-B: win-rate trend, rolling win rate, the **season selector**, and the Rank / Rating chart — with a separate scale or presentation where pre-S and S cannot be compared directly | PLANNED | medium |
 | UI-3B | **Opponent build statistics presentation.** Weapon / leg-type / full-build views for #17 and #10/#11/#12. Follows its data | PLANNED | medium |
 | UI-4 | Tray / Launcher modernization — [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26). Separate issue, separate PR, last | BACKLOG | **high** |

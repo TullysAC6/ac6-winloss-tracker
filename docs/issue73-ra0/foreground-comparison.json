@@ -1,0 +1,2397 @@
+{
+  "prototype_version": 3,
+  "parameter_freeze_commit": "5c93919",
+  "evaluation_type": "controlled classifier intervention: cached capture/motion/gameplay inputs; unchanged production state/gate",
+  "sources": {
+    "vP": {
+      "comparison_sha256": "cf92b8e911c8df8f179005aafdd0de169c0c7a298abc6c3563b3c95a3793580a",
+      "truth_sha256": "1790aa931efaf2507b84c2b807c9bb27be112cc29641764395de129eb0cdc65a",
+      "phases": [
+        {
+          "phase": 0,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 36,
+              "LOSS": 4
+            },
+            "outcomes": {
+              "Correct": 40,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 36,
+              "LOSS": 4
+            },
+            "outcomes": {
+              "Correct": 40,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 1,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [
+              {
+                "t": 1284.2175,
+                "candidate": "draw"
+              }
+            ],
+            "poc": [
+              {
+                "t": 1284.2175,
+                "candidate": "draw"
+              }
+            ]
+          },
+          "current": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 36,
+              "LOSS": 4
+            },
+            "outcomes": {
+              "Correct": 40,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 36,
+              "LOSS": 4
+            },
+            "outcomes": {
+              "Correct": 40,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 2,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 36,
+              "LOSS": 3
+            },
+            "outcomes": {
+              "Correct": 39,
+              "Miss": 2
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              },
+              {
+                "event": "VP-26",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 36,
+              "LOSS": 3
+            },
+            "outcomes": {
+              "Correct": 39,
+              "Miss": 2
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              },
+              {
+                "event": "VP-26",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 3,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 35,
+              "LOSS": 4
+            },
+            "outcomes": {
+              "Correct": 39,
+              "Miss": 2
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              },
+              {
+                "event": "VP-39",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 36,
+              "LOSS": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 35,
+              "LOSS": 4
+            },
+            "outcomes": {
+              "Correct": 39,
+              "Miss": 2
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "VP-24",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              },
+              {
+                "event": "VP-39",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        }
+      ],
+      "frame_signal_counts": {
+        "negative_window_polls": 31585,
+        "banner_interval_polls": 471,
+        "current_matching": 422,
+        "poc_matching": 435
+      }
+    },
+    "LT25": {
+      "comparison_sha256": "49658a6c7b292d25811a4d7f8d0fb5601b99409c2e0c5cba026d1c720069b786",
+      "truth_sha256": "50bc336c994d5520659214965c2041155b7f1eace803cad1bbb414b8e18581da",
+      "phases": [
+        {
+          "phase": 0,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        },
+        {
+          "phase": 1,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        },
+        {
+          "phase": 2,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        },
+        {
+          "phase": 3,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "correct": {
+              "WIN": 8,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        }
+      ],
+      "frame_signal_counts": {
+        "negative_window_polls": 19632,
+        "banner_interval_polls": 193,
+        "current_matching": 164,
+        "poc_matching": 168
+      }
+    },
+    "fAph": {
+      "comparison_sha256": "f86b4eaab72fe02516a2d70a8432eb120b723fa578d9e8b39a43b749f26bcb6b",
+      "truth_sha256": "5ae78dc8004cfd4d9b81a56ddb8feb8e725b47d7652f185f8bbb7a9d52dcece6",
+      "phases": [
+        {
+          "phase": 0,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 1,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 2,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 3,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 15,
+              "WIN": 4,
+              "DRAW": 1
+            },
+            "correct": {
+              "LOSS": 15,
+              "WIN": 4
+            },
+            "outcomes": {
+              "Correct": 19,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "FA-18",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        }
+      ],
+      "frame_signal_counts": {
+        "negative_window_polls": 21378,
+        "banner_interval_polls": 222,
+        "current_matching": 190,
+        "poc_matching": 194
+      }
+    },
+    "IXV8": {
+      "comparison_sha256": "46a7638a413aa1a79c6bf77cabae83fb4f9293d64fcae6cf4ec20224dc75c245",
+      "truth_sha256": "7ed345698d9d4750172bd877045cd734e9621b727a3b728cfe352b8c5f8f06b8",
+      "phases": [
+        {
+          "phase": 0,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 22,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Miss": 2,
+              "Correct": 29
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 23,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 30,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 1,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 23,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 30,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 23,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 30,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 2,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 22,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 29,
+              "Miss": 2
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-12",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 23,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 30,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 3,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 22,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 29,
+              "Miss": 2
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-12",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 23,
+              "LOSS": 7,
+              "DRAW": 1
+            },
+            "correct": {
+              "WIN": 23,
+              "LOSS": 7
+            },
+            "outcomes": {
+              "Correct": 30,
+              "Miss": 1
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "IX-26",
+                "truth": "DRAW",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        }
+      ],
+      "frame_signal_counts": {
+        "negative_window_polls": 28732,
+        "banner_interval_polls": 354,
+        "current_matching": 313,
+        "poc_matching": 321
+      }
+    },
+    "yB": {
+      "comparison_sha256": "8bb0c684cc5299e502b19812ecbb071269d661ab49b04b9c81de10d03629ba7a",
+      "truth_sha256": "02ccb649c23425e91bfe8cbbba88fb4daa3bc3e9fa3ca2d015bbddb73f4412a3",
+      "phases": [
+        {
+          "phase": 0,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 1,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 2,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        },
+        {
+          "phase": 3,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          },
+          "poc": {
+            "totals": {
+              "WIN": 12,
+              "LOSS": 8
+            },
+            "correct": {},
+            "outcomes": {
+              "Miss": 20
+            },
+            "false_positives": [],
+            "noncorrect": [
+              {
+                "event": "YB-01",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-02",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-03",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-04",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-05",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-06",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-07",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-08",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-09",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-10",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-11",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-12",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-13",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-14",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-15",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-16",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-17",
+                "truth": "LOSS",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-18",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-19",
+                "truth": "WIN",
+                "outcome": "Miss"
+              },
+              {
+                "event": "YB-20",
+                "truth": "WIN",
+                "outcome": "Miss"
+              }
+            ]
+          }
+        }
+      ],
+      "frame_signal_counts": {
+        "negative_window_polls": 28742,
+        "banner_interval_polls": 240
+      }
+    },
+    "AYng": {
+      "comparison_sha256": "9451b8c5e79185cb034d12f87c732b5b61fa998ba763ace360156a7173551215",
+      "truth_sha256": "6517b0ffd661bd304c0bc14d4302eef0c5ff0aed6c5a3b78b7b9fa0c681be2ea",
+      "phases": [
+        {
+          "phase": 0,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        },
+        {
+          "phase": 1,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        },
+        {
+          "phase": 2,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        },
+        {
+          "phase": 3,
+          "baseline_control_all_states_identical": true,
+          "near_fp": {
+            "current": [],
+            "poc": []
+          },
+          "current": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          },
+          "poc": {
+            "totals": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "correct": {
+              "LOSS": 6,
+              "WIN": 9
+            },
+            "outcomes": {
+              "Correct": 15
+            },
+            "false_positives": [],
+            "noncorrect": []
+          }
+        }
+      ],
+      "frame_signal_counts": {
+        "negative_window_polls": 21189,
+        "banner_interval_polls": 188,
+        "current_matching": 162,
+        "poc_matching": 164
+      }
+    }
+  },
+  "groups": {
+    "standard": {
+      "current": {
+        "totals": {
+          "WIN": 284,
+          "LOSS": 132,
+          "DRAW": 12
+        },
+        "correct": {
+          "WIN": 280,
+          "LOSS": 131
+        },
+        "outcomes": {
+          "Correct": 411,
+          "Miss": 17
+        },
+        "false_positives": 0,
+        "near_fp": 1
+      },
+      "poc": {
+        "totals": {
+          "WIN": 284,
+          "LOSS": 132,
+          "DRAW": 12
+        },
+        "correct": {
+          "WIN": 283,
+          "LOSS": 131
+        },
+        "outcomes": {
+          "Correct": 414,
+          "Miss": 14
+        },
+        "false_positives": 0,
+        "near_fp": 1
+      },
+      "frame_signal_counts": {
+        "negative_window_polls": 101327,
+        "banner_interval_polls": 1240,
+        "current_matching": 1089,
+        "poc_matching": 1118
+      }
+    },
+    "validation": {
+      "current": {
+        "totals": {
+          "WIN": 48,
+          "LOSS": 88,
+          "DRAW": 4
+        },
+        "correct": {
+          "WIN": 48,
+          "LOSS": 88
+        },
+        "outcomes": {
+          "Correct": 136,
+          "Miss": 4
+        },
+        "false_positives": 0,
+        "near_fp": 0
+      },
+      "poc": {
+        "totals": {
+          "WIN": 48,
+          "LOSS": 88,
+          "DRAW": 4
+        },
+        "correct": {
+          "WIN": 48,
+          "LOSS": 88
+        },
+        "outcomes": {
+          "Correct": 136,
+          "Miss": 4
+        },
+        "false_positives": 0,
+        "near_fp": 0
+      },
+      "frame_signal_counts": {
+        "negative_window_polls": 41010,
+        "banner_interval_polls": 415,
+        "current_matching": 354,
+        "poc_matching": 362
+      }
+    },
+    "typeface": {
+      "current": {
+        "totals": {
+          "WIN": 48,
+          "LOSS": 32
+        },
+        "correct": {},
+        "outcomes": {
+          "Miss": 80
+        },
+        "false_positives": 0,
+        "near_fp": 0
+      },
+      "poc": {
+        "totals": {
+          "WIN": 48,
+          "LOSS": 32
+        },
+        "correct": {},
+        "outcomes": {
+          "Miss": 80
+        },
+        "false_positives": 0,
+        "near_fp": 0
+      },
+      "frame_signal_counts": {
+        "negative_window_polls": 28742,
+        "banner_interval_polls": 240
+      }
+    },
+    "broadcast": {
+      "current": {
+        "totals": {
+          "LOSS": 24,
+          "WIN": 36
+        },
+        "correct": {
+          "LOSS": 24,
+          "WIN": 36
+        },
+        "outcomes": {
+          "Correct": 60
+        },
+        "false_positives": 0,
+        "near_fp": 0
+      },
+      "poc": {
+        "totals": {
+          "LOSS": 24,
+          "WIN": 36
+        },
+        "correct": {
+          "LOSS": 24,
+          "WIN": 36
+        },
+        "outcomes": {
+          "Correct": 60
+        },
+        "false_positives": 0,
+        "near_fp": 0
+      },
+      "frame_signal_counts": {
+        "negative_window_polls": 21189,
+        "banner_interval_polls": 188,
+        "current_matching": 162,
+        "poc_matching": 164
+      }
+    }
+  },
+  "retained": {
+    "68": {
+      "provenance": [
+        {
+          "file": "98e926fab4854857a914e0e1c692e540.zip",
+          "sha256": "350ef3c63526e241f3cecc0ba266f268038441c538b575edb30c10ebcf1e4bd2"
+        }
+      ],
+      "accepted": {
+        "current": [
+          "win"
+        ],
+        "poc": [
+          "win"
+        ]
+      },
+      "frame_classifications": [
+        {
+          "captured_at": 631071.5512039,
+          "current": "CLEAR",
+          "poc": "CLEAR"
+        },
+        {
+          "captured_at": 631072.3775076,
+          "current": "FINAL_WIN",
+          "poc": "FINAL_WIN"
+        },
+        {
+          "captured_at": 631073.4228491,
+          "current": "FINAL_WIN",
+          "poc": "FINAL_WIN"
+        }
+      ]
+    },
+    "72": {
+      "provenance": [
+        {
+          "file": "b3f1faf5bc2d43c996412777d39fa50a.zip",
+          "sha256": "21290af88457e1ccac07aa4b4285046f641399f18206a93499d94002f4aa709f"
+        },
+        {
+          "file": "bb8ce355ed3142a2873fc67656d70558.zip",
+          "sha256": "93c39baaff6f40df05ff5f938238ad4b48dfbd08a376e040dbf3018caa48265e"
+        }
+      ],
+      "accepted": {
+        "current": [],
+        "poc": [
+          "loss"
+        ]
+      },
+      "frame_classifications": [
+        {
+          "captured_at": 181193.0291233,
+          "current": "CLEAR",
+          "poc": "CLEAR"
+        },
+        {
+          "captured_at": 181193.8660326,
+          "current": "FINAL_LOSS",
+          "poc": "FINAL_LOSS"
+        },
+        {
+          "captured_at": 181194.6959228,
+          "current": "NON_CLEAR",
+          "poc": "FINAL_LOSS"
+        },
+        {
+          "captured_at": 181195.5258028,
+          "current": "FINAL_LOSS",
+          "poc": "FINAL_LOSS"
+        },
+        {
+          "captured_at": 181196.5678915,
+          "current": "CLEAR",
+          "poc": "CLEAR"
+        }
+      ]
+    }
+  },
+  "canonical_stills": [
+    {
+      "path": "tests\\fixtures\\false_cyan_hud_synthetic.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\final_loss_01.ppm",
+      "current": "FINAL_LOSS",
+      "poc": "FINAL_LOSS"
+    },
+    {
+      "path": "tests\\fixtures\\final_loss_02.ppm",
+      "current": "FINAL_LOSS",
+      "poc": "FINAL_LOSS"
+    },
+    {
+      "path": "tests\\fixtures\\final_win_01.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\final_win_02.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\final_win_03.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\live_gameplay_6349.ppm",
+      "current": "CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\normal_01.ppm",
+      "current": "CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\phase_loss_01.ppm",
+      "current": "PHASE",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\phase_white_prefix_synthetic.ppm",
+      "current": "PHASE",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\phase_win_01.ppm",
+      "current": "PHASE",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_dark_gameplay_0_75.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_dark_gameplay_1_50.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_dark_gameplay_2_25.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_draw_1_2.ppm",
+      "current": "FINAL_DRAW",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_draw_1_6.ppm",
+      "current": "FINAL_DRAW",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_draw_2_5.ppm",
+      "current": "FINAL_DRAW",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_false_draw_combat_1_4667.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_false_draw_combat_1_6667.ppm",
+      "current": "CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_false_draw_combat_1_7667.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_false_garage_20_1.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_false_garage_menu_21_4.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_missed_final_win_6_00.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\video_rank_menu_23_267.ppm",
+      "current": "NON_CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\video_true_final_win_5_9.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\results\\clear\\owner-bright-band-0.ppm",
+      "current": "CLEAR",
+      "poc": null
+    },
+    {
+      "path": "tests\\fixtures\\results\\win\\owner-bright-band-1.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    },
+    {
+      "path": "tests\\fixtures\\results\\win\\owner-bright-band-2.ppm",
+      "current": "FINAL_WIN",
+      "poc": "FINAL_WIN"
+    }
+  ],
+  "synthetic_prefix_stress": {
+    "current": [],
+    "poc": [
+      {
+        "result": "win",
+        "source": "auto",
+        "accepted": true
+      }
+    ]
+  },
+  "decision": "Reject frozen v3 as RA-1 candidate: new false WIN acceptance on canonical synthetic PHASE-prefix stress, despite improved natural-video recall."
+}

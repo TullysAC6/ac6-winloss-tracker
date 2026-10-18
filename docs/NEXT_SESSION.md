@@ -1,6 +1,98 @@
 # Next session
 
-## Current checkpoint — #15-5 revalidation after #68, 2026-10-05
+## Current checkpoint — #15-5 A2 sync/revalidation, 2026-10-18
+
+[Owner decision A1/A2](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6248830021) and [A2 ownership transfer](https://github.com/TullysAC6/ac6-winloss-tracker/pull/65#issuecomment-6248945914). Synchronize PR #65
+with exact main `acc7798337c07e1701776931510ac9c90607b078` by ordinary merge from
+`889d9e18a917fd183e0788495a86d542203040de`, keeping both parents and every historical T3 FAIL.
+Keep the classifier, ResultStateMachine, ResultGate and templates identical to main and the
+reviewed #15-5 hooks unchanged; do not include PR #79. [ISSUE15_5_T3.md](ISSUE15_5_T3.md) defines
+T3-A (per-feature #15-5 verification, allowed before #73 Acceptance; a known main-origin WIN/LOSS
+anomaly keeps its FAIL and is attributed to #73 with evidence, otherwise STOP) and T3-B (FULL T3,
+no main-origin exemption, after #73 Acceptance). Run full T0, formal T1, affected T2, exact-head CI
+and the mandatory independent sync-diff review; apply fixes and rerun affected gates. STOP after A2:
+T3-A starts only on a separate owner A3 instruction; no T3-B, merge, release, #73 Acceptance or #72.
+
+## Historical scope — adopted roadmap docs alignment, 2026-10-13
+
+Read Issue #6 / [owner adoption6136934115](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115)
+→ MASTER_REQUIREMENTS → [PROJECT_STATE live checkpoint](PROJECT_STATE.md#live-checkpoint--adopted-roadmap-2026-10-13)
+→ this file → ROADMAP → DECISIONS → Issue #73/#72/#16/#37/#70 → exact main/open PRs/CI.
+Check ownership, process references and <=2 active unmerged generations before creating a branch.
+PROJECT_STATE holds live SHA/CI/candidate/owner/gate state; older checkpoints below are history.
+
+This task aligns docs only. Complete document/link/diff checks, fresh Astra / High review,
+necessary docs corrections and exact-head CI, then STOP for owner merge authorization.
+Do not start #72 product work, #70-A, Analytics/UI-2, performance measurement, T3 or release.
+Preserve PR #65 and other sessions. PR #77 DRAW requirements and original test truth remain intact.
+
+The [adopted development order](ROADMAP.md#adopted-development-order--2026-10-13) separates #73
+lanes A (#72 real LOSS), B (five accepted-FP adverse constructions), C (temporal/capture/CLEAR/
+re-arm/duplicate/stale). A lane's research GO is not full #73 Acceptance. Keep zero accepted FP,
+wrong class and duplicate, recall >=99%, DRAW non-interference and native/gate/review/performance
+requirements. Case B stays RETIRED and Banner PoC RESEARCH NO-GO.
+
+For a later separately authorized bounded experiment: predeclare the single component, unchanged
+controls, development/validation/holdout split, early positive/adverse NO-GO and STOP conditions.
+Use #72/#68/clear WIN/LOSS and inherited negatives early; freeze before held-out assessment.
+Reuse existing T1/T2 and small strict helper contracts; rerun affected paths only. Preserve original
+logs, source hashes/truth, empty-versus-missing output and product/environment/helper distinctions.
+Repeated same-class failure requires architectural reassessment, not another predicate or a
+renamed restart. This policy does not authorize edits to a currently owned helper/worktree.
+
+Future approvals prioritize #73 → existing authorized SINGLE-only #15-5 FULL T3 → reliability
+release decision → basic reliable WIN/LOSS Analytics + minimum UI-2 History/Statistics.
+#70-A is an independent bounded feasibility GO/NO-GO, not a prerequisite to that basic increment.
+Generic Rank/#70-B/opponent capture must not block basic time-based trends; #28-A applies only to
+season-specific claims. Rank/Rating and opponent analytics wait for their actual evidence/data.
+Reuse #37's existing capture tool for paired OFF/accepted/candidate evidence after separate approval;
+no numerical budgets or runtime performance claims are invented from offline timing.
+
+## Historical requirement scope — WIN/LOSS accuracy and #72, 2026-10-13
+
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS →
+Issue #73 / [owner decision6135964654](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654)
+→ Issue #72 → current main/open PRs/CI; verify local worktrees and the two-generation limit.
+
+The next defect priority is #72's retained natural faded/pulsing LOSS, within #73 WIN/LOSS
+precision/recall hardening. [§9](MASTER_REQUIREMENTS.md#9-win--lose--draw) requires WIN/LOSS exactly
+once, no duplicate/stale result or incorrect ResultGate behavior, and DRAW false-positive safety
+with no WIN/LOSS counter, streak, win-rate or before/after detection interference.
+Automatic DRAW recognition, display and persistence are optional. Do not improve DRAW recognition
+rates, resume the cancelled coordinate repair, remove existing DRAW behavior or request dedicated live DRAW reproduction.
+
+Existing DRAW-positive fixture/test expectations describe the unchanged implementation, not a new
+acceptance requirement. Any future relaxation needs a separate reviewed requirement/test-alignment
+proposal retaining truth/provenance and historical evidence; retain mandatory no-WIN/LOSS-mutation
+and adjacent-result controls. No tests or fixtures are changed by this docs PR.
+
+Case B is RETIRED; Banner PoC is RESEARCH NO-GO. Preserve their evidence without restarting them.
+PR #65 remains OPEN/DRAFT/untouched, FULL #15-5 owner T3 paused. Docs review/CI is not #73 Acceptance.
+Stop after this docs-only PR's checks, independent review and exact-head CI; merge needs separate
+owner authorization. Do not start #72 implementation, recognition research, T3 or release here.
+
+## Historical owner scope — #73 Result Accuracy Hardening, 2026-10-07
+
+Read Issue #6 → MASTER_REQUIREMENTS → PROJECT_STATE → this file → ROADMAP → DECISIONS →
+Issue #73 → Issue #72 → current main/open PRs/CI.
+
+Owner priority is now **WIN / LOSS / DRAW reliability**. Start with #73 RA-0 evidence inventory /
+benchmark freeze; do not begin with another threshold patch. Ground-truth result events in recorded
+video must be discovered independently of the production detector before replay, so a detector that
+emits no candidate can still be measured as a miss.
+
+PR #65 / #15-5 remains OPEN/DRAFT and its FULL owner T3 is paused until #73 is accepted.
+
+#15-6 is already merged and exact-main green, but the owner explicitly withholds acceptance of it
+as the final general self-rank architecture. Treat its code/fixtures as a bounded
+**numbered/top-100 S prototype/evidence asset**. General self-rank recognition is Issue #74:
+rank identity must be separable from PLACE/top-100 position; pre-S, numberless S and Ranked Team
+support require genuine evidence and a coherent architecture before runtime use.
+
+Do not start #70, #28-A, UI work, or general Rank runtime while #73 is the active priority unless
+the owner explicitly changes the order.
+
+## Historical checkpoint — #15-5 revalidation after #68, 2026-10-05
 
 [Owner authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5981356526).
 Sync exact main `ef4af555a5187b370dafea334bac6ab1bac81df4` into historical PR65

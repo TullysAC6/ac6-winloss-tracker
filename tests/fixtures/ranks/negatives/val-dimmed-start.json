@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-dimmed-start",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-dimmed-start-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 19153,
+    "sha256": "1440410699c7b06c310446d200169d7a2a93a7acbd127ef012075d57aca48fc9"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/val-dimmed-start-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 25701,
+    "sha256": "0543941c514191556213d2fe5005094486bb9d4e9d13806bebee00382420a5ec"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "lobby_dimmed_start",
+    "visible_text": "Complete header and an S badge with place number 01 still visible, but the whole lobby is dimmed after a match was found (match-start status).",
+    "self_identity": "The badge is the player's, but the dimmed match-start presentation is outside the supported fully lit lobby; abstention is expected."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "context"
+  },
+  "coverage": [
+    "rank.self_s.lobby_transition"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "y86wDex-EQI",
+    "reference": "https://www.youtube.com/watch?v=y86wDex-EQI",
+    "timestamp_ms": 114000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "07da7e89b8f838871a40f767a230bdc44f2566588c77460ad81754a98901f2c3",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.dev-crossfade-system",
+  "family": "ranks",
+  "category": "negatives",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-crossfade-system-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 29591,
+    "sha256": "009ee533699755ac33abdae8d2dbb000e00cee204a837e01f8ab651063afc2d0"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/negatives/dev-crossfade-system-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 33314,
+    "sha256": "8c8e27ff48b9a1e06f7522f3ec37bf707cb4b458b4cf8706654e045bc8559e9e"
+  },
+  "truth": {
+    "self_rank": "unknown",
+    "screen": "lobby_crossfade_lit_header",
+    "visible_text": "Complete lit RANK MATCH: SINGLE header, but the lobby is visibly cross-fading into the SYSTEM screen: its settings rows and menu are overlaid on the lobby and the RANK panel interior is washed by the blend; an S badge with place number 14 is still visible.",
+    "self_identity": "The badge is the player's, but a lobby blended with another screen's content is not a clean RANK panel; abstention at a panel stage is expected. Post-hoc addition after independent review: the last lit-header frame before the SYSTEM screen, chosen by that objective rule and labelled from the visible overlay."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": null,
+    "status": "failed",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": "panel"
+  },
+  "coverage": [
+    "rank.self_s.panel_stage"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "aRnhg9vs-zs",
+    "reference": "https://www.youtube.com/watch?v=aRnhg9vs-zs",
+    "timestamp_ms": 222233,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "ccded3c82a343cd8452b830c1b33d11509d38fab7c9064e1aec10facde2800d6",
+    "split": "dev",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

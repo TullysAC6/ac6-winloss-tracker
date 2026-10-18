@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "id": "ranks.val-s-third-source",
+  "family": "ranks",
+  "category": "s_rank",
+  "input": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-third-source-panel.png",
+    "format": "png",
+    "width": 142,
+    "height": 168,
+    "bytes": 24554,
+    "sha256": "a8c204634ccdff21bc6687e4f5a96db15069af7795f5507f47cc68d64f768ee1"
+  },
+  "context": {
+    "kind": "roi",
+    "path": "ranks/s_rank/val-s-third-source-header.png",
+    "format": "png",
+    "width": 480,
+    "height": 60,
+    "bytes": 31391,
+    "sha256": "3d96560015711c981d4983a510a9e9892bc9a993a31fc9be6033f863685fc085"
+  },
+  "truth": {
+    "self_rank": "S",
+    "screen": "lobby_matching",
+    "visible_text": "Complete RANK MATCH: SINGLE header; lobby RANK panel with the RANK label and a red S badge with place number 01.",
+    "self_identity": "The screen owner's own Ranked Single waiting screen: their menu, NP and sortie AC are shown and MATCH INFO holds exactly one card with the RANK panel under it. Matching is in progress (matching status text and cancel prompt), so no opponent exists yet. Same session (dense sampling): the panel never changes through match found; in the intro the lobby card is UNIT BETA beside the AC identical to SORTIE AC INFO, the combat HUD AP equals the lobby AC SPEC AP, and the opponent is UNIT ALPHA on a different card. A mouse pointer is visible elsewhere, not over either crop."
+  },
+  "checks": {
+    "adapter": "self_rank.v1",
+    "self_rank": "S",
+    "status": "recognized",
+    "version": "self-rank-s-lobby.v1",
+    "source": "direct_lobby_rank_panel",
+    "abstention": null
+  },
+  "coverage": [
+    "rank.self_s.positive"
+  ],
+  "provenance": {
+    "source_type": "original_video_frame",
+    "video_id": "y86wDex-EQI",
+    "reference": "https://www.youtube.com/watch?v=y86wDex-EQI",
+    "timestamp_ms": 110000,
+    "source_dimensions": [
+      1920,
+      1080
+    ],
+    "crop_xyxy": [
+      600,
+      432,
+      742,
+      600
+    ],
+    "context_crop_xyxy": [
+      80,
+      40,
+      560,
+      100
+    ],
+    "source_frame_sha256": "9637eb6febecf434ca6a30caa13bab4d135363f7304a991f2d536b5b4cf50cee",
+    "split": "validation",
+    "synthetic": false,
+    "template_source": false
+  },
+  "review": {
+    "method": "original_frame_and_crop_visual_inspection",
+    "verifier": "Claude Code (Opus 5.5) visual inspection; owner Acceptance pending",
+    "date": "2026-10-06",
+    "basis": "Original full frame decoded from the original MP4 and both unmodified crops were inspected, together with dense samples of the surrounding session. Labels are transcribed from visible UI, never from Analyzer output, metadata or a prediction.",
+    "privacy": "Minimal game-UI crops only: the header ROI and the RANK panel ROI. No player or opponent name, handle, emblem, AC name, NP, match ID, date, chat, desktop or full frame.",
+    "corrections": []
+  }
+}

@@ -25,6 +25,10 @@ LEGACY_FILE = "legacy-coverage.json"
 REGISTRY_FILES = frozenset((FAMILIES_FILE, COVERAGE_FILE, LEGACY_FILE))
 ALLOWED_SUFFIXES = frozenset((".json", ".ppm", ".png", ".md"))
 IMAGE_SUFFIXES = frozenset((".ppm", ".png"))
+IMAGE_FAMILIES = ("results", "match_metadata", "ranks")
+# Genuine original-video evidence: one source video belongs to one split across families.
+VIDEO_FAMILIES = ("match_metadata", "ranks")
+PINNED_TEMPLATES = {"match_metadata": ["metadata.dev-header"], "ranks": ["ranks.dev-s-matching"]}
 MAX_RECORDS = 1000
 MAX_CORPUS_IMAGE_BYTES = 64 * 1024 * 1024
 _REPARSE = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
@@ -128,7 +132,7 @@ def load_corpus(root):
             raise CorpusError(f"{relative}: file type is not allowed in the fixture corpus")
         parts = relative.split("/")
         if suffix in IMAGE_SUFFIXES:
-            if len(parts) not in (1, 3) or (len(parts) == 3 and parts[0] not in ("results", "match_metadata")):
+            if len(parts) not in (1, 3) or (len(parts) == 3 and parts[0] not in IMAGE_FAMILIES):
                 raise CorpusError(f"{relative}: images live at the legacy root or under an implemented image family")
             image_files[relative] = path
             continue
@@ -170,42 +174,46 @@ def load_corpus(root):
         if record["id"] in ids:
             raise CorpusError(f"{relative}: duplicate fixture id {record['id']!r}")
         ids.add(record["id"])
-        image = record["input"]
-        if image["path"] in referenced:
-            raise CorpusError(
-                f"{relative}: image {image['path']!r} is already described by {referenced[image['path']]}")
-        referenced[image["path"]] = relative
-        try:
-            file_path = resolve_fixture_file(root, image["path"])
-        except FixturePathError as error:
-            raise CorpusError(f"{relative}: {error}") from None
-        size = file_path.stat().st_size
-        if size != image["bytes"]:
-            raise CorpusError(f"{relative}: {image['path']} is {size} bytes, metadata says {image['bytes']}")
-        data = file_path.read_bytes()
-        actual = hashlib.sha256(data).hexdigest()
-        if actual != image["sha256"]:
-            raise CorpusError(f"{relative}: {image['path']} SHA-256 is {actual}, metadata says {image['sha256']}")
-        try:
-            decoded = decode_image(data, image["format"])
-        except ImageError as error:
-            raise CorpusError(f"{relative}: {image['path']} does not decode: {error}") from None
-        if (decoded.width, decoded.height) != (image["width"], image["height"]):
-            raise CorpusError(
-                f"{relative}: {image['path']} is {decoded.width}x{decoded.height}, "
-                f"metadata says {image['width']}x{image['height']}")
-        corpus.image_bytes += size
+        # A rank record also names the same-frame header crop it needs as context.
+        for image in [record["input"]] + ([record["context"]] if "context" in record else []):
+            if image["path"] in referenced:
+                raise CorpusError(
+                    f"{relative}: image {image['path']!r} is already described by {referenced[image['path']]}")
+            referenced[image["path"]] = relative
+            try:
+                file_path = resolve_fixture_file(root, image["path"])
+            except FixturePathError as error:
+                raise CorpusError(f"{relative}: {error}") from None
+            size = file_path.stat().st_size
+            if size != image["bytes"]:
+                raise CorpusError(f"{relative}: {image['path']} is {size} bytes, metadata says {image['bytes']}")
+            data = file_path.read_bytes()
+            actual = hashlib.sha256(data).hexdigest()
+            if actual != image["sha256"]:
+                raise CorpusError(f"{relative}: {image['path']} SHA-256 is {actual}, metadata says {image['sha256']}")
+            try:
+                decoded = decode_image(data, image["format"])
+            except ImageError as error:
+                raise CorpusError(f"{relative}: {image['path']} does not decode: {error}") from None
+            if (decoded.width, decoded.height) != (image["width"], image["height"]):
+                raise CorpusError(
+                    f"{relative}: {image['path']} is {decoded.width}x{decoded.height}, "
+                    f"metadata says {image['width']}x{image['height']}")
+            corpus.image_bytes += size
+            corpus.files[image["path"]] = actual
         corpus.files[relative] = digest
-        corpus.files[image["path"]] = actual
         corpus.images[record["id"]] = record
         corpus.cases.append(Case(record["id"], "image", relative, record, digest))
-    metadata = [r for r in corpus.images.values() if r["family"] == "match_metadata"]
-    split_videos = {split: {r["provenance"]["video_id"] for r in metadata
-                           if r["provenance"]["split"] == split} for split in ("dev", "validation")}
-    if split_videos["dev"] & split_videos["validation"]:
-        raise CorpusError("metadata source videos must not cross dev/validation splits")
-    if metadata and [r["id"] for r in metadata if r["provenance"]["template_source"]] != ["metadata.dev-header"]:
-        raise CorpusError("metadata has exactly one pinned dev-header template source")
+    video_splits = {}
+    for record in corpus.images.values():
+        if record["family"] in VIDEO_FAMILIES:
+            video_splits.setdefault(record["provenance"]["video_id"], set()).add(record["provenance"]["split"])
+    if any(len(splits) > 1 for splits in video_splits.values()):
+        raise CorpusError("source videos must not cross dev/validation splits, within or across families")
+    for family, pinned in PINNED_TEMPLATES.items():
+        records = [r for r in corpus.images.values() if r["family"] == family]
+        if records and [r["id"] for r in records if r["provenance"]["template_source"]] != pinned:
+            raise CorpusError(f"{family} has exactly one pinned dev template source: {pinned[0]}")
     if corpus.image_bytes > MAX_CORPUS_IMAGE_BYTES:
         raise CorpusError(f"corpus images total {corpus.image_bytes} bytes; the limit is {MAX_CORPUS_IMAGE_BYTES}")
     orphans = sorted(set(image_files) - set(referenced))

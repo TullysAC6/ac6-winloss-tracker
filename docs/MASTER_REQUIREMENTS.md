@@ -11,6 +11,18 @@ Scope: AC6 Win/Loss Tracker / AC6tool
 | **Revision 3** | **2026-09-12** | Runtime isolation / app-local Python environment (§56); UI/UX design identity and the Player/Broadcast overlay split (§57–§63); self-build linkage promoted from a sketch to a recorded requirement with its own issue (§52); seasonal rank / rating progression, including the A/S discontinuity rule (§64) |
 | **Revision 4** | **2026-09-13** | Season catalog / manifest, manual-first synchronization, retrospective assignment, transition handling, and multi-season reconciliation (§65) |
 
+Owner amendment, 2026-10-13: [DRAW recognition is optional; WIN/LOSS non-interference is mandatory](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654).
+This explicitly supersedes the earlier mandatory DRAW recognition/reporting intent; §9 defines the current contract.
+It does not change existing implementation, historical acceptance evidence or fixture truth.
+
+Owner sequencing amendment, 2026-10-13:
+[six-part adopted roadmap](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115).
+The former blanket #28-A-before-UI-2 rule in §55/§63/§65 is narrowed to season-specific functionality.
+Basic reliable WIN/LOSS trends and minimum History/Statistics need no generic Rank, #70-B or opponent
+capture. [ROADMAP current order](ROADMAP.md#adopted-development-order--2026-10-13) governs future
+approvals; older dated sequencing snapshots remain historical. No product/acceptance authorization
+or change to §9 DRAW safety, Season truth or Rank/Rating evidence follows from this amendment.
+
 Revision 4 **adds to** Revisions 2 and 3. Nothing in an earlier revision is silently deleted or
 rewritten. Where a later revision changes a status or sequencing rule, the earlier statement and
 the reason for the change stay visible.
@@ -54,7 +66,7 @@ The Tracker must remain, in this order:
 6. Recoverable
 7. Extensible through optional features
 
-The authoritative WIN / LOSE / DRAW handling must never be weakened to make secondary features work.
+Authoritative WIN / LOSE handling and DRAW non-interference (§9) must never be weakened to make secondary features work.
 
 A missing optional enrichment record is acceptable.
 
@@ -297,11 +309,32 @@ Optional failures must not alter:
 
 # 9. WIN / LOSE / DRAW
 
-Current intended behavior:
+Current owner requirement, amended 2026-10-13:
+[Issue #73 decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654).
 
-- WIN: counted
-- LOSE: counted
-- DRAW: detected/reported but excluded from WIN/LOSE count and win-rate denominator unless a future explicit product decision changes this
+Mandatory:
+
+- Each genuine WIN and LOSE is correctly counted exactly once.
+- DRAW must not be misclassified or persisted as WIN/LOSE.
+- DRAW must not change WIN/LOSE counts, winning streaks or win rate, including its denominator.
+- DRAW must not impair WIN/LOSE detection or counting before or after it. The next genuine WIN/LOSE
+  must still be detected and counted; DRAW must not leave stale, armed or locked state that causes a miss.
+- Duplicate or stale results and incorrect ResultGate behavior remain prohibited.
+
+Optional:
+
+- Automatic DRAW recognition, display and persistence.
+
+DRAW recognition-rate improvement is not a current development goal. No dedicated live DRAW
+reproduction is required; use existing frozen evidence to check false-positive safety and adjacent WIN/LOSE non-interference.
+For #73 acceptance, the exactly-one-result requirement applies to genuine WIN/LOSE;
+DRAW coverage requires no WIN/LOSE mutation and non-interference. The linked owner decision
+supersedes older DRAW-required acceptance wording without relabelling historical gate results.
+
+This requirement change does not authorize removing existing DRAW functionality or changing
+the classifier, ResultGate, CLEAR/re-arm, persistence or historical rows. Existing benign DRAW
+behavior is retained. Old tests that require DRAW recognition remain unchanged until a separately
+reviewed requirement/test-alignment change; do not relabel frozen truth or erase prior evidence.
 
 Win-rate definition:
 
@@ -309,7 +342,7 @@ Win-rate definition:
 WIN / (WIN + LOSE) * 100
 ```
 
-DRAW is displayed separately.
+When DRAW is displayed, it is separate from WIN/LOSE; displaying it is optional.
 
 Do not silently change the historical win-rate definition.
 
@@ -370,10 +403,13 @@ TEAM is **not ignored as a match**.
 TEAM should continue to use the normal result path as far as the existing result visuals permit:
 
 ```text
-WIN / LOSE / DRAW
+WIN / LOSE
 → ResultGate
 → history
 ```
+
+DRAW recognition/display/persistence is optional under §9, including for TEAM.
+Existing DRAW handling remains; it must not alter WIN/LOSE statistics or block a later result.
 
 The additional requirement is to identify and record that the match was `TEAM`.
 
@@ -386,7 +422,7 @@ TEAM must not introduce a separate result-counting architecture unless real-game
 Initial TEAM support:
 
 - Detect/record `TEAM`
-- Record WIN/LOSE/DRAW as usual
+- Record WIN/LOSE through the normal result path; DRAW recognition/display/persistence is optional under §9
 - Include TEAM in match history
 - Include TEAM in win-rate statistics
 - Record self rank if reliably available
@@ -509,7 +545,8 @@ A future minimum-sample rule (for rankings/highlights) is allowed.
 
 Opponent recognition must remain completely optional.
 
-It applies after WIN / LOSE / DRAW handling has completed.
+It applies after WIN / LOSE handling has completed. A recognized DRAW may also be used;
+the optional DRAW behavior follows §9 and is not a prerequisite for WIN/LOSE enrichment.
 
 Recognition failure, timeout, cancellation, or partial recognition must never affect the saved result.
 
@@ -1038,7 +1075,7 @@ before it is written down. `tests/test_readme_bootstrap_hash.py` now enforces it
 ## Phase 8B — Live Opponent Build Recognition
 - Single only
 - post-result
-- WIN / LOSE / DRAW all valid
+- WIN / LOSE and a recognized DRAW are valid; DRAW recognition remains optional under §9
 - full build acquisition
 - partial recognition
 - manual correction
@@ -1293,7 +1330,8 @@ Potential checks include:
 
 - WIN
 - LOSE
-- DRAW
+- DRAW false-positive safety and WIN/LOSE non-interference (§9), using existing frozen evidence;
+  no dedicated live DRAW reproduction or recognition-rate improvement is required
 - Ranked / Custom
 - Single / Team
 - rank metadata
@@ -1872,7 +1910,8 @@ A previous build may be shown only as a user-facing comparison/hint in a future 
 10. Future self-build cross analysis (§52)
 
 Seasonal rank / rating progression (§64) sits with items 2–4. Its Season assignment foundation is
-§65 / #28-A, scheduled after #15 and before UI-2; analytics are #16-A / #28-B after UI-2.
+§65 / #28-A, required for season-specific features; rank-independent basic trends need neither
+Season resolution nor generic Rank/#70-B. Seasonal Rank/Rating analytics retain their actual dependencies.
 
 ## Presentation and runtime (added in Revision 3)
 
@@ -1881,13 +1920,14 @@ These are cross-cutting; they are not a third feature track competing with the t
 1. Runtime isolation — app-local Python environment (§56). After the fixture/replay harness
 2. UI-0 design specification (§63). Documentation only; human review before any UI code
 3. UI-1A Player Overlay polish, then UI-1B Broadcast Overlay polish
-4. #28-A Season Catalog / Assignment Foundation — after #15 and before UI-2
-5. UI-2 Dashboard / History / Settings shell — after #15 and #28-A; Settings includes manual Season refresh
+4. #28-A Season Catalog / Assignment Foundation — required for season-specific UI/analytics
+5. Minimum UI-2 History/Statistics — reliable existing data first; manual Season refresh follows #28-A
 6. UI-3A Growth / Rank / Rating presentation, then UI-3B Opponent build statistics presentation,
    each following its own data. #16 owns the data; UI-3A/UI-3B own the rendering
 7. UI-4 Tray / Launcher modernization, last, and only if its lifecycle safety can be demonstrated
 
-The full interleaved order is recorded under **Sequencing** in `docs/ROADMAP.md`.
+The full interleaved order is recorded under
+[Adopted development order — 2026-10-13](ROADMAP.md#adopted-development-order--2026-10-13).
 
 The roadmap may implement prerequisite foundations before the visible feature that depends on them.
 
@@ -2281,12 +2321,13 @@ Status: **ADOPTED (process).** Tracked as
 [#26](https://github.com/TullysAC6/ac6-winloss-tracker/issues/26) for UI-4.
 
 The UI phases interleave with the feature phases rather than running as a block. The authoritative
-interleaved order lives in `docs/ROADMAP.md` under **Sequencing**. Two dependencies in it are
+interleaved order lives in
+[ROADMAP's adopted development order](ROADMAP.md#adopted-development-order--2026-10-13). Two dependencies in it are
 requirements, not scheduling preferences:
 
-- **UI-2 lands after the match-metadata foundation (§10, #15) and Season assignment foundation
-  (§65, #28-A).** UI-2 rebuilds Dashboard / History / Settings and includes manual Season refresh;
-  both data contracts must be settled first.
+- **UI-2 uses reliable existing history and settled match-data contracts (§10, #15).** Only its
+  Season assignment/selection/manual-refresh features require §65 / #28-A. Minimum History/Statistics
+  and rank-independent basic trends do not wait for general Rank, #70-B or opponent capture.
 - **#16 owns the analytics and time-series data; UI-3A / UI-3B own the chart rendering.** Neither
   implements the other's half.
 
@@ -2295,7 +2336,7 @@ requirements, not scheduling preferences:
 | **UI-0** | Design specification. **No code change.** Survey the current framework, Player Overlay, Broadcast Overlay, Dashboard, History, Settings, Launcher, performance, lifecycle, DPI, accessibility. Before → Proposed per item. Classify every change Low / Medium / High. Rollback plan. Regression-test plan. **Human review before any implementation.** | none |
 | **UI-1A** | Player Overlay polish — low-risk visual changes only | low |
 | **UI-1B** | Broadcast / streaming Overlay polish | low |
-| **UI-2** | Dashboard / History / Settings shell — top navigation, surfaces, KPI hierarchy, and §65 manual Season information / refresh. **Scheduled after §10 / #15 and #28-A** | medium |
+| **UI-2** | Minimum existing-data History/Statistics first; fuller Dashboard/History/Settings shell remains planned. §65 Season information/refresh follows #28-A; generic Rank/#70-B are not prerequisites to basic trends | medium |
 | **UI-3A** | **Growth / Rank / Rating presentation** — win-rate trend, rolling win rate, season selector, Rank / Rating chart. Follows #16-A and #28-B. Ships without waiting for the opponent-recognition programme | medium |
 | **UI-3B** | **Opponent build statistics presentation** — weapon / leg-type / full-build views. Follows #17 and #10/#11/#12 | medium |
 | **UI-4** | Tray / Launcher modernization — separate issue, separate PR, last | high |
@@ -2538,6 +2579,9 @@ operation continues. Refresh failure may never cause Tracker startup failure, WI
 history failure, Rating observation loss, or any change to the authoritative result path.
 
 ## Required sequencing
+
+The chain below applies to **season-specific UI/analytics**, not all UI-2 or ordinary time-based
+WIN/LOSS trends (owner amendment2026-10-13). Unresolved Season never blocks that basic increment.
 
 ```text
 #15 Match Metadata Foundation

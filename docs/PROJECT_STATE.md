@@ -1,12 +1,89 @@
 # Project state
 
-Last updated: 2026-10-05 JST
+Last updated: 2026-10-18 JST
 
 Requirements: [MASTER_REQUIREMENTS.md](MASTER_REQUIREMENTS.md) (Revision 4; canonical on main since PR #31 merged as e214ae0) · roadmap: [ROADMAP.md](ROADMAP.md) · decisions: [DECISIONS.md](DECISIONS.md) · GitHub entry point: [#6](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6)
 
 `Requirement` / `Implemented` / `Accepted` / `Released` are separate states throughout this file.
 
-## Current checkpoint — #15-5 revalidation after #68, 2026-10-05
+## Current checkpoint — #15-5 A2 sync/revalidation, 2026-10-18
+
+[Owner decision A1/A2](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6248830021): #15-5 **T3-A** (independent metadata-feature verification)
+may run before #73 Acceptance; **T3-B** (FULL T3 including WIN/LOSS reliability) keeps its #73
+dependency. A2 ownership moved to the Claude session ([PR #65 transfer](https://github.com/TullysAC6/ac6-winloss-tracker/pull/65#issuecomment-6248945914)); the Codex
+worktrees are untouched. Exact main `acc7798337c07e1701776931510ac9c90607b078` is merged into
+PR65 head `889d9e18a917fd183e0788495a86d542203040de` by ordinary merge with both parents kept.
+Classifier, ResultStateMachine, ResultGate and templates stay identical to main; ResultDetector.run
+differs only by the reviewed #15-5 hooks. PR #79 is not included. [T3 procedure](ISSUE15_5_T3.md)
+defines T3-A/T3-B. Full T0, formal T1, affected T2, exact-head CI and a mandatory independent
+sync-diff review precede any A3 decision. Historical #15-5 T3 FAILs (capture_gap, 10-03 WIN miss,
+10-06 LOSS miss) remain FAIL. PR65 OPEN/DRAFT; Merged NO, Accepted PENDING, Released NO. No T3-A
+(A3 needs separate owner authorization), T3-B, merge, release or #72 change.
+
+## Live checkpoint — adopted roadmap, 2026-10-13
+
+Update this compact section after verifying GitHub; older sections are dated audit history, not
+live scope. [Owner-adopted six-part plan](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115)
+and [current development order](ROADMAP.md#adopted-development-order--2026-10-13) govern future approvals.
+
+| Dimension | Verified state / next decision |
+|---|---|
+| Main / CI | Verification anchor `1869f9d576bce06786a94435c18e5c569df8ba93` (docs-only PR #77); [exact-main CI 38336338466](https://github.com/TullysAC6/ac6-winloss-tracker/actions/runs/38336338466) SUCCESS, attempt 1. Recheck exact current main/CI at each session; a later docs merge changes the repository SHA, not product behavior |
+| Stable | v1.2.0; no reliability release authorized by this plan |
+| Active product candidate / owner | PR #65 OPEN/DRAFT, `889d9e18a917fd183e0788495a86d542203040de`, GitHub head `codex/issue15-5-runtime-20261002`; existing local branch/worktree `codex/issue15-5-main-sync-20261003` / `ac6-wt-issue15-5-main-sync` retained for its existing session; no ownership transfer or edit authorized here |
+| Current work / owner | Codex Sol 6.1: separate `codex/adopted-roadmap-docs-20261013` / `ac6-wt-roadmap-adoption-docs-20261013`, documentation alignment only. Pin candidate SHA, review and CI in its PR; no #72/#70/Analytics product candidate started |
+| #73 A | #72 OPEN/reopened, genuine faded/pulsing LOSS unresolved. Feature-loss hypothesis needs exact-main evidence verification before a separately authorized repair |
+| #73 B | Five inherited synthetic accepted-FP constructions unresolved; retained mandatory adverse controls, not excluded from full Acceptance |
+| #73 C | Temporal/capture/CLEAR/re-arm, duplicate/stale and persistence boundaries separately tracked; no blanket gap, lock or capture change authorized |
+| Known FAIL / NOT_MEASURABLE | #72 natural miss; five synthetic accepted FP; prior #15-5 FULL owner T3 FAIL/paused. Offline evidence does not verify native #68/#72 live-capture conditions; preserve source-specific NM and failed traces |
+| #73 lifecycle | Implemented: baseline only, hardening incomplete; Gates: incomplete; Reviewed: historical slice reviews only; T3: full #73 acceptance not done; Accepted: NO; Merged: baseline/selected earlier slices only; Released: no accepted #73 hardening release |
+| #15-5 lifecycle | Implemented: experimental candidate; Gates/Reviewed: historical evidence requiring affected revalidation; T3: FAIL/paused; Accepted: NO; Merged: NO; Released: NO |
+| Retired assets | Case B RETIRED; Banner PoC RESEARCH NO-GO. Research evidence/refs preserved; neither product Accepted/Merged/Released, no restart |
+| Next owner decision | After this docs PR, separate merge authorization; next engineering scope is one bounded #72 investigation/repair. #15-5 T3, #37 native measurement, reliability release, Analytics/UI-2 and #70-A each require their applicable separate authorization |
+| Generations | At preflight, PR #65 alone (1/2); this independent docs candidate occupies the second slot (2/2). Recheck active refs/worktrees before any subsequent branch |
+
+Lane research GO means the owned defect improves on frozen evidence with no new regression; it
+does not accept #73. Full #73 still requires audited WIN/LOSS recall >=99%, accepted FP=0,
+wrong class=0, duplicate=0, DRAW non-interference, all applicable gates, independent review,
+native owner T3 and performance evidence. A/B/C progress never relabels another lane's FAIL as PASS.
+
+## Historical requirement amendment — WIN/LOSS accuracy and #72, 2026-10-13
+
+[Owner decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654):
+#73 prioritizes WIN/LOSS precision and recall, with [#72](https://github.com/TullysAC6/ac6-winloss-tracker/issues/72)'s
+retained natural pulsing/faded LOSS miss as the next defect. DRAW recognition, display and persistence
+are optional; DRAW must not alter WIN/LOSS counts, streaks or win rate, be mistaken for WIN/LOSS,
+or interfere with detection/counting before or after it. Duplicate/stale results and ResultGate safety
+remain mandatory. [MASTER_REQUIREMENTS §9](MASTER_REQUIREMENTS.md#9-win--lose--draw) is the contract.
+
+DRAW coordinate/template repair and recognition-rate improvement are cancelled. Existing DRAW
+implementation and frozen test truth remain unchanged; this is a requirement amendment, not
+implementation or accuracy Acceptance. Case B remains **RETIRED** and Banner PoC **RESEARCH NO-GO**;
+neither is accepted, merged or released. PR #65 remains OPEN/DRAFT and untouched; its FULL owner
+#15-5 T3 remains paused until #73 is accepted. This docs-only alignment does not start #72 product
+repair, new recognition research, T3 or release. Historical checkpoints below remain historical evidence.
+
+## Historical priority — #73 Result Accuracy Hardening, 2026-10-07
+
+Owner considers current WIN / LOSS / DRAW reliability unacceptable and has adopted
+[#73](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73) as the next priority phase.
+#72 is the first known open defect under that umbrella. #15-5 / PR #65 remains OPEN/DRAFT and its
+FULL owner T3 is paused until #73 is accepted.
+
+#15-6 merged as `7e83c834c97bc30096cc050faa2dd6e9df6ee00e` after review GO, T3 N/A and
+exact-head CI success; exact-main CI 37467698421 also succeeded attempt 1. The owner does **not**
+accept #15-6 as the final general self-rank recognition architecture. Its supported durable meaning
+is the evidence-backed **numbered/top-100 S presentation prototype** and its genuine fixtures.
+General self-rank recognition is deferred to
+[#74](https://github.com/TullysAC6/ac6-winloss-tracker/issues/74), which must separate rank identity
+from PLACE/top-100 position and require genuine pre-S / numberless-S evidence before claiming those
+presentations. #15-6 remains Merged YES / technically verified YES / Released NO; general-architecture
+Owner Acceptance is WITHHELD.
+
+Current order: #73 → repeat/close #15-5 T3 → #70 Network Telemetry phases → later roadmap work.
+GitHub issues/PRs override older checkpoints below.
+
+## Historical checkpoint — #15-5 revalidation after #68, 2026-10-05
 
 [Owner authorization](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-5981356526).
 Sync exact main `ef4af555a5187b370dafea334bac6ab1bac81df4` into historical PR65

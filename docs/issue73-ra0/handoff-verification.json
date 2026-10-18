@@ -1,0 +1,1207 @@
+{
+  "sources": {
+    "vP": {
+      "truth_sha256": "1790aa931efaf2507b84c2b807c9bb27be112cc29641764395de129eb0cdc65a",
+      "truth_regenerated_byte_identical": true,
+      "phases": [
+        {
+          "phase": 0,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 8660,
+          "outcomes": {
+            "Correct": 40,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "f858b6e4148bc2d8b881cabf2ec529eddb74175cb81c0c67e28fb4643a30be5f",
+          "metadata_sha256": "4bcdb6471248d4167a237258a036b9a1ae00f43e1e0ff263a50d844d2939990f"
+        },
+        {
+          "phase": 1,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 8660,
+          "outcomes": {
+            "Correct": 40,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "959c7bf68a6734dc3802b8e1a6dc6c18ee6efac0ebebffa8e7e307e0f3240c91",
+          "metadata_sha256": "8fcc313850b965b65473583e5b4a2e70a28086d8a430b20c35855817443e8e27"
+        },
+        {
+          "phase": 2,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 8659,
+          "outcomes": {
+            "Correct": 39,
+            "Miss": 2
+          },
+          "false_positives": [],
+          "replay_sha256": "a256590c610ba5acfb82228aa9f60929ba9b858312d36dcfd7e2f5e6b0c4eb2d",
+          "metadata_sha256": "9565da6a2d8f7640ab3629856ae117c32c3b414e4e9d808ccf8eee22e7b178aa"
+        },
+        {
+          "phase": 3,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 8659,
+          "outcomes": {
+            "Correct": 39,
+            "Miss": 2
+          },
+          "false_positives": [],
+          "replay_sha256": "e359241e82d8e97a73cb8d324268c8aa299ef46ae5eafb5823609bc948f11898",
+          "metadata_sha256": "c1ab8ea49810f94154f32c7c3d0245661b8d00799e0e5b46245266e3673b626b"
+        }
+      ],
+      "frame_checks": [
+        {
+          "phase": 0,
+          "poll": 0,
+          "source_s": 0.0,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 0,
+          "poll": 313,
+          "source_s": 259.78333333333336,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 0,
+          "source_s": 0.2,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 312,
+          "source_s": 259.1666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 0,
+          "source_s": 0.4166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 312,
+          "source_s": 259.3666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 0,
+          "source_s": 0.6166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 312,
+          "source_s": 259.5833333333333,
+          "bit_identical_full_frame": true
+        }
+      ]
+    },
+    "LT25": {
+      "truth_sha256": "50bc336c994d5520659214965c2041155b7f1eace803cad1bbb414b8e18581da",
+      "truth_regenerated_byte_identical": true,
+      "phases": [
+        {
+          "phase": 0,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 5191,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "77ab0ffe9eb1d9557b0e7fb90ac7c8962365cc36d87ba7d62a96c92018efc169",
+          "metadata_sha256": "6cc925ba204ad7b10f9e9756beb3c58e25b572359d1c3763b4ffbdacf152458e"
+        },
+        {
+          "phase": 1,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 5191,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "b1c1880c6678c1fb022068cfe95819ce8337a6ec15b29e71c6d9e49d66c524f0",
+          "metadata_sha256": "f9151e9f9eb1a617c185e7619c7a79d3bfc28a3a93413de51c89d9545b3aa92d"
+        },
+        {
+          "phase": 2,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 5190,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "137747a009eaaff7840a6606d9c7906d961badc6527fcd6e75ed5f9e5f9cf52b",
+          "metadata_sha256": "28dbb4f252090fe01196833c730cb0c27253a7bd8f844217ea725c9772d2b9e0"
+        },
+        {
+          "phase": 3,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 5190,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "64268822efbfd7791258090c2436c96b885ea482fd4855c74be0cf4a549d7bc5",
+          "metadata_sha256": "6d2103238757c880d623b9f2ca3b10764ce79a0f76074f021dc61a75023fdcb3"
+        }
+      ],
+      "frame_checks": [
+        {
+          "phase": 0,
+          "poll": 0,
+          "source_s": 0.0,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 0,
+          "poll": 211,
+          "source_s": 175.13333333333333,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 0,
+          "source_s": 0.2,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 211,
+          "source_s": 175.33333333333334,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 0,
+          "source_s": 0.4166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 210,
+          "source_s": 174.71666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 0,
+          "source_s": 0.6166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 210,
+          "source_s": 174.91666666666666,
+          "bit_identical_full_frame": true
+        }
+      ]
+    },
+    "fAph": {
+      "truth_sha256": "5ae78dc8004cfd4d9b81a56ddb8feb8e725b47d7652f185f8bbb7a9d52dcece6",
+      "truth_regenerated_byte_identical": true,
+      "phases": [
+        {
+          "phase": 0,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 5716,
+          "outcomes": {
+            "Correct": 19,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "d643a05255fe663657bc38dd6e9862c84dc3d4079a9ca59faff9d3690a2b2ae9",
+          "metadata_sha256": "c662559ab5aa3ac7f1fe6bdd9b948e9924b8361a71e65203bdc60b3259ea4532"
+        },
+        {
+          "phase": 1,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 5716,
+          "outcomes": {
+            "Correct": 19,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "52e15c1c249e9698b8da632bdcc80dc63e9ef2df08050d0344f19c0eb0a188e0",
+          "metadata_sha256": "12c9060e26e53820b30bf76ac1576102a6ec8e0dd2113f00cd8f89e4d2b589c4"
+        },
+        {
+          "phase": 2,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 5716,
+          "outcomes": {
+            "Correct": 19,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "680cd891bd574097c6940f42349f8336c5e57a25e0ee52ee9136652e0c56e1b9",
+          "metadata_sha256": "06935d7c84a801173863a0230a066493f738d8ec14a1e017943265cb4e847120"
+        },
+        {
+          "phase": 3,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 5715,
+          "outcomes": {
+            "Correct": 19,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "966bf390b5cd7aac2edfc04d478267e12063d83d1218f6de2261cca3cf391530",
+          "metadata_sha256": "316c7950d6a67d7290712041d73962d9ef450ddc4867803e7983c5cf3cea8c89"
+        }
+      ],
+      "frame_checks": [
+        {
+          "phase": 0,
+          "poll": 0,
+          "source_s": 0.0,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 0,
+          "poll": 361,
+          "source_s": 299.6333333333333,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 0,
+          "source_s": 0.2,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 361,
+          "source_s": 299.8333333333333,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 0,
+          "source_s": 0.4166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 361,
+          "source_s": 300.05,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 0,
+          "source_s": 0.6166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 361,
+          "source_s": 300.25,
+          "bit_identical_full_frame": true
+        }
+      ]
+    },
+    "IXV8": {
+      "truth_sha256": "7ed345698d9d4750172bd877045cd734e9621b727a3b728cfe352b8c5f8f06b8",
+      "truth_regenerated_byte_identical": true,
+      "phases": [
+        {
+          "phase": 0,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 7761,
+          "outcomes": {
+            "Miss": 2,
+            "Correct": 29
+          },
+          "false_positives": [],
+          "replay_sha256": "3d7aa84133b88e18ea89cf55f9277dc94fd0b2b79f46f68208648ff060c6b28a",
+          "metadata_sha256": "6550a24b80e6af898e0edc3a19c8fa270fdfb268f6de0d7a88c44df56a24eb17"
+        },
+        {
+          "phase": 1,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 7760,
+          "outcomes": {
+            "Correct": 30,
+            "Miss": 1
+          },
+          "false_positives": [],
+          "replay_sha256": "cb7f8372261bfa2afac351a5b2dcd0a997a39a1d16b28eb00342959b0db94358",
+          "metadata_sha256": "60ae63701f7c2c0d4db063096318479113b8401fd480ee0f39274061c34a01ec"
+        },
+        {
+          "phase": 2,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 7760,
+          "outcomes": {
+            "Correct": 29,
+            "Miss": 2
+          },
+          "false_positives": [],
+          "replay_sha256": "c2af4283909208a81cbd3120a364e4f04ba63ae73702951e7d1560f814bbbb4c",
+          "metadata_sha256": "f97d446f4f7b8654c9e8b71cc16b9e32abd883a66ccbb1257f32dc46c3ed9cea"
+        },
+        {
+          "phase": 3,
+          "roi": [
+            256,
+            309,
+            768,
+            50
+          ],
+          "decode_crop": [
+            252,
+            304,
+            776,
+            60
+          ],
+          "polls": 7760,
+          "outcomes": {
+            "Correct": 29,
+            "Miss": 2
+          },
+          "false_positives": [],
+          "replay_sha256": "8013d4f54a57a307bb8670d88ff5f21eb1af1b163ed5a891c7831bc112fa360b",
+          "metadata_sha256": "115eda6fc475d398e7fca3943250ad482a564a634c1b50a4713208a3674f42e6"
+        }
+      ],
+      "frame_checks": [
+        {
+          "phase": 0,
+          "poll": 0,
+          "source_s": 0.0,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 0,
+          "poll": 268,
+          "source_s": 222.43333333333334,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 0,
+          "source_s": 0.2,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 268,
+          "source_s": 222.65,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 0,
+          "source_s": 0.4166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 268,
+          "source_s": 222.85,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 0,
+          "source_s": 0.6166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 267,
+          "source_s": 222.23333333333332,
+          "bit_identical_full_frame": true
+        }
+      ]
+    },
+    "yB": {
+      "truth_sha256": "02ccb649c23425e91bfe8cbbba88fb4daa3bc3e9fa3ca2d015bbddb73f4412a3",
+      "truth_regenerated_byte_identical": true,
+      "phases": [
+        {
+          "phase": 0,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 7560,
+          "outcomes": {
+            "Miss": 20
+          },
+          "false_positives": [],
+          "replay_sha256": "c20b19420eb99ed337ec6ad72755e6376b4aeb3d7d29eb845462f218e40d648a",
+          "metadata_sha256": "8e47af46e000572563f866b869b8b981067ebea9812eb91c4e8cb4f904143bb8"
+        },
+        {
+          "phase": 1,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 7559,
+          "outcomes": {
+            "Miss": 20
+          },
+          "false_positives": [],
+          "replay_sha256": "c3ac5882c1cb870142e0852327b827fecf376abd4b4548a3bd3a6d3b5f9b8d81",
+          "metadata_sha256": "dfe3324294aab98261cffa8680dd7a2785d076591292dff5ba5cb976ffabb783"
+        },
+        {
+          "phase": 2,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 7559,
+          "outcomes": {
+            "Miss": 20
+          },
+          "false_positives": [],
+          "replay_sha256": "bb97e8554f63d481f1041cea9f7f211348dea11c1d521a1e100a460f0f7ea4a3",
+          "metadata_sha256": "695457986fff06a1c7c9bac6f61112122c0caa36b898aa8c5f220ae454b56829"
+        },
+        {
+          "phase": 3,
+          "roi": [
+            384,
+            464,
+            1152,
+            75
+          ],
+          "decode_crop": [
+            380,
+            460,
+            1160,
+            84
+          ],
+          "polls": 7559,
+          "outcomes": {
+            "Miss": 20
+          },
+          "false_positives": [],
+          "replay_sha256": "69f4981dec169357582a8a936d56734f702763709c4f0f91cd2926081ae16c1a",
+          "metadata_sha256": "20de9f15d88230d12f915d4f650a83873e350d0263a555d58abfebb9c6c57567"
+        }
+      ],
+      "frame_checks": [
+        {
+          "phase": 0,
+          "poll": 0,
+          "source_s": 0.0,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 0,
+          "poll": 534,
+          "source_s": 443.21666666666664,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 0,
+          "source_s": 0.2,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 533,
+          "source_s": 442.6,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 0,
+          "source_s": 0.4166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 533,
+          "source_s": 442.8,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 0,
+          "source_s": 0.6166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 533,
+          "source_s": 443.01666666666665,
+          "bit_identical_full_frame": true
+        }
+      ]
+    },
+    "AYng": {
+      "truth_sha256": "6517b0ffd661bd304c0bc14d4302eef0c5ff0aed6c5a3b78b7b9fa0c681be2ea",
+      "truth_regenerated_byte_identical": true,
+      "phases": [
+        {
+          "phase": 0,
+          "roi": [
+            342,
+            430,
+            979,
+            64
+          ],
+          "decode_crop": [
+            338,
+            426,
+            988,
+            72
+          ],
+          "polls": 5579,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "84b9d7398963755257df95d031397cdeb3fc5b713eb80f87a5297ca8f41b481e",
+          "metadata_sha256": "e6536ee98b8e7c8127ac098b1fc979d210bf4cbfc287abc2a9261b371d60c931"
+        },
+        {
+          "phase": 1,
+          "roi": [
+            342,
+            430,
+            979,
+            64
+          ],
+          "decode_crop": [
+            338,
+            426,
+            988,
+            72
+          ],
+          "polls": 5579,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "37efe6cfd7b7d589d5b163bdf98caef376dadae2d21be14752b69e0560be5775",
+          "metadata_sha256": "2d126eb0ab367d23b34705ba5dafe4f192835a6f7b3b17a53acc45d0b8fc6bf4"
+        },
+        {
+          "phase": 2,
+          "roi": [
+            342,
+            430,
+            979,
+            64
+          ],
+          "decode_crop": [
+            338,
+            426,
+            988,
+            72
+          ],
+          "polls": 5578,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "c9ffaf39d6341948bd1818f0b4a203a63b56d1dfbb24d649ba179d797bc2216c",
+          "metadata_sha256": "756b7c15dc85dc0579adba69c950f525f5e5d7eb7bfb930654155b0fd7dabf39"
+        },
+        {
+          "phase": 3,
+          "roi": [
+            342,
+            430,
+            979,
+            64
+          ],
+          "decode_crop": [
+            338,
+            426,
+            988,
+            72
+          ],
+          "polls": 5578,
+          "outcomes": {
+            "Correct": 15
+          },
+          "false_positives": [],
+          "replay_sha256": "d97f7a7cc1d4a6934ba3dea5e6bff8aaeb229e59ed4b818e06f518ed5a5662cd",
+          "metadata_sha256": "127934333124624ae1a25e0b0d2070b0fe1995156da0cedddacf4dd0058eea7f"
+        }
+      ],
+      "frame_checks": [
+        {
+          "phase": 0,
+          "poll": 0,
+          "source_s": 0.0,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 0,
+          "poll": 552,
+          "source_s": 458.1666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 0,
+          "source_s": 0.2,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 1,
+          "poll": 552,
+          "source_s": 458.3666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 0,
+          "source_s": 0.4166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 2,
+          "poll": 551,
+          "source_s": 457.75,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 0,
+          "source_s": 0.6166666666666667,
+          "bit_identical_full_frame": true
+        },
+        {
+          "phase": 3,
+          "poll": 551,
+          "source_s": 457.95,
+          "bit_identical_full_frame": true
+        }
+      ]
+    }
+  },
+  "reset_occurrences": [
+    {
+      "tag": "vP",
+      "event": "VP-06",
+      "phase": 1,
+      "t": 1119.0475,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-16",
+      "phase": 1,
+      "t": 2807.2675,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-27",
+      "phase": 1,
+      "t": 4722.9075,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-36",
+      "phase": 1,
+      "t": 6327.2975,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-41",
+      "phase": 1,
+      "t": 7140.6975,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-02",
+      "phase": 3,
+      "t": 396.5325,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-04",
+      "phase": 3,
+      "t": 725.2125,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-07",
+      "phase": 3,
+      "t": 1287.9525,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-21",
+      "phase": 3,
+      "t": 3680.0125,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "vP",
+      "event": "VP-23",
+      "phase": 3,
+      "t": 4147.3025,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "LT25",
+      "event": "LT-04",
+      "phase": 1,
+      "t": 1002.0175,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "LT25",
+      "event": "LT-11",
+      "phase": 1,
+      "t": 2976.5875,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "LT25",
+      "event": "LT-02",
+      "phase": 2,
+      "t": 367.275,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "LT25",
+      "event": "LT-09",
+      "phase": 2,
+      "t": 2252.205,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "LT25",
+      "event": "LT-03",
+      "phase": 3,
+      "t": 717.7425,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "fAph",
+      "event": "FA-10",
+      "phase": 0,
+      "t": 2533.16,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "fAph",
+      "event": "FA-11",
+      "phase": 0,
+      "t": 2752.28,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "fAph",
+      "event": "FA-14",
+      "phase": 2,
+      "t": 3396.775,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "fAph",
+      "event": "FA-17",
+      "phase": 2,
+      "t": 4176.975,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "fAph",
+      "event": "FA-13",
+      "phase": 3,
+      "t": 3250.9025,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-01",
+      "phase": 0,
+      "t": 222.44,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-01",
+      "phase": 0,
+      "t": 224.1,
+      "class": "CLEAR",
+      "inside_visible_bounds": false
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-21",
+      "phase": 0,
+      "t": 4110.16,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-22",
+      "phase": 0,
+      "t": 4671.24,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-08",
+      "phase": 1,
+      "t": 1467.6475,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-09",
+      "phase": 1,
+      "t": 1634.4775,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-15",
+      "phase": 1,
+      "t": 2810.5875,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-17",
+      "phase": 1,
+      "t": 3152.5475,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-02",
+      "phase": 2,
+      "t": 363.955,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-12",
+      "phase": 2,
+      "t": 2150.945,
+      "class": "CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-12",
+      "phase": 3,
+      "t": 2151.1525,
+      "class": "CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-12",
+      "phase": 3,
+      "t": 2152.8125,
+      "class": "CLEAR",
+      "inside_visible_bounds": false
+    },
+    {
+      "tag": "IXV8",
+      "event": "IX-28",
+      "phase": 3,
+      "t": 5700.2325,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "AYng",
+      "event": "AY-04",
+      "phase": 1,
+      "t": 1539.0275,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "AYng",
+      "event": "AY-07",
+      "phase": 1,
+      "t": 2438.7475,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "AYng",
+      "event": "AY-05",
+      "phase": 3,
+      "t": 1908.7925,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    },
+    {
+      "tag": "AYng",
+      "event": "AY-09",
+      "phase": 3,
+      "t": 2926.3725,
+      "class": "NON_CLEAR",
+      "inside_visible_bounds": true
+    }
+  ],
+  "excluded": [
+    "vP-test (tool-validation subset; never aggregated)"
+  ],
+  "production_diff": "",
+  "reset_summary": {
+    "event_phases": 35,
+    "occurrences": {
+      "NON_CLEAR": 33,
+      "CLEAR": 4
+    },
+    "inside_visible_bounds": {
+      "NON_CLEAR": 33,
+      "CLEAR": 2
+    },
+    "both_classes": [
+      [
+        "IXV8",
+        "IX-01",
+        0
+      ]
+    ]
+  },
+  "verification_scope": "48 exact full-frame decode spot checks, two per each final source-phase; all phase metadata/shapes/timestamps/evaluations checked; not an exhaustive full-frame comparison",
+  "production_source_sha256": {
+    "result_detector.py": "cfa0d73fcc37fa69c43d3c06a350d4ee336241acebac09eedc5babb6b17ee08c",
+    "result_gate.py": "1532e07c9c9d4c30098099509d5e7a3cbd18dbf952241b996f7ab756d8d2000e",
+    "game_capture.py": "72ca522b500f56373a5b90d110066c00d1918186b4c1171091d4d1512e1c7149",
+    "detector_templates.json": "02a00968c69aa9bd5e992d0c915a045b6d5314ea8c11c6a6934d676147cfb8dc"
+  }
+}

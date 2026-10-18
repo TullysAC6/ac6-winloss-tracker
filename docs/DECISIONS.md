@@ -1,5 +1,82 @@
 # Decisions
 
+## Adopt six-part development policy and dependency-based roadmap
+
+**Owner decision, 2026-10-13 JST:**
+[Issue #6 comment6136934115](https://github.com/TullysAC6/ac6-winloss-tracker/issues/6#issuecomment-6136934115).
+The owner fully adopted the six-part proposal to reduce repeated investigation/helper rework and
+deliver reliable user value earlier. Related Issue checkpoints already record it; this docs PR
+does not repost or renegotiate those decisions.
+
+1. **Three evidence lanes inside #73:** A is #72's genuine faint/pulsing LOSS, B the five inherited
+   synthetic accepted-FP constructions, C temporal/capture/CLEAR/re-arm/duplicate/stale boundaries.
+   Lane research improvement with no new regression is distinct from full product Acceptance:
+   audited WIN/LOSS recall >=99%, accepted FP=0, wrong class=0, duplicate=0, DRAW non-interference,
+   applicable gates, independent review, native owner T3 and performance all remain required.
+2. **Small pre-registered research:** verify surviving discriminating information, vary one
+   representation component with temporal/ResultGate/capture unchanged, and use decisive positives
+   and mandatory adverse controls early. Protect validation/holdout, freeze before assessment,
+   and stop at the declared NO-GO. Repeated same-class failure calls for representation reassessment.
+   Case B RETIRED and Banner PoC RESEARCH NO-GO are retained evidence, not restartable candidates.
+3. **Reusable verification contracts:** prefer existing T1/T2 components; strict UTF-8/schema,
+   source/fixture SHA and independent truth/provenance, empty-versus-missing output, immutable logs,
+   owned bounded runtime/cleanup, and product/environment/helper error classification. Correct and
+   rerun only affected paths inside a future expressly pre-authorized envelope. Historical helper
+   P2/environment findings are not reopened without new evidence; no retroactive worktree permission.
+4. **Dependency-based delivery:** #73 reliability → existing authorized `RANK MATCH: SINGLE`
+   assisted #15-5 FULL T3 → reliability release decision → basic existing-data Analytics and minimum
+   UI-2 History/Statistics. #70-A is an independent bounded feasibility decision; #70-B and generic
+   Rank do not gate basic trends. #28-A gates season-specific claims only; unresolved Season does
+   not block ordinary time-based WIN/LOSS analysis. General Rank/#74, rating/#28-B and opponent/#17
+   analytics follow actual evidence dependencies. #16 owns data; #25 owns presentation.
+5. **Measured performance:** reuse #37's `tools/Start-RC-Performance-Capture.ps1` where appropriate;
+   pair Tracker OFF / accepted main / candidate under matched machine/game/display/settings.
+   Record AC6 frametime p95/p99, CPU/RAM, capture freshness/gaps and cleanup, separating offline
+   classifier speed from loop/game cost. Derive budgets from measurements, not invented numbers.
+   Report sample sizes/conditions, provenance and unknowns; opponent acquisition needs eligible
+   denominator, coverage and selection-bias reporting, not accuracy only on acquired records.
+6. **Live coordination / small releases:** PROJECT_STATE's compact current section owns main/CI,
+   candidate/owner, lane/FAIL/NM and next approval state. Keep Implemented/Gates/Reviewed/T3/
+   Accepted/Merged/Released distinct and link historical evidence. Plan a small reliability release
+   after #73 and required acceptance, auditing all exact-main unreleased contents, dependencies,
+   installer/update/rollback and release gates before publication; do not wait for every enrichment.
+
+This supersedes the older strict #70-B → #28-A → whole UI-2 sequence and broad rank/opponent
+prerequisites for basic analytics **for future approvals only**. MASTER_REQUIREMENTS' blanket
+Season-to-UI-2 dependency is narrowed to season-specific functionality; Season/Rank truth rules
+and the DRAW amendment below are unchanged. Historical implementation/acceptance records remain
+verbatim. See [current order](ROADMAP.md#adopted-development-order--2026-10-13).
+
+Policy/roadmap adoption is not authorization for a product slice, measurement, T3, merge or release.
+This PR changes no code/tests/fixtures/CI; no acceptance state is upgraded by documentation.
+
+## DRAW recognition is optional; WIN/LOSS non-interference is mandatory
+
+**Owner decision, 2026-10-13 JST:**
+[Issue #73 comment6135964654](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6135964654).
+The owner prioritizes correct WIN/LOSS counting and the retained natural LOSS miss in #72,
+and no longer requires automatic DRAW recognition, display or persistence. DRAW recognition-rate
+improvement and the proposed coordinate/template repair are cancelled.
+
+Previously §9 required DRAW detection/reporting and separate display; the older TEAM wording also
+included DRAW in required result handling. These forward-looking obligations are superseded by
+[MASTER_REQUIREMENTS §9](MASTER_REQUIREMENTS.md#9-win--lose--draw). The older wording below is
+retained as history, not a requirement to restart DRAW recognition work.
+
+WIN and LOSS must each be correctly counted exactly once. DRAW must not be misclassified or
+persisted as WIN/LOSS, change counts/streaks/win rate or its denominator, or impair WIN/LOSS
+detection/counting before or after it. It must not leave stale/armed/locked state that causes a
+later miss. Duplicate/stale results and incorrect ResultGate behavior remain prohibited.
+The formula `WIN / (WIN + LOSE) * 100` is unchanged.
+
+This is a requirement-only amendment: retain existing DRAW functionality, production semantics,
+database rows, frozen truth and historical acceptance evidence. Existing tests asserting DRAW
+recognition remain unchanged; a future expectation change requires its own reviewed alignment
+proposal. Use existing frozen evidence for non-interference/false-positive checks; dedicated live
+DRAW reproduction is not required. No product, classifier, ResultGate/CLEAR/re-arm or persistence
+change is authorized here. Case B remains RETIRED; Banner PoC remains RESEARCH NO-GO; PR #65
+is untouched. This decision neither accepts #73 nor starts #72 product repair, research, T3 or release.
+
 ## Recover a verified bright-band final using independent spatial evidence
 
 2026-10-03 owner-authorized product repair follows the diagnostic-first decision
@@ -142,6 +219,9 @@ Why: the whole point of the tool is a correct win/loss count. Everything else is
 
 ## Win-rate definition
 
+2026-10-13 scope amendment: the reporting obligation in the older decision below is now optional
+under §9; the formula, exclusion from the denominator and historical implementation remain unchanged.
+
 **Decision: `win rate = WIN / (WIN + LOSE) * 100`. DRAW is reported but excluded from the denominator.**
 
 This is what `server.status_payload` and `HistoryStore.lifetime_summary` already do. Every new statistic reuses it. Changing it would silently rewrite every historical number the user has seen.
@@ -159,6 +239,10 @@ This is what `server.status_payload` and `HistoryStore.lifetime_summary` already
 ---
 
 ## Supported game modes
+
+2026-10-13 DRAW scope amendment: the older inclusion of DRAW below is no longer a recognition,
+display or persistence requirement. WIN/LOSE still follow the normal result path; DRAW is optional
+under §9 and never contributes to WIN/LOSE statistics. The modes and their historical status are unchanged.
 
 **Decision (current, Revision 2): TEAM and CUSTOM MATCH are in scope as recorded matches. Opponent-build capture for TEAM is not.**
 
@@ -892,3 +976,51 @@ abstentions), correction discipline and exact missing-fixture plan.
 This is an engineering subset within the existing owner authorization; it does
 not change product scope, persistence ownership, A vs A4 precision, the pre-S/S
 boundary, Season ownership or owner Acceptance. STOP after #15-4.
+
+## #15-6 reads self rank S only from the Ranked Single waiting-screen RANK panel
+
+On 2026-10-06 the owner authorized #15-6 ([record](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6005202373));
+the [evidence checkpoint](https://github.com/TullysAC6/ac6-winloss-tracker/issues/15#issuecomment-6006194783)
+passed before code. The only self-rank source is the RANK panel of the native English Ranked Single
+waiting screen. It is the player's own because the idle or matching lobby has no opponent yet, the panel
+never changes through match found, and the lobby card is the one paired with the player's own sortie AC
+and HUD in the intro, while the opponent appears only on a different card.
+
+Rejected as self-rank sources: card badges (two per card, meaning not established, values differ by date), opponent intro cards,
+custom match rooms and results (every member's rank, owner note 2026-10-06), the story-mode ARENA RANK and
+HUNTER CLASS (owner instruction: always ignore), PLACE, RATING, timing, adjacency and Analyzer metadata.
+
+The complete header, judged by the accepted #15-4 decoder on the same frame, is a necessary context gate
+only: it is the one evidenced way to exclude Team lobbies, custom rooms and other screens, and never rank
+evidence. The glyph is matched by red-channel correlation, because absolute colour thresholds failed across
+sources' tone curves (first validation run retained); the lit presentation is enforced by the header gate and
+the absolute frame, label and digit stages instead. Lit-header transitions are not guaranteed to abstain, but every lit-header frame in the evidence shows the player's own S. Only the top-100 numbered S is evidenced; a numberless S is expected, not verified, to abstain.
+[Contract](ISSUE15_6_SELF_RANK_CONTRACT.md). This changes no persistence ownership, A vs A4 precision, pre-S/S
+boundary, Season ownership or owner Acceptance. STOP after #15-6.
+
+
+## #15-6 is evidence for numbered S, not the final general self-rank architecture
+
+On 2026-10-07 the owner reviewed the merged #15-6 design and explicitly **withheld product
+acceptance of it as the final general self-rank recognizer**.
+
+The original narrow evidence decision remains valid: genuine verified RANK-panel evidence existed
+for the player's own S in the numbered/top-100 presentation, so #15-6 correctly abstained outside
+that boundary instead of inventing unsupported truth. Its genuine fixtures, self-owned RANK-panel
+proof and positive-only prototype remain useful engineering assets.
+
+What is **not** adopted is the implication that generic `self_rank = S` should require PLACE/top-100
+digits or that future ranks should be implemented as an expanding set of unrelated one-off
+predicates. Rank identity and PLACE/position are separate concepts.
+
+General self-rank recognition is owned by
+[#74](https://github.com/TullysAC6/ac6-winloss-tracker/issues/74). Before production use it must:
+- separate rank class from PLACE/top-100 position;
+- retain the §64 pre-S/S Rating semantic discontinuity without making basic rank identity S-only;
+- obtain genuine pre-S and numberless-S panel evidence before claiming support;
+- determine Ranked Team behavior from genuine evidence;
+- compare a coherent shared rank-token architecture against bespoke per-rank predicates;
+- keep unsupported presentations UNKNOWN.
+
+#15-6 remains merged and technically verified, but general-architecture Owner Acceptance is
+WITHHELD and it is not a basis for activating generic self-rank runtime.

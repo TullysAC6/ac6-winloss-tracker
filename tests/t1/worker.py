@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-REPLAYED_MODULES = ("result_detector", "result_gate", "game_capture", "owned_worker", "match_header")
+REPLAYED_MODULES = ("result_detector", "result_gate", "game_capture", "owned_worker", "match_header", "self_rank")
 WORKER_VERSION = 1
 
 
@@ -116,6 +116,7 @@ def main(argv):
         import result_detector
         import result_gate
         import match_header
+        import self_rank
         from mss.screenshot import ScreenShot
         import_seconds = time.perf_counter() - import_started
         templates_path = repo_root / "detector_templates.json"
@@ -123,7 +124,8 @@ def main(argv):
                    "game_capture_type": game_capture.GameCapture, "screenshot_type": ScreenShot}
         source_hashes = {name: hashlib.sha256((repo_root / name).read_bytes()).hexdigest()
                          for name in ("result_detector.py", "result_gate.py", "game_capture.py",
-                                      "owned_worker.py", "detector_templates.json", "match_header.py")}
+                                      "owned_worker.py", "detector_templates.json", "match_header.py",
+                                      "self_rank.py")}
         for name in REPLAYED_MODULES:
             module_file = Path(sys.modules[name].__file__).resolve()
             if module_file.parent != repo_root:
@@ -138,6 +140,17 @@ def main(argv):
                 image = images[spec["case_id"]]
                 pixels = np.frombuffer(image.bgra, dtype=np.uint8).reshape(image.height, image.width, 4)
                 actual = dataclasses.asdict(match_header.recognize_header(pixels))
+            elif spec.get("adapter") == "self_rank.v1":
+                import dataclasses
+                import numpy as np
+
+                def pixels(image):
+                    return np.frombuffer(image.bgra, dtype=np.uint8).reshape(image.height, image.width, 4)
+
+                panel = images[spec["case_id"]]
+                from t1.ranks_schema import CONTEXT_SUFFIX
+                header = images[spec["case_id"] + CONTEXT_SUFFIX]
+                actual = dataclasses.asdict(self_rank.recognize_self_rank(pixels(header), pixels(panel)))
             else:
                 actual = classify_image(result_detector, templates_path, images[spec["case_id"]])
         elif spec["kind"] == "sequence":

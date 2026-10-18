@@ -1,5 +1,7 @@
 # ranks/s_rank
 
-Reserved, not implemented. Rank fixtures for S rank, a separate presentation from pre-S.
+#15-6 canonical evidence: the player's own S rank on the native 1920x1080 English Ranked Single waiting screen.
 
-No recognizer or replay adapter exists for this family yet, so no record may be added here. A record in a reserved family fails T1; it is never counted as skipped or passed. See ../README.md and families.json.
+Each record pairs two lossless crops of one original video frame: the RANK panel (`-panel.png`, 600,432-742,600; the badge's place number is present as pixels and never read) and the complete header (`-header.png`, 80,40-560,100) as same-frame context. Ten positives come from three distinct sessions; one dev crop is the pinned template source. Records carry the original video, timestamp, crops, frame hash, visible truth, self-identity reasoning, verifier and split; actual predictions never populate truth.
+
+Only the top-100 numbered S presentation is evidenced. Numberless S, pre-S, Rating, PLACE and opponent rank are not supported. See docs/ISSUE15_6_SELF_RANK_CONTRACT.md.

@@ -4,6 +4,32 @@ Run only after the implementation PR's reviewed exact head has green CI. Keep th
 head/worktree unchanged during T3. No merge or owner Acceptance is implied.
 Use an isolated data root; these steps do not copy or alter your usual history.
 
+## Two stages: T3-A and T3-B
+
+[Owner decision](https://github.com/TullysAC6/ac6-winloss-tracker/issues/73#issuecomment-6248830021)
+splits this procedure into two stages that use the same steps below.
+
+- **T3-A — independent #15-5 metadata-feature verification.** May run before #73
+  Acceptance, only on a separate owner A3 instruction. Report each feature as PASS,
+  FAIL, NOT REACHED or NM:
+
+  | feature | steps below |
+  |---|---|
+  | F1 OFF inertness | OFF baseline |
+  | F2 Acquisition | Phase B acquisition |
+  | F3 Personal attestation | Phase B fixed IDs and 「合っています」 |
+  | F4 Write and snapshot | Phase B status and snapshot lookup |
+  | F5 No inheritance | Phase C |
+  | F6 Cancel / OFF | Cancel/OFF and cleanup |
+  | F7 Lifecycle and cleanup | Launcher/UI start, normal Exit, residue checks |
+  | F8 Performance observations | CPU/memory/responsiveness notes |
+
+  A T3-A record is never FULL T3 PASS, #15-5 Acceptance, merge or release.
+- **T3-B — FULL #15-5 T3 including WIN/LOSS reliability.** Only after #73 Acceptance
+  (unless a separate owner decision changes this). PASS needs F1-F8 PASS on the exact
+  head **and** every natural WIN/LOSS counted exactly once, with no miss, wrong class,
+  duplicate or stale result. There is no exemption for main-origin anomalies.
+
 ## Historical failures and stop rule
 
 Earlier acquisition T3 on1bf2ed53 failed capture_gap;91dffac preserves the strict
@@ -11,12 +37,28 @@ native captured_at > newest monotonic gap correction. The2026-10-03 T3 on91dffac
 also FAILED: OFF-baseline first WIN had one FINAL_WIN then CLEAR, no saved WIN;
 second LOSS saved. Later #66 evidence proved a shared classifier defect on a
 retained genuine WIN pair: #68 repaired it on exact main ef4af555. Earlier misses
-without decisive pixels remain UNKNOWN. Neither #66 nor #68 turns historical
-#15-5 T3 into PASS. All failed roots/bundles remain preserved.
+without decisive pixels remain UNKNOWN. The 2026-10-06 FULL T3 on 889d9e18 also
+FAILED: the second OFF-baseline LOSS was not saved (faded/pulsing YOU LOSE broke
+consecutive confirmation; replay was identical on main, tracked as #72). Phases B/C
+were not reached. Neither #66 nor #68 turns historical #15-5 T3 into PASS. All
+failed roots/bundles remain preserved.
 
-If any natural WIN/LOSS miss recurs: STOP T3/gameplay, preserve the isolated root
-and diagnostics/candidate-bundles/*.zip, then replay offline on the current main
-and candidate. Do not tune thresholds, repair history, or play retries for green.
+If any natural WIN/LOSS anomaly occurs (miss, wrong class, duplicate or stale
+result), preserve the isolated root and diagnostics/candidate-bundles/*.zip, then
+replay the bundle offline on the current main and on the exact candidate:
+
+- **T3-B:** the anomaly is a T3-B FAIL. STOP T3/gameplay.
+- **T3-A:** the anomaly keeps its original FAIL in the report. Only if the replay is
+  identical on main and on the candidate, and the classifier, state machine,
+  ResultGate and templates are identical to main, attribute it to #73 with that
+  evidence (bundle hash, both replay outputs, digests); T3-A may then continue for
+  the #15-5 features. If the cause cannot be determined (no bundle, divergent replay,
+  missing evidence), STOP. If the Phase B acquired match is the one affected, F3/F4
+  are NOT REACHED for this attempt; a new Phase B attempt needs the owner's explicit
+  instruction.
+- Any #15-5-caused defect is a FAIL of that feature: STOP and preserve evidence.
+
+Do not tune thresholds, repair history, or play retries for green.
 An expired/UNKNOWN acquisition or confirmation is reported honestly; no timeout
 increase or repeated matches to get a pass.
 
@@ -25,7 +67,7 @@ increase or repeated matches to get a pass.
 Close the normal Tracker yourself first. Leave AC6 running. Open PowerShell and paste:
 
 ```powershell
-$candidate = 'C:\Users\makis\OneDrive\ドキュメント\ChatGPT\AC6 Tool Dev\ac6-wt-issue15-5-main-sync'
+$candidate = 'C:\Users\makis\OneDrive\ドキュメント\ChatGPT\AC6 Tool Dev\ac6-wt-issue15-5-a2-sync-20261018'
 $python = 'C:\Users\makis\AppData\Local\Programs\Python\Python314\python.exe'
 $t3Base = Join-Path $env:TEMP ('AC6-Issue15-5-sync-T3-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 if (Test-Path -LiteralPath $t3Base) { throw 'Existing T3 root: preserve it and use a new timestamp.' }
@@ -67,7 +109,7 @@ Status must be disabled. PHASE A is FREE PLAY: play Ranked Match for as long as
 desired, with no fixed match count, until the owner says 「終わりました」. Then
 verify every reported outcome against exact saved events/counts/streak before
 Phase B. A read-only observer must be running and have written observer-ready.json
-before a later authorized task tells the owner 「検証準備OKです」. A miss fails T3: preserve the #66 bundle and stop. Note Tracker CPU/memory in Task Manager and your game responsiveness.
+before a later authorized task tells the owner 「検証準備OKです」. A miss or any other WIN/LOSS anomaly follows the stop rule above (T3-B: FAIL and stop; T3-A: keep the FAIL, attribute with evidence or stop). Note Tracker CPU/memory in Task Manager and your game responsiveness.
 No lobby_worker.py should appear in process command lines while OFF.
 
 ## Phase B: exactly ONE explicit acquisition match and personal confirmation
@@ -178,7 +220,10 @@ Get-ChildItem -LiteralPath $t3Data -Force | Where-Object { $_.Name -match 'runti
 Report PASS/FAIL for OFF free-play events, Phase B saved fields/result/streak,
 ALL Phase C events/no inheritance,
 cancel/OFF, shutdown residue and performance observations. Keep the isolated T3
-data until evidence is recorded. Explicitly say **T3 PASS** only if all checks pass.
+data until evidence is recorded. For T3-A, report F1-F8 individually together with
+every WIN/LOSS anomaly and its attribution evidence; never call it T3 PASS. For T3-B,
+explicitly say **T3 PASS** only if all checks pass, including every natural WIN/LOSS
+counted exactly once.
 Any DRAW you happen to observe must consume pending; a separate DRAW gameplay
 session is not required when automated evidence passes. STOP; no next slice.
 
