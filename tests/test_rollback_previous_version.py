@@ -29,11 +29,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-# Dormant #15-3 builds on exact accepted #15-2 main (sidecar v3).
-PREVIOUS_VERSION = "148a25c955ae3b6fd0a7624005f1465e31a13256"
+# #15-5 adds preferences v3 on this exact v2 base; preserve unknown opt-in
+# through the previous build's reader/save and re-upgrade.
+PREVIOUS_VERSION = "27e5f49aa7bb73b9a90f04a0465624e4e5d58008"
 KEY = "player_streak_status_enabled"
 BROADCAST = "broadcast_show_best_streak"
-# This generation adds no preference: both builds understand the same v2 keys.
+# The previous build understands exactly the existing v2 display keys.
 PREVIOUS_CONTRACT = (2, {KEY: "bool", BROADCAST: "bool"})
 
 # Runs inside the child with the chosen source tree first on sys.path.
@@ -281,7 +282,8 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         config_after_new = (self.data / "config.json").read_bytes()
         preferences_after_new = (self.data / "preferences.json").read_bytes()
         self.assertEqual(self.stored_preferences(),
-                         {"preferences_version": new_version, KEY: False, BROADCAST: False})
+                         {"preferences_version": new_version, KEY: False, BROADCAST: False,
+                          "match_metadata_detection": True})
         for key in (KEY, BROADCAST):
             self.assertNotIn(key.encode(), config_after_new, "a new setting never enters config.json")
         self.assertIs(installed["config_endpoint"][BROADCAST], False, "/config serves the saved value")
@@ -308,7 +310,8 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         resaved = self.phase(self.previous, "previous-save")
         self.assertEqual((resaved["lifetime_before"], resaved["lifetime_after"]), (2, 3))
         self.assertEqual(self.stored_preferences(),
-                         {"preferences_version": new_version, KEY: True, BROADCAST: True})
+                         {"preferences_version": new_version, KEY: True, BROADCAST: True,
+                          "match_metadata_detection": True})
         self.assertEqual((self.data / "config.json").read_bytes(), config_after_new)
 
         upgraded = self.phase(ROOT, "new-again")
@@ -317,6 +320,8 @@ class RollbackToPreviousVersionTests(unittest.TestCase):
         self.assertIs(upgraded["settings"][BROADCAST], True, "the previous build's Broadcast change is kept")
         self.assertIs(upgraded["config_endpoint"][BROADCAST], True)
         self.assertEqual(upgraded["settings"]["overlay_stats_scope"], "lifetime")
+        self.assertIs(upgraded["settings"]["match_metadata_detection"], True,
+                      "the previous reader/save preserves the explicit new opt-in")
         self.assertEqual(len(history_rows(self.data)), 4)
         self.assertEqual(list(self.data.glob(".*runtime*.json")), [])
 

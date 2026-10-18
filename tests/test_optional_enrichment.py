@@ -246,15 +246,24 @@ class FacadeTests(unittest.TestCase):
         for ids in (["A"] * 65, iter(["A"]), ["\0"], [123]):
             self.assertEqual(self.service.lookup_many(ids).status, "rejected")
         self.assertEqual(self.service.cleanup_deleted(["A"] * 65).status, "rejected")
-        # No current runtime may even import the dormant foundation.
+        # Only the explicitly opted-in #15-5 task may lazily import the facade.
+        # OFF startup is also guarded against imports and sidecar I/O at T2.
         for path in ROOT.glob("*.py*"):
             if path.name in ("enrichment_store.py", "optional_enrichment.py") or path.suffix not in (".py", ".pyw"):
                 continue
             tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+            permitted = set()
+            if path.name == "metadata_runtime.py":
+                for function in ast.walk(tree):
+                    if isinstance(function, ast.FunctionDef) and function.name in ("default_service", "work"):
+                        permitted.update(id(n) for n in ast.walk(function) if isinstance(n, ast.ImportFrom)
+                                         and n.module == "optional_enrichment")
             for node in ast.walk(tree):
                 names = ([node.module] if isinstance(node, ast.ImportFrom) else
                          [a.name for a in node.names] if isinstance(node, ast.Import) else [])
-                self.assertTrue(all(name not in ("enrichment_store", "optional_enrichment") for name in names), path)
+                self.assertTrue(all(name != "enrichment_store" and
+                                    (name != "optional_enrichment" or id(node) in permitted)
+                                    for name in names), path)
 
     def test_cleanup_scope_preserves_unrelated_sql_observations(self):
         orphan = self.add("A").binding

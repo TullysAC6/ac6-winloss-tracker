@@ -1,11 +1,16 @@
 """T2: independent observations survive exact v3 and public v1.2.0 match deletion."""
 import unittest
+import json
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import test_enrichment_rollback as rollback
-from test_rollback_previous_version import PREVIOUS_VERSION, extract_previous
+from test_rollback_previous_version import extract_previous
+
+# This storage-compatibility fixture remains the exact v3 sidecar generation;
+# the separate preferences rollback target advances when preferences do.
+EXACT_V3 = '148a25c955ae3b6fd0a7624005f1465e31a13256'
 
 PUBLIC = 'c64b241c6b14b54bf7a4ac7897d3be42c8d7d9f4'
 SEED_OBSERVATIONS = '''
@@ -67,7 +72,7 @@ class ObservationRollbackTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.directory = tempfile.TemporaryDirectory(prefix='ac6-observation-t2-')
-        cls.old_v3 = extract_previous(Path(cls.directory.name) / 'exact-v3', revision=PREVIOUS_VERSION)
+        cls.old_v3 = extract_previous(Path(cls.directory.name) / 'exact-v3', revision=EXACT_V3)
         cls.public = extract_previous(Path(cls.directory.name) / 'public-v120', revision=PUBLIC)
         if cls.old_v3 is None or cls.public is None:
             cls.directory.cleanup()
@@ -79,12 +84,24 @@ class ObservationRollbackTests(unittest.TestCase):
 
     def roundtrip(self, source, scenario, public=False):
         root, data, port = self.profile(('public-' if public else 'v3-') + scenario)
+        # Both explicit values survive real unaware-reader startup/deletion and
+        # re-upgrade; ON startup still must not import/start optional work.
+        opted_in = scenario in ('record', 'date', 'refuse')
+        preference = data / 'preferences.json'
+        preference.write_text(json.dumps({'preferences_version':3,
+            'player_streak_status_enabled':False, 'broadcast_show_best_streak':False,
+            'match_metadata_detection':opted_in}), encoding='utf-8')
+        preserved = preference.read_bytes()
         with patch.object(rollback, 'PHASE', phase_script(public)):
             seed = self.phase(rollback.ROOT, root, 'seed', scenario, port)
             untouched = (data / 'enrichment.db').read_bytes()
             old = self.phase(source, root, 'old', scenario, port)
             self.assertEqual((data / 'enrichment.db').read_bytes(), untouched)
             again = self.phase(rollback.ROOT, root, 'again', scenario, port)
+        self.assertEqual(preference.read_bytes(), preserved)
+        import preferences
+        self.assertIs(preferences.validate(json.loads(preference.read_text(encoding='utf-8')))
+                      ['match_metadata_detection'], opted_in)
         self.assertEqual(again['before'], old['after'])
         self.assertEqual(again['after'], old['after'])
         self.assertTrue(again['observations_survived_and_explicit_purge_revoked_work'])

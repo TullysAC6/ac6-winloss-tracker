@@ -359,7 +359,11 @@ class HistoryStore:
                     "best_streak=MAX(best_streak, ?) WHERE id=?",
                     (int(stats.get("streak", 0)), session_id),
                 )
-                return True
+            # In-memory receipt of this successful commit, not a new DB field
+            # or write. server reads it immediately under its result lock after
+            # stats also succeeds. Preserve the Boolean result API.
+            self.last_result_witness = (str(event_id), created_at, result)
+            return True
 
     @staticmethod
     def _optional_timestamp(value: Any, field: str) -> float | None:

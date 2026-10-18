@@ -38,9 +38,11 @@ from typing import Any
 
 import config_utils
 
-PREFERENCES_VERSION = 2
+PREFERENCES_VERSION = 3
 VERSION_KEY = "preferences_version"
 DEFAULTS: dict[str, Any] = {
+    # #15-5: acceptance never changes this default; acquisition is explicit too.
+    "match_metadata_detection": False,
     # UI-1A (version 1): persistent Player streak-status wording (アツい … RUSH継続中).
     "player_streak_status_enabled": True,
     # UI-1B (version 2): 最高連勝 line of the OBS Broadcast Overlay.  Broadcast-only;

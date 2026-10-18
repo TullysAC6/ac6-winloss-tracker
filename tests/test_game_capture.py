@@ -314,6 +314,32 @@ class CaptureGapTests(unittest.TestCase):
             self.assertEqual(detector.classifier.classify_bgra.call_count, 7)
         desktop_factory.return_value.__enter__.return_value.grab.assert_not_called()
 
+    @patch("result_detector.mss.mss")
+    def test_actual_accepted_draw_notifies_optional_consumer_without_core_save(self, desktop_factory):
+        from mss.screenshot import ScreenShot
+        sequence = [CLEAR,CLEAR,CLEAR,FINAL_DRAW,FINAL_DRAW,FINAL_DRAW]
+        cursor = [0]
+        class Stop:
+            def is_set(self): return cursor[0] >= len(sequence)
+            def wait(self, timeout): cursor[0] += 1
+        observed = Mock()
+        detector = ResultDetector(Path(__file__).resolve().parents[1],
+            lambda:{"result_detector_enabled":True},Mock(),Mock(),Stop(),on_optional_event=observed)
+        capture = Mock(discontinuity=False,identity_changed=False,status="WGC")
+        frame = ScreenShot.from_size(bytearray(128*40*4),128,40)
+        def grab(sct):
+            capture.captured_at=100+cursor[0]*.5
+            return frame
+        capture.grab.side_effect=grab
+        detector.capture=capture
+        detector.classifier=Mock()
+        detector.classifier.classify_bgra.side_effect=lambda *args:(sequence[cursor[0]],{})
+        detector._save_debug_result_roi=Mock()
+        detector.run()
+        observed.assert_called_once_with("result",result="draw")
+        detector.on_result.assert_not_called()
+        self.assertTrue(detector.state.post_result_lock)
+
     def observe(self, state, frame, now):
         return state.observe(frame, 2, 3, 5, now=now)
 
