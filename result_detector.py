@@ -936,8 +936,9 @@ class ResultClassifier:
         # phrase better than the other one, and the coloured region must be
         # made of separate strokes. These checks only veto an unambiguous
         # tentative final; when both colours qualify, the frame stays
-        # non-final exactly as before and the checks never pick a side.
-        # DRAW/PHASE classification and the CLEAR fallback remain unchanged.
+        # non-final exactly as before and the checks never pick a side. A
+        # vetoed final returns NON_CLEAR below, never the CLEAR fallback.
+        # DRAW/PHASE classification is unchanged.
         win_ok = (
             (result_band_like or (
                 recovery_band_like and not phase_prefix_shape and not prefix_contrast_like
