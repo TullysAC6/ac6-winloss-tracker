@@ -964,6 +964,7 @@ class ResultClassifier:
             and loss_final_grid_score >= 0.82
             and loss_final_grid_score >= loss_phase_grid_score + 0.12
         )
+        phrase_unverified = False
         if win_ok and not loss_ok:
             win_ok = win_final_grid_score > win_cross_grid_score
             if win_ok:
@@ -971,6 +972,7 @@ class ResultClassifier:
                     win_mask, width, height, win_cluster, win_y_cluster, self.bx, self.by
                 )
                 win_ok = debug["win_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
+            phrase_unverified = not win_ok
         elif loss_ok and not win_ok:
             loss_ok = loss_final_grid_score > loss_cross_grid_score
             if loss_ok:
@@ -978,6 +980,7 @@ class ResultClassifier:
                     loss_mask, width, height, loss_cluster, loss_y_cluster, self.bx, self.by
                 )
                 loss_ok = debug["loss_stroke_runs"] >= MIN_PHRASE_STROKE_RUNS
+            phrase_unverified = not loss_ok
         debug["win_ok"] = win_ok
         debug["loss_ok"] = loss_ok
 
@@ -985,6 +988,13 @@ class ResultClassifier:
             return FINAL_WIN, debug
         if loss_ok and not win_ok:
             return FINAL_LOSS, debug
+
+        # A final that failed phrase verification is still a result-like
+        # frame. Like the dark result-band frames below, it must never become
+        # CLEAR: CLEAR is the gameplay evidence that arms the detector and
+        # releases the post-result lock.
+        if phrase_unverified:
+            return NON_CLEAR, {**debug, "reason": "phrase_unverified"}
 
         # Black/transition frames are NON_CLEAR. CLEAR requires actual gameplay
         # image information, not merely absence of colored result pixels.

@@ -415,18 +415,22 @@ for name, expected, key in (("final_win_01.ppm", FINAL_WIN, "win"), ("final_win_
 normal = read_ppm(Path(__file__).parent / "fixtures" / "normal_01.ppm")
 
 
-def accepted_results(frame, polls=4):
+def accepted_in(sequence, armed_at=None):
     state, gate, accepted = ResultStateMachine(), ResultGate(), []
-    for i, (pixels, w, h) in enumerate([normal] * 3 + [frame] * polls):
+    for i, (pixels, w, h) in enumerate(sequence):
         now = 100.0 + 0.75 * i
         frame_state, _ = classifier.classify_bgra(pixels, w, h)
         result = state.observe(frame_state, CONFIRM_HITS, CLEAR_HITS_REQUIRED, COOLDOWN_SECONDS, now=now)
         if result in ("win", "loss") and gate.try_accept(COOLDOWN_SECONDS, now=now):
             accepted.append(result)
             state.external_mutation(now)
-        if i == 2:
+        if i == armed_at:
             assert state.armed, "three CLEAR polls must arm the detector"
     return accepted
+
+
+def accepted_results(frame, polls=4):
+    return accepted_in([normal] * 3 + [frame] * polls, armed_at=2)
 
 
 for name, (pixels, _) in false_finals.items():
@@ -469,6 +473,32 @@ for pixels, digest, vetoed in ambiguous_frames:
     assert debug[f"{vetoed}_final_grid_score"] < debug[f"{vetoed}_cross_grid_score"], debug
     assert accepted_results((pixels, width, height)) == [], digest
 print("Lane B ambiguity: frames qualifying for both WIN and LOSS stay non-final.")
+
+# A final that fails phrase verification stays result-like: it must never be
+# CLEAR gameplay evidence. Stand-in for frames of the displayed WIN banner that
+# main accepts but the phrase checks veto: the WIN ROI stretched 1.25x about its
+# centre, with its top eight rows grey so that the frame is bright enough for
+# the CLEAR fallback (dark ratio below 0.78).
+stretched_bright_win = bytearray(win_raw)
+centre = (width - 1) / 2
+for y in range(height):
+    for x in range(width):
+        sx = min(width - 1, max(0, round(centre + (x - centre) / 1.25)))
+        j, k = (y * width + x) * 4, (y * width + sx) * 4
+        stretched_bright_win[j:j+4] = (bytes((128, 128, 128, 255)) if y < 8 else win_raw[k:k+4])
+stretched_bright_win = bytes(stretched_bright_win)
+assert hashlib.sha256(stretched_bright_win).hexdigest() == \
+    "3d2ae12231437b78b706458de9aba987a5c571b94c852c49025604e9491e8ba0"
+got, debug = classifier.classify_bgra(stretched_bright_win, width, height)
+assert got == NON_CLEAR and debug["reason"] == "phrase_unverified", (got, debug)
+assert debug["dark_ratio"] < 0.78, debug
+assert debug["win_final_grid_score"] < debug["win_cross_grid_score"], debug
+vetoed, win = (stretched_bright_win, width, height), (win_raw, width, height)
+# Tracker started while the banner is displayed: it must never count.
+assert accepted_in([vetoed] * 3 + [win] * 3) == []
+# The banner stays displayed after it was counted: it counts exactly once.
+assert accepted_in([normal] * 3 + [win] * 2 + [vetoed] * 16 + [win] * 2, armed_at=2) == ["win"]
+print("Lane B veto: a vetoed final never arms the detector or releases the post-result lock.")
 
 if failed:
     print("\nFAILED")
